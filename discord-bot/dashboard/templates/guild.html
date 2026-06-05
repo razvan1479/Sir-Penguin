@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Bun venit · {{ meta.get('name','Server') }}{% endblock %}
+
+{% block extra_style %}
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; align-items:start; }
+    @media (max-width:1200px){ .grid{ grid-template-columns:1fr; } }
+    .panel { background:var(--card); border-radius:14px; padding:22px; }
+    label { display:block; font-weight:600; margin:18px 0 8px; font-size:12px; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); }
+    label:first-of-type { margin-top:0; }
+    input[type=text], textarea, input[type=color] { width:100%; padding:11px; border-radius:8px; border:none; background:var(--input); color:var(--text); font-size:14px; font-family:inherit; }
+    textarea { min-height:90px; resize:vertical; }
+    input[type=color]{ height:44px; padding:4px; cursor:pointer; }
+    .toggle { display:flex; align-items:center; gap:10px; margin:14px 0; cursor:pointer; }
+    .toggle input { width:18px; height:18px; accent-color:var(--accent); }
+    .hint { color:var(--muted); font-size:12px; margin-top:6px; }
+    .hint code { background:var(--input); padding:2px 6px; border-radius:4px; }
+    button.save { background:var(--accent); color:#fff; border:none; padding:13px 26px; border-radius:8px; font-weight:600; cursor:pointer; font-size:15px; margin-top:22px; width:100%; }
+    .preview-title { font-size:12px; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); margin-bottom:14px; }
+    .embed { background:#313338; border-radius:6px; padding:12px 16px; border-left:4px solid var(--accent); position:relative; }
+    .embed-author { display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; margin-bottom:8px; }
+    .embed-author img { width:24px; height:24px; border-radius:50%; }
+    .embed-desc { font-size:14px; line-height:1.4; }
+    .embed-desc .mention, .mention { background:rgba(88,101,242,.3); color:#c9cdfb; border-radius:4px; padding:0 2px; }
+    .embed-thumb { width:60px; height:60px; border-radius:50%; position:absolute; top:12px; right:16px; object-fit:cover; background:#1e1f22; }
+    .embed-banner { width:100%; border-radius:4px; margin-top:10px; display:block; background:#1e1f22; aspect-ratio:5/2; object-fit:cover; }
+{% endblock %}
+
+{% block content %}
+  {% if saved %}<div class="saved">✓ Salvat! Botul foloseste deja noile setari.</div>{% endif %}
+  <div class="grid">
+    <form class="panel" method="POST">
+      <label class="toggle">
+        <input type="checkbox" name="enabled" id="enabled" {% if cfg.get('enabled') %}checked{% endif %}>
+        <span>Activeaza mesajul de bun venit</span>
+      </label>
+
+      <label>ID canal</label>
+      <input type="text" name="channel_id" id="channel_id" placeholder="ex: 123456789012345678" value="{{ cfg.get('channel_id', '') }}">
+      <p class="hint">Click dreapta pe canal → Copiaza ID canal (cu Mod Developer pornit).</p>
+
+      <label>Mesaj</label>
+      <textarea name="message" id="message" placeholder="Bun venit {user} pe {server}!">{{ cfg.get('message', '') }}</textarea>
+      <p class="hint">Placeholdere: <code>{user}</code> <code>{username}</code> <code>{server}</code> <code>{count}</code></p>
+
+      <label>Culoare embed</label>
+      <input type="color" name="color" id="color" value="{{ cfg.get('color', '#5865f2') }}">
+
+      <label class="toggle"><input type="checkbox" name="show_avatar" id="show_avatar" {% if cfg.get('show_avatar', True) %}checked{% endif %}><span>Arata poza de profil (avatar)</span></label>
+      <label class="toggle"><input type="checkbox" name="show_banner" id="show_banner" {% if cfg.get('show_banner', True) %}checked{% endif %}><span>Arata bannerul</span></label>
+      <label class="toggle"><input type="checkbox" name="show_inviter" id="show_inviter" {% if cfg.get('show_inviter', True) %}checked{% endif %}><span>Arata cine a invitat (necesita modulul invites)</span></label>
+
+      <button class="save" type="submit">💾 Salveaza</button>
+    </form>
+
+    <div class="panel">
+      <p class="preview-title">Previzualizare</p>
+      <div class="embed" id="embed">
+        <div class="embed-author">
+          <img src="https://cdn.discordapp.com/embed/avatars/0.png" alt="">
+          <span>NumeUtilizator a intrat!</span>
+        </div>
+        <img class="embed-thumb" id="pv-avatar" src="https://cdn.discordapp.com/embed/avatars/0.png" alt="">
+        <div class="embed-desc" id="pv-desc"></div>
+        <div id="pv-inviter" style="margin-top:8px; font-size:13px;">
+          <strong>📨 Invitat de</strong><br>
+          <span class="mention">@AltUtilizator</span> (acum are <strong>5</strong> invitatii)
+        </div>
+        <img class="embed-banner" id="pv-banner" src="https://singlecolorimage.com/get/5865f2/600x240" alt="">
+      </div>
+      <p class="hint" style="margin-top:14px">Previzualizarea e orientativa — pe server apar avatarul si bannerul real ale userului.</p>
+    </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const $ = id => document.getElementById(id);
+  function render() {
+    const msg = $('message').value || 'Bun venit {user} pe {server}!';
+    $('pv-desc').innerHTML = msg
+      .replaceAll('{user}', '<span class="mention">@NumeUtilizator</span>')
+      .replaceAll('{username}', 'NumeUtilizator')
+      .replaceAll('{server}', 'Serverul Tau')
+      .replaceAll('{count}', '128')
+      .replaceAll('\n', '<br>');
+    const color = $('color').value;
+    $('embed').style.borderLeftColor = color;
+    $('pv-banner').src = 'https://singlecolorimage.com/get/' + color.replace('#','') + '/600x240';
+    $('pv-avatar').style.display = $('show_avatar').checked ? 'block' : 'none';
+    $('pv-banner').style.display = $('show_banner').checked ? 'block' : 'none';
+    $('pv-inviter').style.display = $('show_inviter').checked ? 'block' : 'none';
+  }
+  ['message','color','show_avatar','show_banner','show_inviter'].forEach(id => {
+    $(id).addEventListener('input', render); $(id).addEventListener('change', render);
+  });
+  render();
+</script>
+{% endblock %}

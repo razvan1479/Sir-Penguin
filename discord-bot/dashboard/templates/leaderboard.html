@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Leaderboard · {{ meta.get('name','Server') }}{% endblock %}
+
+{% block extra_style %}
+    .tabs { display:flex; gap:8px; margin-bottom:18px; }
+    .tab { padding:10px 18px; border-radius:8px; background:var(--card); cursor:pointer; font-weight:600; font-size:14px; border:2px solid transparent; }
+    .tab.active { border-color:var(--accent); }
+    .board { display:none; }
+    .board.active { display:block; }
+    .panel { background:var(--card); border-radius:14px; padding:8px 0; }
+    .row { display:flex; align-items:center; gap:14px; padding:14px 20px; border-bottom:1px solid #3a3c41; }
+    .row:last-child { border-bottom:none; }
+    .rank { font-size:18px; font-weight:700; width:40px; text-align:center; }
+    .rank.top { color:var(--gold); }
+    .uid { flex:1; font-family:monospace; }
+    .count { font-weight:700; color:var(--gold); }
+    .empty { color:var(--muted); padding:24px 20px; }
+    .vanity { color:var(--muted); font-size:13px; margin-top:14px; }
+{% endblock %}
+
+{% block content %}
+  <div class="tabs">
+    <div class="tab active" data-b="all">Tot timpul</div>
+    <div class="tab" data-b="week">Saptamana</div>
+    <div class="tab" data-b="month">Luna</div>
+  </div>
+
+  {% macro board(rows, id, active, names) %}
+  <div class="board {{ 'active' if active }}" id="b-{{ id }}">
+    <div class="panel">
+      {% if rows %}
+        {% for uid, n in rows %}
+        <div class="row">
+          <span class="rank {{ 'top' if loop.index <= 3 }}">
+            {% if loop.index == 1 %}🥇{% elif loop.index == 2 %}🥈{% elif loop.index == 3 %}🥉{% else %}#{{ loop.index }}{% endif %}
+          </span>
+          <span class="uid">{{ names.get(uid, 'User ' + uid) }}</span>
+          <span class="count">{{ n }} invitatii</span>
+        </div>
+        {% endfor %}
+      {% else %}
+        <p class="empty">Niciun invitator in clasament inca. 📭</p>
+      {% endif %}
+    </div>
+  </div>
+  {% endmacro %}
+
+  {{ board(all_time, 'all', True, names) }}
+  {{ board(week, 'week', False, names) }}
+  {{ board(month, 'month', False, names) }}
+
+  {% if vanity %}<p class="vanity">+ {{ vanity }} intrari prin linkul personalizat al serverului (tot timpul)</p>{% endif %}
+  <p class="vanity">Numele apar ca ID fiindca dashboardul nu e inca logat prin Discord (OAuth). In Discord, comanda /leaderboard arata mention-uri.</p>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+    document.querySelectorAll('.board').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById('b-' + t.dataset.b).classList.add('active');
+  });
+</script>
+{% endblock %}

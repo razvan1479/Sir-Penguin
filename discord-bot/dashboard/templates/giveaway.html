@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Giveaway · {{ meta.get('name','Server') }}{% endblock %}
+
+{% block extra_style %}
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; align-items:start; }
+    @media (max-width:1200px){ .grid{ grid-template-columns:1fr; } }
+    .panel { background:var(--card); border-radius:14px; padding:22px; }
+    label { display:block; font-weight:600; margin:18px 0 8px; font-size:12px; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); }
+    label:first-of-type { margin-top:0; }
+    input[type=text], input[type=number], input[type=color] { width:100%; padding:11px; border-radius:8px; border:none; background:var(--input); color:var(--text); font-size:14px; font-family:inherit; }
+    input[type=color]{ height:44px; padding:4px; cursor:pointer; }
+    .two { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .toggle { display:flex; align-items:center; gap:10px; margin:16px 0 6px; cursor:pointer; }
+    .toggle input { width:18px; height:18px; accent-color:var(--accent); }
+    .hint { color:var(--muted); font-size:12px; margin-top:6px; }
+    .hint code { background:var(--input); padding:2px 6px; border-radius:4px; }
+    button.save { background:var(--accent); color:#fff; border:none; padding:13px 26px; border-radius:8px; font-weight:600; cursor:pointer; font-size:15px; margin-top:22px; width:100%; }
+    .preview-title { font-size:12px; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); margin-bottom:14px; }
+    .embed { background:#313338; border-radius:6px; padding:14px 16px; border-left:4px solid var(--accent); }
+    .e-title { color:#f2f3f5; font-size:16px; font-weight:600; margin-bottom:8px; }
+    .e-desc { color:#dbdee1; font-size:14px; line-height:1.5; }
+    .e-btn { margin-top:14px; display:inline-block; background:#248046; color:#fff; font-weight:600; font-size:14px; padding:9px 16px; border-radius:8px; }
+    .cmd { color:var(--muted); font-size:13px; margin-top:14px; }
+    .cmd code { background:var(--input); padding:2px 6px; border-radius:4px; color:#dbdee1; }
+    #interval-wrap { display:none; }
+{% endblock %}
+
+{% block content %}
+  {% if saved %}<div class="saved">✓ Salvat! Botul foloseste deja noua configurare.</div>{% endif %}
+  {% if active_count %}<p class="cmd" style="margin-bottom:14px">🎁 Giveaway-uri active acum: <strong>{{ active_count }}</strong></p>{% endif %}
+
+  <div class="grid">
+    <!-- FORMULAR -->
+    <form class="panel" method="POST">
+      <label>ID canal (unde se posteaza)</label>
+      <input type="text" name="channel_id" id="channel_id" placeholder="ex: 123456789012345678" value="{{ cfg.get('channel_id','') }}">
+      <p class="hint">Click dreapta pe canal → Copiaza ID canal.</p>
+
+      <label>Premiu</label>
+      <input type="text" name="prize" id="prize" placeholder="ex: Discord Nitro" value="{{ cfg.get('prize','') }}">
+
+      <label>ID rol necesar (optional)</label>
+      <input type="text" name="required_role_id" id="required_role_id" placeholder="gol = poate participa toata lumea" value="{{ cfg.get('required_role_id','') }}">
+      <p class="hint">Doar membrii cu acest rol pot intra. Setari server → Roluri → click dreapta pe rol → Copiaza ID. Daca e setat, anuntul da ping pe rol in loc de @everyone.</p>
+
+      <div class="two">
+        <div>
+          <label>Durata (minute)</label>
+          <input type="number" name="duration_minutes" id="duration_minutes" min="1" value="{{ cfg.get('duration_minutes', 60) }}">
+        </div>
+        <div>
+          <label>Castigatori</label>
+          <input type="number" name="winners" id="winners" min="1" value="{{ cfg.get('winners', 1) }}">
+        </div>
+      </div>
+
+      <label>Titlu</label>
+      <input type="text" name="title" id="title" value="{{ cfg.get('title','🎉 GIVEAWAY 🎉') }}">
+
+      <label>Text buton</label>
+      <input type="text" name="button_label" id="button_label" value="{{ cfg.get('button_label','🎉 Particip') }}">
+
+      <label>Culoare</label>
+      <input type="color" name="color" id="color" value="{{ cfg.get('color','#5865f2') }}">
+
+      <label class="toggle">
+        <input type="checkbox" name="ping_everyone" id="ping_everyone" {% if cfg.get('ping_everyone', True) %}checked{% endif %}>
+        <span>Anunta la postare (@everyone, sau rolul setat)</span>
+      </label>
+
+      <label class="toggle">
+        <input type="checkbox" name="recurring" id="recurring" {% if cfg.get('recurring') %}checked{% endif %}>
+        <span>Postare automata la interval (giveaway recurent)</span>
+      </label>
+      <div id="interval-wrap">
+        <label>Interval intre postari (ore)</label>
+        <input type="number" name="interval_hours" id="interval_hours" min="1" value="{{ cfg.get('interval_hours', 24) }}">
+        <p class="hint">Botul posteaza singur un giveaway nou la fiecare atatea ore.</p>
+      </div>
+
+      <button class="save" type="submit">💾 Salveaza</button>
+    </form>
+
+    <!-- PREVIEW -->
+    <div class="panel">
+      <p class="preview-title">Previzualizare</p>
+      <div id="pv-everyone" style="color:#5865f2;font-weight:600;font-size:14px;margin-bottom:6px;">@everyone</div>
+      <div class="embed" id="embed">
+        <div class="e-title" id="pv-title"></div>
+        <div class="e-desc" id="pv-desc"></div>
+        <span class="e-btn" id="pv-btn"></span>
+        <div style="color:#949ba4;font-size:12px;margin-top:12px;">👥 0 participanti</div>
+      </div>
+      <p class="cmd">Posteaza manual oricand cu <code>/giveaway start</code>. La final, botul alege singur castigatorii. Reroll: <code>/giveaway reroll &lt;message_id&gt;</code></p>
+    </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const $ = id => document.getElementById(id);
+  function render(){
+    $('embed').style.borderLeftColor = $('color').value;
+    $('pv-title').textContent = $('title').value || '🎉 GIVEAWAY 🎉';
+    const prize = $('prize').value || 'Premiu';
+    const win = $('winners').value || 1;
+    const dur = $('duration_minutes').value || 60;
+    const role = $('required_role_id').value.trim();
+    let desc = '<strong>Premiu:</strong> ' + prize +
+      '<br><strong>Castigatori:</strong> ' + win +
+      '<br><strong>Se termina:</strong> in ' + dur + ' minute';
+    if (role) desc += '<br><strong>Doar pentru:</strong> <span style="color:#c9cdfb">@rolul setat</span>';
+    desc += '<br><br>Apasa butonul de mai jos ca sa participi!';
+    $('pv-desc').innerHTML = desc;
+    $('pv-btn').textContent = $('button_label').value || '🎉 Particip';
+    $('interval-wrap').style.display = $('recurring').checked ? 'block' : 'none';
+    $('pv-everyone').style.display = $('ping_everyone').checked ? 'block' : 'none';
+    $('pv-everyone').textContent = role ? '@rolul setat' : '@everyone';
+  }
+  ['title','prize','winners','duration_minutes','button_label','color','recurring','ping_everyone','required_role_id'].forEach(id => {
+    $(id).addEventListener('input', render); $(id).addEventListener('change', render);
+  });
+  render();
+</script>
+{% endblock %}

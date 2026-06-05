@@ -1,0 +1,204 @@
+{
+  "1487297320805728429": {
+    "welcome": {
+      "enabled": true,
+      "channel_id": 1487297322512814214,
+      "message": "",
+      "show_avatar": true,
+      "show_banner": true,
+      "show_inviter": false,
+      "color": "#59f3f0"
+    },
+    "invites": {
+      "members": {
+        "1414994207046897837": {
+          "regular": 0,
+          "left": 0,
+          "fake": 0,
+          "bonus": 10000
+        }
+      },
+      "joined_by": {
+        "1492668651801940231": {
+          "inviter": "unknown",
+          "code": null,
+          "fake": false
+        }
+      },
+      "history": [
+        {
+          "member": "432610292342587392",
+          "inviter": "unknown",
+          "ts": 1780553245.193464,
+          "fake": false,
+          "left": true
+        },
+        {
+          "member": "432610292342587392",
+          "inviter": "unknown",
+          "ts": 1780553401.3307414,
+          "fake": false,
+          "left": true
+        },
+        {
+          "member": "1492668651801940231",
+          "inviter": "unknown",
+          "ts": 1780577829.016455,
+          "fake": false,
+          "left": false
+        }
+      ]
+    },
+    "meta": {
+      "name": "Prezentare Server Discord Metin2",
+      "icon": "https://cdn.discordapp.com/icons/1487297320805728429/2c3cc2414d950a30a363f264c1627796.png?size=1024",
+      "members": 14,
+      "updated": 1780636066.7409182
+    },
+    "embeds": {
+      "iDeaL": {
+        "title": "GG",
+        "description": "# 📜 Regulament General\r\n\r\n## 1. Dispoziții Generale\r\n• Regulile pot fi modificate oricând.\r\n• Contul implică acceptarea regulamentului.\r\n\r\n## 2. Respect și Comportament\r\n• Respect obligatoriu între membri.\r\n• Insultele și hărțuirea sunt interzise.\r\n\r\n  3. Chat și Comunicare\r\n• Spam-ul este interzis.\r\n• Reclama fără aprobare este interzisă.",
+        "color": "#1abc9c",
+        "image": "",
+        "thumbnail": "",
+        "footer": ""
+      }
+    },
+    "giveaways": {
+      "config": {
+        "channel_id": 1487572971508727908,
+        "prize": "Cont PVP",
+        "duration_minutes": 1,
+        "winners": 1,
+        "button_label": "🎉 Particip",
+        "title": "🎉 GIVEAWAY 🎉",
+        "color": "#5865f2",
+        "recurring": false,
+        "interval_hours": 24,
+        "ping_everyone": true,
+        "required_role_id": null
+      },
+      "next_post_ts": null,
+      "active": {},
+      "ended": {
+        "1512050460473819146": {
+          "channel_id": 1487572971508727908,
+          "prize": "Cont PVP",
+          "end_ts": 1780571381,
+          "winners": 1,
+          "participants": [
+            1493163753447882894
+          ]
+        },
+        "1512053104068268052": {
+          "channel_id": 1487572971508727908,
+          "prize": "Cont PVP",
+          "end_ts": 1780572012,
+          "winners": 1,
+          "participants": [],
+          "required_role_id": 1487568658354929694
+        },
+        "1512053386168766505": {
+          "channel_id": 1487572971508727908,
+          "prize": "Cont PVP",
+          "end_ts": 1780572079,
+          "winners": 1,
+          "participants": [
+            1493163753447882894
+          ],
+          "required_role_id": null
+        },
+        "1512055366547013832": {
+          "channel_id": 1487572971508727908,
+          "prize": "Cont PVP",
+          "end_ts": 1780572551,
+          "winners": 1,
+          "participants": [
+            1493163753447882894
+          ],
+          "required_role_id": null
+        },
+        "1512055516493385749": {
+          "channel_id": 1487572971508727908,
+          "prize": "Cont PVP",
+          "end_ts": 1780572587,
+          "winners": 1,
+          "participants": [
+            1493163753447882894
+          ],
+          "required_role_id": null
+        },
+        "1512057403108229313": {
+          "channel_id": 1487572971508727908,
+          "prize": "Cont PVP",
+          "end_ts": 1780573037,
+          "winners": 1,
+          "participants": [
+            1493163753447882894
+          ],
+          "required_role_id": null
+        },
+        "1512085401672614008": {
+          "channel_id": 1487572971508727908,
+          "prize": "Cont PVP",
+          "end_ts": 1780579712,
+          "winners": 1,
+          "participants": [
+            1493163753447882894
+          ],
+          "required_role_id": null
+        }
+      }
+    }
+  },
+  "1417183978095378604": {
+    "meta": {
+      "name": "root",
+      "icon": "https://cdn.discordapp.com/icons/1417183978095378604/89e44c263b483e40bbc70b64f7b3d9ed.png?size=1024",
+      "members": 3,
+      "updated": 1780636066.7384102
+    },
+    "welcome": {
+      "enabled": true,
+      "channel_id": 1417183978661871879,
+      "message": "",
+      "show_avatar": true,
+      "show_banner": true,
+      "show_inviter": true,
+      "color": "#5865f2"
+    },
+    "invites": {
+      "joined_by": {
+        "944016826751389717": {
+          "inviter": "unknown",
+          "code": null,
+          "fake": false
+        }
+      },
+      "members": {},
+      "history": [
+        {
+          "member": "944016826751389717",
+          "inviter": "unknown",
+          "ts": 1780567540.491431,
+          "fake": false,
+          "left": false
+        }
+      ]
+    },
+    "embeds": {
+      "iDeaL": {
+        "title": "ee",
+        "description": "ee",
+        "color": "#1abc9c",
+        "image": "",
+        "thumbnail": "",
+        "footer": ""
+      }
+    }
+  },
+  "_global": {
+    "cmd_sig": "addinvites,avatar,banner,embed,embed delete,embed list,embed preview,embed send,findlink,giveaway,giveaway end,giveaway reroll,giveaway start,invitecodes,invitedlist,inviter,invites,leaderboard,notify,notify list,notify test,removeinvites,resetinvites,welcome,welcome channel,welcome test"
+  }
+}
