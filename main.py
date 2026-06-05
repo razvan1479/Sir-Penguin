@@ -59,43 +59,58 @@ class MyBot(commands.Bot):
         await self._auto_sync()
 
     async def _auto_sync(self):
-        # Sincronizeaza comenzile slash AUTOMAT, instant pe fiecare server,
-        # dar doar daca s-au schimbat fata de ultima pornire (altfel lovim
-        # degeaba limitele Discord). Nu trebuie sa rulezi nimic manual.
+        # Sincronizeaza comenzile slash AUTOMAT pe fiecare server.
+        # Tine minte PE CE SERVERE a sincronizat deja (synced_guilds), ca sa
+        # prinda automat orice server nou — chiar daca botul era oprit cand a
+        # fost adaugat. Nu trebuie sa repornesti niciodata manual.
         if getattr(self, "_did_sync", False):
             return
         self._did_sync = True
 
         sig = ",".join(sorted(c.qualified_name for c in self.tree.walk_commands()))
-        if storage.get("_global", "cmd_sig", None) == sig:
-            log.info("Comenzile nu s-au schimbat — nu mai sincronizez.")
-            return
+        saved_sig = storage.get("_global", "cmd_sig", None)
+        synced = set(storage.get("_global", "synced_guilds", []) or [])
 
-        # Stergem comenzile globale vechi (daca s-a facut candva sync global),
-        # ca sa nu apara dublate alaturi de cele sincronizate pe server.
-        try:
-            await self.http.bulk_upsert_global_commands(self.application_id, [])
-        except Exception:
-            pass
+        if sig != saved_sig:
+            # comenzile s-au schimbat -> resincronizam TOATE serverele
+            try:
+                await self.http.bulk_upsert_global_commands(self.application_id, [])
+            except Exception:
+                pass
+            to_sync = list(self.guilds)
+            synced = set()
+        else:
+            # comenzile la fel -> sincronizam doar serverele NOI
+            to_sync = [g for g in self.guilds if str(g.id) not in synced]
+            if not to_sync:
+                log.info("Comenzile sunt deja sincronizate pe toate serverele.")
+                return
 
         total = 0
-        for g in self.guilds:
+        for g in to_sync:
             try:
                 self.tree.copy_global_to(guild=g)
-                synced = await self.tree.sync(guild=g)
-                total += len(synced)
+                res = await self.tree.sync(guild=g)
+                total += len(res)
+                synced.add(str(g.id))
             except discord.HTTPException as e:
                 log.warning("Sync esuat pe %s: %s", g.id, e)
+
         storage.set("_global", "cmd_sig", sig)
-        log.info("Auto-sincronizat %d comenzi pe %d servere.", total, len(self.guilds))
+        storage.set("_global", "synced_guilds", sorted(synced))
+        log.info("Auto-sincronizat %d comenzi pe %d servere.", total, len(to_sync))
 
     async def on_guild_join(self, guild):
-        # server nou -> ii sincronizam comenzile instant
+        # server nou (cat botul e pornit) -> ii sincronizam comenzile instant
         try:
             self.tree.copy_global_to(guild=guild)
             await self.tree.sync(guild=guild)
-        except discord.HTTPException:
-            pass
+            synced = set(storage.get("_global", "synced_guilds", []) or [])
+            synced.add(str(guild.id))
+            storage.set("_global", "synced_guilds", sorted(synced))
+            log.info("Server nou %s — comenzi sincronizate instant.", guild.id)
+        except discord.HTTPException as e:
+            log.warning("Sync esuat la intrare pe %s: %s", guild.id, e)
 
 
 async def main():
