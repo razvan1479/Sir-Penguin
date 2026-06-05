@@ -54,6 +54,7 @@
       <a class="nav {% if section=='giveaway' %}active{% endif %}" href="/giveaway/{{ guild_id }}"><span class="ic">🎁</span> Giveaway</a>
       <a class="nav {% if section=='notifications' %}active{% endif %}" href="/notifications/{{ guild_id }}"><span class="ic">🔔</span> Notificari</a>
       <a class="nav {% if section=='rankup' %}active{% endif %}" href="/rankup/{{ guild_id }}"><span class="ic">⏫</span> Rank-uri auto</a>
+      <a class="nav {% if section=='game' %}active{% endif %}" href="/game/{{ guild_id }}"><span class="ic">🎲</span> Joc numere</a>
     </aside>
 
     <main>{% block content %}{% endblock %}</main>

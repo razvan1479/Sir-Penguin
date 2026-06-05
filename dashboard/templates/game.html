@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Joc numere · {{ meta.get('name','Server') }}{% endblock %}
+
+{% block extra_style %}
+    .panel { background:var(--card); border-radius:14px; padding:22px; max-width:620px; }
+    label { display:block; font-weight:600; margin:18px 0 8px; font-size:12px; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); }
+    label:first-of-type { margin-top:0; }
+    input[type=text], input[type=number] { width:100%; padding:11px; border-radius:8px; border:none; background:var(--input); color:var(--text); font-size:14px; font-family:inherit; }
+    .toggle { display:flex; align-items:center; gap:10px; margin:4px 0 8px; cursor:pointer; }
+    .toggle input { width:18px; height:18px; accent-color:var(--accent); }
+    .hint { color:var(--muted); font-size:12px; margin-top:6px; }
+    .hint code { background:var(--input); padding:2px 6px; border-radius:4px; }
+    .row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; }
+    @media (max-width:600px){ .row{ grid-template-columns:1fr; } }
+    button.save { background:var(--accent); color:#fff; border:none; padding:13px 26px; border-radius:8px; font-weight:600; cursor:pointer; font-size:15px; margin-top:24px; width:100%; }
+    .sep { height:1px; background:var(--input); margin:22px 0; border:none; }
+    .how { background:var(--input); border-radius:10px; padding:14px 16px; font-size:13px; line-height:1.7; color:var(--muted); margin-top:16px; }
+    .how code { background:var(--card); padding:2px 6px; border-radius:4px; color:var(--text); }
+{% endblock %}
+
+{% block content %}
+  {% if saved %}<div class="saved">✓ Salvat! Botul foloseste deja noile setari.</div>{% endif %}
+
+  <form class="panel" method="POST">
+    <label class="toggle">
+      <input type="checkbox" name="enabled" {% if cfg.get('enabled') %}checked{% endif %}>
+      <span>Activeaza jocul</span>
+    </label>
+
+    <label>ID canal joc</label>
+    <input type="text" name="channel_id" value="{{ cfg.get('channel_id', '') if cfg.get('channel_id') is not none else '' }}" placeholder="ex: 123456789012345678">
+    <p class="hint">Jocul merge doar pe acest canal. Click dreapta pe canal → Copiaza ID canal.</p>
+
+    <hr class="sep">
+    <div class="row">
+      <div>
+        <label>Numar minim</label>
+        <input type="number" name="min" value="{{ cfg.get('min', 0) }}">
+      </div>
+      <div>
+        <label>Numar maxim</label>
+        <input type="number" name="max" value="{{ cfg.get('max', 100) }}">
+      </div>
+      <div>
+        <label>Countdown (sec)</label>
+        <input type="number" name="countdown" value="{{ cfg.get('countdown', 60) }}">
+      </div>
+    </div>
+
+    <div class="how">
+      <b>Cum se joaca:</b><br>
+      1. Un admin scrie <code>/randome</code> → apare panoul cu butoane.<br>
+      2. Admin apasa <b>▶️ Start</b> → incepe countdown-ul.<br>
+      3. Jucatorii aleg privat cu <code>/alege &lt;numar&gt;</code> (o data fiecare).<br>
+      4. La final, botul scoate un numar random — castiga cine s-a apropiat cel mai mult.<br>
+      Butoanele <b>Stop</b> (incheie acum) si <b>Reset</b> (curata) sunt doar pentru admini.
+    </div>
+
+    <button class="save" type="submit">Salveaza</button>
+  </form>
+{% endblock %}

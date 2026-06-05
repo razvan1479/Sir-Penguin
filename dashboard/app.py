@@ -417,5 +417,25 @@ def rankup(guild_id):
                            section="rankup", saved=request.args.get("saved"))
 
 
+@app.route("/game/<guild_id>", methods=["GET", "POST"])
+@guild_required
+def game(guild_id):
+    if request.method == "POST":
+        cfg = {
+            "enabled": request.form.get("enabled") == "on",
+            "channel_id": _to_int(request.form.get("channel_id", "")),
+            "countdown": _to_int(request.form.get("countdown", "60")) or 60,
+            "min": _to_int(request.form.get("min", "0")) or 0,
+            "max": _to_int(request.form.get("max", "100")) or 100,
+        }
+        storage.set(int(guild_id), "game", cfg)
+        return redirect(url_for("game", guild_id=guild_id, saved=1))
+
+    cfg = storage.get(int(guild_id), "game", {})
+    return render_template("game.html", guild_id=guild_id, cfg=cfg,
+                           meta=storage.get(int(guild_id), "meta", {}),
+                           section="game", saved=request.args.get("saved"))
+
+
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
