@@ -391,5 +391,31 @@ def notifications(guild_id):
                            section="notifications", saved=request.args.get("saved"))
 
 
+@app.route("/rankup/<guild_id>", methods=["GET", "POST"])
+@guild_required
+def rankup(guild_id):
+    if request.method == "POST":
+        ranks_raw = request.form.get("ranks", "")
+        ranks = [r.strip() for r in ranks_raw.split(",") if r.strip()]
+        cfg = {
+            "enabled": request.form.get("enabled") == "on",
+            "log_channel_id": _to_int(request.form.get("log_channel_id", "")),
+            "ranks": ranks or ["🫡", "⭐", "⭐⭐", "⭐⭐⭐", "⚡", "⚡⚡", "⚡⚡⚡", "✨"],
+            "first_role_id": _to_int(request.form.get("first_role_id", "")),
+            "ultimate_role_id": _to_int(request.form.get("ultimate_role_id", "")),
+            "ultimate_rank_index": _to_int(request.form.get("ultimate_rank_index", "4")) or 4,
+            "min_days": _to_int(request.form.get("min_days", "30")) or 30,
+            "first_star_days": _to_int(request.form.get("first_star_days", "180")) or 180,
+            "interval_months": _to_int(request.form.get("interval_months", "6")) or 6,
+        }
+        storage.set(int(guild_id), "rankup", cfg)
+        return redirect(url_for("rankup", guild_id=guild_id, saved=1))
+
+    cfg = storage.get(int(guild_id), "rankup", {})
+    return render_template("rankup.html", guild_id=guild_id, cfg=cfg,
+                           meta=storage.get(int(guild_id), "meta", {}),
+                           section="rankup", saved=request.args.get("saved"))
+
+
 if __name__ == "__main__":
     app.run(debug=True, port=5000)

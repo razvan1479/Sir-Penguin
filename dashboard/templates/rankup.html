@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Rank-uri auto · {{ meta.get('name','Server') }}{% endblock %}
+
+{% block extra_style %}
+    .panel { background:var(--card); border-radius:14px; padding:22px; max-width:680px; }
+    label { display:block; font-weight:600; margin:18px 0 8px; font-size:12px; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); }
+    label:first-of-type { margin-top:0; }
+    input[type=text], input[type=number] { width:100%; padding:11px; border-radius:8px; border:none; background:var(--input); color:var(--text); font-size:14px; font-family:inherit; }
+    .toggle { display:flex; align-items:center; gap:10px; margin:4px 0 8px; cursor:pointer; }
+    .toggle input { width:18px; height:18px; accent-color:var(--accent); }
+    .hint { color:var(--muted); font-size:12px; margin-top:6px; }
+    .hint code { background:var(--input); padding:2px 6px; border-radius:4px; }
+    .row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; }
+    @media (max-width:700px){ .row{ grid-template-columns:1fr; } }
+    button.save { background:var(--accent); color:#fff; border:none; padding:13px 26px; border-radius:8px; font-weight:600; cursor:pointer; font-size:15px; margin-top:24px; width:100%; }
+    .sep { height:1px; background:var(--input); margin:22px 0; border:none; }
+    .group-title { font-size:13px; font-weight:700; color:var(--text); margin-bottom:4px; }
+{% endblock %}
+
+{% block content %}
+  {% if saved %}<div class="saved">✓ Salvat! Botul foloseste deja noile setari.</div>{% endif %}
+
+  <form class="panel" method="POST">
+    <label class="toggle">
+      <input type="checkbox" name="enabled" {% if cfg.get('enabled') %}checked{% endif %}>
+      <span>Activeaza rank-urile automate</span>
+    </label>
+    <p class="hint">Botul verifica la fiecare 24h (si la pornire). Poti rula si manual cu <code>/rankup run</code>.</p>
+
+    <hr class="sep">
+    <div class="group-title">🏷️ Ranguri (emoji)</div>
+    <label>Lista de ranguri, separate prin virgula</label>
+    <input type="text" name="ranks" value="{{ (cfg.get('ranks') or ['🫡','⭐','⭐⭐','⭐⭐⭐','⚡','⚡⚡','⚡⚡⚡','✨'])|join(', ') }}">
+    <p class="hint">In ordine, de la cel mai mic la cel mai mare. Se adauga la finalul nickname-ului.</p>
+
+    <hr class="sep">
+    <div class="group-title">⏱️ Vechime</div>
+    <div class="row">
+      <div>
+        <label>Primul rang dupa (zile)</label>
+        <input type="number" name="min_days" value="{{ cfg.get('min_days', 30) }}">
+      </div>
+      <div>
+        <label>Urcare la rang 2 dupa (zile)</label>
+        <input type="number" name="first_star_days" value="{{ cfg.get('first_star_days', 180) }}">
+      </div>
+      <div>
+        <label>Apoi, la fiecare (luni)</label>
+        <input type="number" name="interval_months" value="{{ cfg.get('interval_months', 6) }}">
+      </div>
+    </div>
+    <p class="hint">Sub primul prag = niciun rang. Intre praguri = primul rang. Apoi avanseaza cu cate un rang la intervalul setat.</p>
+
+    <hr class="sep">
+    <div class="group-title">🎭 Roluri</div>
+    <label>ID rol primar (ranguri mici)</label>
+    <input type="text" name="first_role_id" value="{{ cfg.get('first_role_id', '') if cfg.get('first_role_id') is not none else '' }}" placeholder="ex: 123456789012345678">
+    <label>ID rol veteran (ranguri mari)</label>
+    <input type="text" name="ultimate_role_id" value="{{ cfg.get('ultimate_role_id', '') if cfg.get('ultimate_role_id') is not none else '' }}" placeholder="ex: 123456789012345678">
+    <label>De la al catelea rang se da rolul veteran (index)</label>
+    <input type="number" name="ultimate_rank_index" value="{{ cfg.get('ultimate_rank_index', 4) }}">
+    <p class="hint">Index incepe de la 0. Cu rangurile implicite, <code>4</code> = de la ⚡ in sus primesc rolul veteran, iar sub el primesc rolul primar. Lasa gol ID-urile daca nu vrei roluri.</p>
+
+    <hr class="sep">
+    <div class="group-title">📋 Logare</div>
+    <label>ID canal pentru loguri</label>
+    <input type="text" name="log_channel_id" value="{{ cfg.get('log_channel_id', '') if cfg.get('log_channel_id') is not none else '' }}" placeholder="ex: 123456789012345678">
+    <p class="hint">Aici se anunta schimbarile de rank/rol. Lasa gol daca nu vrei loguri.</p>
+
+    <button class="save" type="submit">Salveaza</button>
+  </form>
+{% endblock %}

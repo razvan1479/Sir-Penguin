@@ -1,109 +1,253 @@
-# 🤖 Bot Discord Modular — Welcome + Invitatii
+# 🤖 Sir-Penguin — Bot de Discord modular + Dashboard
 
-Bot Discord structurat pe module (Cogs). Momentan are:
-- **Welcome** — mesaj de bun venit cu avatar, banner si cine a invitat membrul
-- **Invitatii** — sistem complet de tip „Invite Tracker” cu leaderboard pe perioade
-- **Dashboard web** — configurare welcome + vizualizare leaderboard
+Bot de Discord cu mai multe module independente și un panou web (dashboard) de unde
+configurezi totul, cu login prin Discord. Fiecare funcție e un modul separat (un „cog"),
+deci poți adăuga sau modifica funcții fără să strici restul.
 
-## 📁 Structura
+## ✨ Ce știe să facă
+
+- **Bun venit** — mesaj de întâmpinare cu avatar, banner și cine a invitat membrul
+- **Invitații** — sistem complet de tip „invite tracker" cu leaderboard pe perioade
+- **Embed builder** — creezi mesaje frumoase (regulament, anunțuri) și le postezi
+- **Giveaway** — concursuri cu buton de înscriere, counter live, recurență, restricție pe rol
+- **Notificări** — anunță când un creator postează/intră live pe YouTube, Twitch, Kick, TikTok
+- **Avatar & Banner** — afișează avatarul/bannerul oricui, cu linkuri de descărcare
+- **Dashboard web** — configurezi tot din browser, cu login prin contul tău de Discord
+
+---
+
+## 🚀 Instalare și pornire
+
+### 1. Pregătește botul pe Discord
+1. Intră pe https://discord.com/developers/applications și creează o aplicație.
+2. La **Bot**, activează *Privileged Gateway Intents*: **SERVER MEMBERS INTENT** și **MESSAGE CONTENT INTENT**.
+3. Copiază tokenul botului (Reset Token).
+4. Când inviți botul pe server, dă-i permisiunea **Manage Server** (necesară pentru invitații)
+   și permisiunea de a trimite mesaje/embed-uri.
+
+### 2. Configurează fișierul `.env`
+Creează un fișier `.env` în folderul proiectului:
+
+```
+DISCORD_TOKEN=tokenul_botului
+
+# Pentru dashboard (login cu Discord)
+DISCORD_CLIENT_ID=id_aplicatie
+DISCORD_CLIENT_SECRET=secret_oauth2
+DISCORD_REDIRECT_URI=http://localhost:5000/callback
+FLASK_SECRET=orice_text_random_lung
+
+# Opțional — pentru notificările Twitch (gratuit de pe dev.twitch.tv/console)
+TWITCH_CLIENT_ID=
+TWITCH_CLIENT_SECRET=
+```
+
+> `.env` NU se urcă pe GitHub (e în `.gitignore`). Pe un server de hosting,
+> pui aceste valori în variabilele de mediu ale platformei.
+
+### 3. Instalează dependențele
+```
+pip install -r requirements.txt
+```
+
+### 4. Pornește
+Cel mai simplu — botul și dashboardul deodată:
+```
+python run.py
+```
+Sau separat, în două terminale:
+```
+python main.py            # botul
+python dashboard/app.py   # dashboardul -> http://localhost:5000
+```
+
+Comenzile slash se sincronizează **automat** la pornire (și se re-sincronizează singure
+doar când adaugi/modifici comenzi). Nu trebuie să rulezi nimic manual.
+
+---
+
+## 📁 Structura proiectului
 
 ```
 discord-bot/
-├── main.py                 # porneste botul + incarca automat tot din cogs/
-├── .env                    # tokenul (secret!)
+├── main.py              # pornește botul + încarcă automat tot din cogs/
+├── run.py               # pornește bot + dashboard împreună
+├── .env                 # tokenul și secretele (nu se urcă pe GitHub)
 ├── requirements.txt
-├── cogs/                   # fiecare modul = un fisier independent
+├── cogs/                # fiecare modul = un fișier independent
 │   ├── welcome.py
-│   └── invites.py
+│   ├── invites.py
+│   ├── embeds.py
+│   ├── giveaway.py
+│   ├── notifications.py
+│   ├── avatar.py
+│   └── dashboard_sync.py
 ├── utils/
-│   └── storage.py          # depozit comun de date (bot + dashboard)
+│   └── storage.py       # depozit comun de date (bot + dashboard)
 ├── data/
-│   └── store.json          # se creeaza automat; aici se salveaza tot
+│   └── store.json       # se creează automat; aici se salvează totul
 └── dashboard/
-    ├── app.py
-    └── templates/          # index, guild (setari), leaderboard
+    ├── app.py           # serverul web (Flask) + login OAuth2
+    └── templates/       # paginile dashboardului
 ```
 
-## 🚀 Pornire
+---
 
-1. Creeaza botul pe https://discord.com/developers/applications
-2. La **Bot → Privileged Gateway Intents**, activeaza **SERVER MEMBERS** si **MESSAGE CONTENT**.
-3. La invitarea botului pe server, da-i permisiunea **Manage Server** (obligatoriu pentru invitatii!).
-4. Pune tokenul real in `.env`.
-5. Instaleaza: `pip install -r requirements.txt`
-6. Porneste botul: `python main.py`
-7. (Optional) Dashboard, in alt terminal: `python dashboard/app.py` → http://localhost:5000
+## 💬 Comenzile, pe module
 
-## 💬 Comenzi
+> Comenzile marcate cu 🔒 cer permisiunea **Manage Server** (sau Admin).
 
-### Welcome
-| Comanda | Ce face |
+### 👋 Bun venit
+Trimite un embed când intră cineva pe server: mesaj configurabil, avatarul (thumbnail),
+bannerul (imaginea mare) și opțional cine l-a invitat. Se configurează din dashboard.
+
+| Comandă | Ce face |
 |---|---|
-| `/welcome test` | Trimite un mesaj de test |
-| `/welcome channel <canal>` | Seteaza rapid canalul de bun venit |
+| `/welcome test` 🔒 | Trimite un mesaj de bun venit de test |
+| `/welcome channel <canal>` 🔒 | Setează rapid canalul de bun venit |
 
-(Configurarea completa — mesaj, culoare, avatar, banner, invitator — se face din dashboard.)
+Mesajul acceptă placeholdere: `{user}` (mention), `{username}`, `{server}`, `{count}` (nr. membri).
 
-### Invitatii — user
-| Comanda | Ce face |
-|---|---|
-| `/invites [membru]` | Numarul + detalierea (reale / plecate / false / bonus) |
-| `/inviter <membru>` | Cine a invitat membrul respectiv |
-| `/invitedlist [membru]` | Lista celor invitati de cineva |
-| `/invitecodes [membru]` | Codurile de invitatie + folosiri |
-| `/findlink` | Unul dintre linkurile tale de invitatie |
-| `/leaderboard [perioada] [rol]` | Clasament: **tot timpul / saptamana / luna**, optional filtrat pe rol |
-
-### Invitatii — admin
-| Comanda | Ce face |
-|---|---|
-| `/addinvites <membru> <numar>` | Adauga invitatii bonus |
-| `/removeinvites <membru> <numar>` | Scade invitatii bonus |
-| `/resetinvites [membru]` | Reseteaza tot serverul sau un singur membru |
-
-## 🧮 Cum se numara invitatiile
-
-Categorii (ca la Invite Tracker):
-- ✅ **Reale** — au intrat prin tine si sunt inca pe server
-- ❌ **Plecate** — au intrat prin tine dar au plecat
-- 🚫 **False** — cont prea nou (sub 7 zile) — anti-trisare
-- 🎁 **Bonus** — adaugate manual de admin
+### 📨 Invitații
+Urmărește cine pe cine invită, prin compararea folosirilor invitațiilor. Distinge între
+invitație **personală**, **link personalizat al serverului (vanity)** și **necunoscut**.
+Invitațiile se împart pe categorii:
+- **Reale** — au intrat și au rămas
+- **Plecate** — au intrat dar au plecat
+- **False** — conturi prea noi (sub 7 zile), anti-trișare
+- **Bonus** — adăugate manual de admin
 
 **Total = reale + bonus − plecate − false**
 
-Leaderboardul pe **saptamana / luna** numara doar intrarile reale (non-false, care nu au plecat)
-din ultimele 7 / 30 zile, folosind istoricul cu data salvat la fiecare intrare.
+| Comandă | Ce face |
+|---|---|
+| `/invites [membru]` | Numărul și detalierea invitațiilor cuiva |
+| `/inviter <membru>` | Cine a invitat membrul respectiv |
+| `/invitedlist [membru]` | Lista celor invitați de cineva |
+| `/invitecodes [membru]` | Codurile de invitație + folosiri |
+| `/findlink` | Unul dintre linkurile tale de invitație |
+| `/leaderboard [perioadă] [rol]` | Clasament: tot timpul / săptămână / lună, opțional filtrat pe rol |
+| `/addinvites <membru> <număr>` 🔒 | Adaugă invitații bonus |
+| `/removeinvites <membru> <număr>` 🔒 | Scade invitații bonus |
+| `/resetinvites [membru]` 🔒 | Resetează tot serverul sau un singur membru |
+
+> Necesită permisiunea **Manage Server** pe bot ca să poată citi invitațiile.
+
+### 🧩 Embed builder
+Creezi embed-uri custom în dashboard (titlu, text cu markdown, imagine/gif, footer, culoare),
+le dai un nume, apoi le postezi. Util pentru regulament, anunțuri, info.
+
+| Comandă | Ce face |
+|---|---|
+| `/embed send <nume> [canal]` 🔒 | Postează un embed salvat pe server |
+| `/embed preview <nume>` 🔒 | Îl vezi doar tu, fără să-l postezi |
+| `/embed list` | Lista embed-urilor salvate |
+| `/embed delete <nume>` 🔒 | Șterge un embed |
+
+Imaginile se pun prin link (urci poza pe Discord/imgur și copiezi linkul direct).
+
+### 🎁 Giveaway
+Postezi un embed cu buton; cine apasă intră în tragere. Are counter live de participanți,
+se încheie singur exact la timp, alege câștigătorii automat. Configurabil din dashboard:
+canal, premiu, durată, nr. câștigători, text buton, culoare, ping `@everyone`,
+restricție pe un anumit rol, și postare automată recurentă la interval.
+
+| Comandă | Ce face |
+|---|---|
+| `/giveaway start` 🔒 | Postează acum un giveaway (folosește config din dashboard) |
+| `/giveaway end <message_id>` 🔒 | Încheie un giveaway mai devreme |
+| `/giveaway reroll <message_id>` 🔒 | Alege alt câștigător pentru unul încheiat |
+
+> ID-ul mesajului: click dreapta pe mesaj → Copiază ID mesaj (cu Mod Developer pornit).
+
+### 🔔 Notificări
+Urmărește creatori și anunță când apare conținut nou. Se adaugă din dashboard
+(platformă, URL canal, canal Discord, mesaj, rol de ping). Verifică la ~5 minute.
+
+| Comandă | Ce face |
+|---|---|
+| `/notify list` | Creatorii urmăriți pe acest server |
+| `/notify test <id>` 🔒 | Trimite o notificare de test |
+
+Platforme: **YouTube** (merge direct), **Twitch** (necesită credențiale în `.env`),
+**Kick** (API neoficial), **TikTok** (experimental — TikTok nu are API public).
+
+### 🖼️ Avatar & Banner
+| Comandă | Ce face |
+|---|---|
+| `/avatar [user]` | Avatarul cuiva, cu linkuri de descărcare (PNG/JPG/WEBP, GIF dacă e animat) |
+| `/banner [user]` | Bannerul cuiva, cu aceleași formate |
+
+### 🔧 Comenzi de owner (în chat, cu prefix `!`)
+| Comandă | Ce face |
+|---|---|
+| `!reload <modul>` | Reîncarcă un cog fără să repornești botul (ex: `!reload giveaway`) |
+
+---
+
+## 🖥️ Dashboardul web
+
+Pornește pe http://localhost:5000. Te loghezi cu **contul tău de Discord** și vezi
+**doar serverele tale** (unde ești admin/owner) în care e și botul, cu nume și poze reale.
+
+Pagini disponibile pentru fiecare server (meniu în stânga):
+- **Bun venit** — mesajul de întâmpinare, cu previzualizare live
+- **Invitații** — leaderboard pe tot timpul / săptămână / lună, cu nume reale
+- **Embed builder** — creezi și editezi embed-uri, cu previzualizare
+- **Giveaway** — configurezi giveaway-urile
+- **Notificări** — adaugi creatori de urmărit
+
+Pentru login trebuie configurat OAuth2 (vezi `.env`) și, în Developer Portal →
+OAuth2 → Redirects, trebuie adăugată exact adresa din `DISCORD_REDIRECT_URI`.
+
+---
 
 ## ➕ Cum adaugi un modul nou
 
-Pui un fisier in `cogs/` (ex: `cogs/giveaway.py`) cu structura:
+Pui un fișier în `cogs/` (ex: `cogs/moderare.py`) cu structura:
+
 ```python
 from discord.ext import commands
+from discord import app_commands
+import discord
 
-class NumeModul(commands.Cog):
+class Moderare(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
+    @app_commands.command(name="kick", description="...")
+    async def kick(self, interaction: discord.Interaction):
+        ...
+
 async def setup(bot):
-    await bot.add_cog(NumeModul(bot))
+    await bot.add_cog(Moderare(bot))
 ```
-`main.py` il incarca automat. Hot reload din Discord: `!reload numemodul`.
 
-## ⚠️ De stiut
+`main.py` îl încarcă automat. Comenzile noi se sincronizează singure la pornire.
 
-- Botul are nevoie de **Manage Server** ca sa citeasca invitatiile. Fara ea, totul iese „necunoscut”.
-- Detectarea invitatiei e ~99% sigura. Cazuri rare (intrari simultane, invitatie stearsa imediat
-  dupa ce atinge limita) pot iesi „necunoscut”.
-- Cache-ul de invitatii se reconstruieste la pornire (`on_ready`); intrarile din primele secunde
-  dupa start pot iesi nedetectate.
-- Datele sunt in JSON (`data/store.json`) — perfect pentru servere mici. Cand creste, se inlocuieste
-  doar `utils/storage.py` cu SQLite, restul codului ramane neatins.
+---
 
-## 🔒 Eroare SSL la pornire? (Python 3.13+ pe retele corporate)
+## ⚠️ Lucruri de știut / probleme frecvente
 
-Daca la pornire vezi `CERTIFICATE_VERIFY_FAILED: Missing Authority Key Identifier`,
-cauza e un antivirus/proxy care inspecteaza HTTPS, combinat cu verificarea stricta
-din Python 3.13+. Doua solutii:
-  1. Foloseste **Python 3.12** (cel mai simplu).
-  2. Sau ramai pe 3.14 — `main.py` din proiect contine deja un fix care relaxeaza
-     DOAR verificarea stricta a extensiilor (restul validarii ramane activ).
+- **Eroare SSL la pornire** (`CERTIFICATE_VERIFY_FAILED`) pe rețele cu antivirus/proxy +
+  Python 3.13+: codul conține deja un fix care relaxează doar verificarea strictă. Alternativ,
+  folosește Python 3.12.
+- **Comenzile slash nu apar imediat:** prima sincronizare poate dura puțin. Dă **Ctrl+R**
+  în Discord dacă nu le vezi.
+- **Bannerul nu apare:** majoritatea userilor nu au banner (e feature de Nitro). E normal.
+- **Datele** se țin în `data/store.json` (JSON). Perfect pentru servere mici. La scară mare,
+  se înlocuiește doar `utils/storage.py` cu o bază de date, restul codului rămâne la fel.
+- **`.env` nu se urcă niciodată pe GitHub.** Tokenul e secret — dacă se expune, resetează-l.
+
+---
+
+## 🏠 Hosting
+
+Botul trebuie să ruleze non-stop. Opțiuni:
+- **VPS** (ex. Hetzner) sau **Oracle Cloud Free Tier** — rulează 24/7, fără întreruperi.
+  Recomandat pentru producție (botul pornit ca serviciu `systemd`).
+- **Render / Railway gratuit** — bun pentru testat, dar planurile gratuite pot „adormi"
+  serviciul, ceea ce face botul să apară offline.
+
+Pe orice host: codul vine din GitHub (`git clone`), iar `.env` se pune manual pe server
+(secretele nu sunt în repo).
