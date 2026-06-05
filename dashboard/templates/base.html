@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Dashboard{% endblock %}</title>
+  <style>
+    :root { --bg:#1a1b1e; --card:#2b2d31; --input:#1e1f22; --accent:#5865f2; --gold:#f0b232; --text:#dbdee1; --muted:#949ba4; }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { font-family:system-ui,sans-serif; background:var(--bg); color:var(--text); padding:36px 24px; }
+    .wrap { max-width:1120px; margin:0 auto; }
+    a.back { color:var(--accent); text-decoration:none; font-size:14px; }
+    .server-header { display:flex; align-items:center; gap:14px; margin:14px 0 22px; }
+    .server-header .icon, .server-header .icon-fallback { width:56px; height:56px; border-radius:50%; flex-shrink:0; }
+    .server-header .icon { object-fit:cover; }
+    .server-header .icon-fallback { background:var(--accent); display:flex; align-items:center; justify-content:center; font-size:22px; font-weight:700; color:#fff; }
+    .server-header h1 { font-size:24px; margin:0; }
+    .server-header .sub { color:var(--muted); font-size:14px; margin-top:3px; }
+
+    .layout { display:grid; grid-template-columns:230px 1fr; gap:24px; align-items:start; }
+    @media (max-width:880px){ .layout{ grid-template-columns:1fr; } }
+
+    .sidebar { background:var(--card); border-radius:14px; padding:12px; position:sticky; top:24px; }
+    .side-title { font-size:12px; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); padding:6px 10px 8px; }
+    .nav { display:flex; align-items:center; gap:11px; padding:11px 12px; border-radius:8px; text-decoration:none; color:var(--text); font-size:15px; font-weight:500; margin-bottom:2px; }
+    .nav:hover { background:var(--input); }
+    .nav.active { background:var(--accent); color:#fff; }
+    .nav .ic { font-size:18px; width:22px; text-align:center; }
+
+    .saved { background:#248046; color:#fff; padding:8px 14px; border-radius:8px; display:inline-block; margin-bottom:16px; font-size:14px; }
+    {% block extra_style %}{% endblock %}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="/">&larr; Inapoi la servere</a>
+
+  <div class="server-header">
+    {% if meta and meta.get('icon') %}<img class="icon" src="{{ meta.get('icon') }}" alt="">
+    {% elif meta and meta.get('name') %}<div class="icon-fallback">{{ meta.get('name')[0]|upper }}</div>
+    {% else %}<div class="icon-fallback">?</div>{% endif %}
+    <div>
+      <h1>{{ meta.get('name') if meta and meta.get('name') else 'Server' }}</h1>
+      <div class="sub">{% if meta and meta.get('members') is not none %}{{ meta.get('members') }} membri · {% endif %}ID: {{ guild_id }}</div>
+    </div>
+  </div>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <p class="side-title">Ce vrei sa configurezi</p>
+      <a class="nav {% if section=='welcome' %}active{% endif %}" href="/guild/{{ guild_id }}"><span class="ic">👋</span> Bun venit</a>
+      <a class="nav {% if section=='leaderboard' %}active{% endif %}" href="/leaderboard/{{ guild_id }}"><span class="ic">🏆</span> Invitatii</a>
+      <a class="nav {% if section=='embeds' %}active{% endif %}" href="/embeds/{{ guild_id }}"><span class="ic">🧩</span> Embed builder</a>
+      <a class="nav {% if section=='giveaway' %}active{% endif %}" href="/giveaway/{{ guild_id }}"><span class="ic">🎁</span> Giveaway</a>
+      <a class="nav {% if section=='notifications' %}active{% endif %}" href="/notifications/{{ guild_id }}"><span class="ic">🔔</span> Notificari</a>
+    </aside>
+
+    <main>{% block content %}{% endblock %}</main>
+  </div>
+</div>
+{% block scripts %}{% endblock %}
+</body>
+</html>

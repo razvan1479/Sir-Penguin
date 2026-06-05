@@ -1,0 +1,395 @@
+"""
+cogs/invites.py — sistem de INVITATII complet (stil Invite Tracker).
+
+DIFERENTA fata de varianta simpla: invitatiile se impart pe CATEGORII:
+  ✅ reale   (regular) - au intrat prin tine si sunt inca pe server
+  ❌ plecate (left)    - au intrat prin tine dar au plecat
+  🚫 false   (fake)    - cont prea nou (sub 7 zile) -> anti-trisare
+  🎁 bonus   (bonus)   - adaugate manual de admin
+
+  TOTAL = reale + bonus - plecate - false
+
+CUM detectam cine a invitat: tinem in memorie un "cache" cu folosirile fiecarei
+invitatii; cand intra cineva, comparam si vedem ce invitatie a crescut.
+  - link personal -> +1 la cel care l-a creat
+  - link personalizat al serverului (vanity) -> numarat separat
+  - nedetectabil -> "necunoscut"
+
+NECESITA permisiunea "Manage Server"!
+
+Comenzi user:
+  /invites [membru]      - numarul si detalierea invitatiilor
+  /inviter <membru>      - cine a invitat membrul respectiv
+  /invitedlist [membru]  - lista celor invitati de cineva
+  /invitecodes [membru]  - codurile de invitatie ale cuiva (cu folosiri)
+  /findlink              - unul dintre linkurile tale de invitatie
+  /leaderboard [rol]     - clasamentul invitatorilor
+
+Comenzi admin:
+  /addinvites <membru> <numar>     - adauga invitatii bonus
+  /removeinvites <membru> <numar>  - scade invitatii bonus
+  /resetinvites [membru]           - reseteaza tot (sau un singur membru)
+"""
+
+import datetime
+
+import discord
+from discord import app_commands
+from discord.ext import commands
+
+from utils import storage
+
+# cont mai nou de atatea zile = considerat "fals" (anti-trisare)
+FAKE_DAYS = 7
+
+
+def invite_total(stats: dict) -> int:
+    """Formula de total a invitatiilor (ca la Invite Tracker)."""
+    return (stats.get("regular", 0) + stats.get("bonus", 0)
+            - stats.get("left", 0) - stats.get("fake", 0))
+
+
+def _empty_stats() -> dict:
+    return {"regular": 0, "left": 0, "fake": 0, "bonus": 0}
+
+
+class Invites(commands.Cog):
+    def __init__(self, bot: commands.Bot):
+        self.bot = bot
+        self.invite_cache: dict[int, dict[str, int]] = {}
+        self.vanity_cache: dict[int, int] = {}
+
+    # ------------------------------------------------------------- cache
+    async def _cache_guild(self, guild: discord.Guild):
+        try:
+            invites = await guild.invites()
+            self.invite_cache[guild.id] = {inv.code: inv.uses or 0 for inv in invites}
+        except (discord.Forbidden, discord.HTTPException):
+            self.invite_cache[guild.id] = {}
+        if "VANITY_URL" in guild.features:
+            try:
+                v = await guild.vanity_invite()
+                self.vanity_cache[guild.id] = (v.uses or 0) if v else 0
+            except discord.HTTPException:
+                pass
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        for guild in self.bot.guilds:
+            await self._cache_guild(guild)
+
+    @commands.Cog.listener()
+    async def on_guild_join(self, guild):
+        await self._cache_guild(guild)
+
+    @commands.Cog.listener()
+    async def on_invite_create(self, invite):
+        self.invite_cache.setdefault(invite.guild.id, {})[invite.code] = invite.uses or 0
+
+    @commands.Cog.listener()
+    async def on_invite_delete(self, invite):
+        self.invite_cache.get(invite.guild.id, {}).pop(invite.code, None)
+
+    # ------------------------------------------------------------- detectare
+    @commands.Cog.listener()
+    async def on_member_join(self, member: discord.Member):
+        guild = member.guild
+        info = {"type": "unknown", "inviter_id": None, "inviter_name": None, "code": None}
+        try:
+            before = self.invite_cache.get(guild.id, {})
+            after_list = await guild.invites()
+            after = {inv.code: inv for inv in after_list}
+            used = None
+            for code, inv in after.items():
+                if (inv.uses or 0) > before.get(code, 0):
+                    used = inv
+                    break
+            self.invite_cache[guild.id] = {inv.code: inv.uses or 0 for inv in after_list}
+
+            if used and used.inviter:
+                info = {"type": "personal", "inviter_id": used.inviter.id,
+                        "inviter_name": str(used.inviter), "code": used.code}
+            elif "VANITY_URL" in guild.features:
+                try:
+                    v = await guild.vanity_invite()
+                    if v and (v.uses or 0) > self.vanity_cache.get(guild.id, 0):
+                        self.vanity_cache[guild.id] = v.uses or 0
+                        info = {"type": "vanity", "inviter_id": None,
+                                "inviter_name": None, "code": guild.vanity_url_code}
+                except discord.HTTPException:
+                    pass
+        except (discord.Forbidden, discord.HTTPException):
+            pass
+        finally:
+            self._record_join(guild, member, info)
+            self.bot.dispatch("invite_join", member, info)
+
+    def _record_join(self, guild, member, info):
+        import time
+        data = storage.get(guild.id, "invites", {})
+        members = data.get("members", {})
+        joined_by = data.get("joined_by", {})
+        history = data.get("history", [])
+
+        # cont prea nou = posibil fals
+        age = datetime.datetime.now(datetime.timezone.utc) - member.created_at
+        is_fake = age.days < FAKE_DAYS
+
+        if info["type"] == "personal" and info["inviter_id"]:
+            inviter_key = str(info["inviter_id"])
+            stats = members.setdefault(inviter_key, _empty_stats())
+            stats["fake" if is_fake else "regular"] += 1
+        elif info["type"] == "vanity":
+            inviter_key = "vanity"
+            data["vanity_count"] = data.get("vanity_count", 0) + 1
+        else:
+            inviter_key = "unknown"
+
+        joined_by[str(member.id)] = {"inviter": inviter_key, "code": info.get("code"), "fake": is_fake}
+        # istoricul cu data (pentru leaderboard pe saptamana / luna)
+        history.append({"member": str(member.id), "inviter": inviter_key,
+                        "ts": time.time(), "fake": is_fake, "left": False})
+
+        data["members"] = members
+        data["joined_by"] = joined_by
+        data["history"] = history
+        storage.set(guild.id, "invites", data)
+
+    @commands.Cog.listener()
+    async def on_member_remove(self, member: discord.Member):
+        data = storage.get(member.guild.id, "invites", {})
+        joined_by = data.get("joined_by", {})
+        rec = joined_by.pop(str(member.id), None)
+
+        if rec and rec["inviter"] not in ("vanity", "unknown"):
+            members = data.get("members", {})
+            stats = members.setdefault(rec["inviter"], _empty_stats())
+            if rec.get("fake"):
+                pass  # ramane "fals" - nu se rasplateste un cont fals care pleaca
+            else:
+                stats["regular"] = max(0, stats["regular"] - 1)
+                stats["left"] += 1
+            data["members"] = members
+        elif rec and rec["inviter"] == "vanity":
+            data["vanity_count"] = max(0, data.get("vanity_count", 0) - 1)
+
+        # marcam in istoric ca a plecat (ca sa nu se numere in leaderboardul pe perioada)
+        for e in reversed(data.get("history", [])):
+            if e.get("member") == str(member.id) and not e.get("left"):
+                e["left"] = True
+                break
+
+        data["joined_by"] = joined_by
+        storage.set(member.guild.id, "invites", data)
+
+    # ------------------------------------------------------------- helper
+    def _stats_for(self, guild_id, user_id) -> dict:
+        members = storage.get(guild_id, "invites", {}).get("members", {})
+        return members.get(str(user_id), _empty_stats())
+
+    # ------------------------------------------------------------- comenzi user
+    @app_commands.command(name="invites", description="Vezi numarul si detalierea invitatiilor")
+    async def invites(self, interaction: discord.Interaction, membru: discord.Member = None):
+        target = membru or interaction.user
+        s = self._stats_for(interaction.guild_id, target.id)
+        total = invite_total(s)
+        embed = discord.Embed(
+            title=f"📨 Invitatiile lui {target.display_name}",
+            description=f"# {total} invitatii",
+            color=discord.Color.blurple(),
+        )
+        embed.add_field(name="✅ Reale", value=str(s["regular"]), inline=True)
+        embed.add_field(name="❌ Plecate", value=str(s["left"]), inline=True)
+        embed.add_field(name="🚫 False", value=str(s["fake"]), inline=True)
+        embed.add_field(name="🎁 Bonus", value=str(s["bonus"]), inline=True)
+        embed.set_thumbnail(url=target.display_avatar.url)
+        await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(name="inviter", description="Cine a invitat un membru")
+    async def inviter(self, interaction: discord.Interaction, membru: discord.Member):
+        joined_by = storage.get(interaction.guild_id, "invites", {}).get("joined_by", {})
+        rec = joined_by.get(str(membru.id))
+        if not rec:
+            return await interaction.response.send_message(
+                f"Nu stiu cine a invitat pe {membru.mention} (a intrat inainte sa pornesc urmarirea).",
+                ephemeral=True)
+        src = rec["inviter"]
+        if src == "vanity":
+            msg = f"🔗 {membru.mention} a intrat prin linkul personalizat al serverului."
+        elif src == "unknown":
+            msg = f"❔ Sursa invitatiei lui {membru.mention} nu a putut fi determinata."
+        else:
+            extra = " (cont nou — posibil fals)" if rec.get("fake") else ""
+            msg = f"📨 {membru.mention} a fost invitat de <@{src}>{extra}."
+        await interaction.response.send_message(msg)
+
+    @app_commands.command(name="invitedlist", description="Lista celor invitati de cineva")
+    async def invitedlist(self, interaction: discord.Interaction, membru: discord.Member = None):
+        target = membru or interaction.user
+        joined_by = storage.get(interaction.guild_id, "invites", {}).get("joined_by", {})
+        invited = [uid for uid, rec in joined_by.items() if rec.get("inviter") == str(target.id)]
+        if not invited:
+            return await interaction.response.send_message(
+                f"{target.mention} nu a invitat pe nimeni (inca).", ephemeral=True)
+        lines = "\n".join(f"• <@{uid}>" for uid in invited[:25])
+        more = f"\n…si inca {len(invited) - 25}" if len(invited) > 25 else ""
+        embed = discord.Embed(
+            title=f"👥 Invitati de {target.display_name}",
+            description=lines + more,
+            color=discord.Color.blurple(),
+        )
+        embed.set_footer(text=f"Total: {len(invited)} membri")
+        await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(name="invitecodes", description="Codurile de invitatie ale cuiva")
+    async def invitecodes(self, interaction: discord.Interaction, membru: discord.Member = None):
+        target = membru or interaction.user
+        try:
+            invites = await interaction.guild.invites()
+        except discord.Forbidden:
+            return await interaction.response.send_message(
+                "Nu am permisiunea „Manage Server” ca sa vad invitatiile.", ephemeral=True)
+        mine = sorted([i for i in invites if i.inviter and i.inviter.id == target.id],
+                      key=lambda i: i.uses or 0, reverse=True)
+        if not mine:
+            return await interaction.response.send_message(
+                f"{target.mention} nu are coduri de invitatie active.", ephemeral=True)
+        lines = "\n".join(f"`{i.code}` — {i.uses or 0} folosiri" for i in mine[:25])
+        embed = discord.Embed(title=f"🔗 Codurile lui {target.display_name}",
+                              description=lines, color=discord.Color.blurple())
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @app_commands.command(name="findlink", description="Unul dintre linkurile tale de invitatie")
+    async def findlink(self, interaction: discord.Interaction):
+        try:
+            invites = await interaction.guild.invites()
+        except discord.Forbidden:
+            return await interaction.response.send_message(
+                "Nu am permisiunea „Manage Server”.", ephemeral=True)
+        mine = [i for i in invites if i.inviter and i.inviter.id == interaction.user.id]
+        if not mine:
+            return await interaction.response.send_message(
+                "Nu ai niciun link de invitatie. Creeaza unul din Discord (click dreapta pe canal → Invite).",
+                ephemeral=True)
+        best = max(mine, key=lambda i: i.uses or 0)
+        await interaction.response.send_message(
+            f"🔗 Linkul tau: https://discord.gg/{best.code} ({best.uses or 0} folosiri)", ephemeral=True)
+
+    def _period_counts(self, guild_id, days) -> dict:
+        """Numara invitatiile reale (non-false, ramase) din ultimele `days` zile."""
+        import time
+        cutoff = time.time() - days * 86400
+        history = storage.get(guild_id, "invites", {}).get("history", [])
+        counts = {}
+        for e in history:
+            if e.get("ts", 0) < cutoff:
+                continue
+            if e.get("fake") or e.get("left"):
+                continue
+            inv = e.get("inviter")
+            if not inv or inv in ("vanity", "unknown"):
+                continue
+            counts[inv] = counts.get(inv, 0) + 1
+        return counts
+
+    @app_commands.command(name="leaderboard", description="Clasamentul invitatorilor")
+    @app_commands.describe(perioada="Perioada clasamentului", rol="Filtreaza la un anumit rol")
+    @app_commands.choices(perioada=[
+        app_commands.Choice(name="Tot timpul", value="all"),
+        app_commands.Choice(name="Saptamana (7 zile)", value="week"),
+        app_commands.Choice(name="Luna (30 zile)", value="month"),
+    ])
+    async def leaderboard(self, interaction: discord.Interaction,
+                          perioada: app_commands.Choice[str] = None,
+                          rol: discord.Role = None):
+        period = perioada.value if perioada else "all"
+
+        # alegem sursa de date in functie de perioada
+        if period == "week":
+            raw = self._period_counts(interaction.guild_id, 7)
+            label = "Saptamana"
+        elif period == "month":
+            raw = self._period_counts(interaction.guild_id, 30)
+            label = "Luna"
+        else:
+            members = storage.get(interaction.guild_id, "invites", {}).get("members", {})
+            raw = {uid: invite_total(s) for uid, s in members.items()}
+            label = "Tot timpul"
+
+        ranked = []
+        for uid, n in raw.items():
+            if n <= 0:
+                continue
+            if rol:
+                m = interaction.guild.get_member(int(uid))
+                if not m or rol not in m.roles:
+                    continue
+            ranked.append((uid, n))
+        ranked.sort(key=lambda x: x[1], reverse=True)
+        ranked = ranked[:10]
+
+        if not ranked:
+            return await interaction.response.send_message(
+                f"Niciun invitator in clasament ({label.lower()}). 📭", ephemeral=True)
+
+        lines = []
+        for i, (uid, n) in enumerate(ranked, 1):
+            medal = {1: "🥇", 2: "🥈", 3: "🥉"}.get(i, f"`#{i}`")
+            lines.append(f"{medal} <@{uid}> — **{n}** invitatii")
+
+        title = f"🏆 Leaderboard Invitatii · {label}"
+        if rol:
+            title += f" · {rol.name}"
+        embed = discord.Embed(title=title, description="\n".join(lines), color=discord.Color.gold())
+        if period == "all":
+            vanity = storage.get(interaction.guild_id, "invites", {}).get("vanity_count", 0)
+            if vanity:
+                embed.set_footer(text=f"+ {vanity} intrari prin linkul personalizat")
+        await interaction.response.send_message(embed=embed)
+
+    # ------------------------------------------------------------- comenzi admin
+    @app_commands.command(name="addinvites", description="Adauga invitatii bonus unui membru")
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def addinvites(self, interaction: discord.Interaction, membru: discord.Member, numar: int):
+        data = storage.get(interaction.guild_id, "invites", {})
+        members = data.get("members", {})
+        stats = members.setdefault(str(membru.id), _empty_stats())
+        stats["bonus"] += numar
+        data["members"] = members
+        storage.set(interaction.guild_id, "invites", data)
+        await interaction.response.send_message(
+            f"🎁 Am adaugat **{numar}** invitatii bonus pentru {membru.mention}. "
+            f"Total acum: **{invite_total(stats)}**.")
+
+    @app_commands.command(name="removeinvites", description="Scade invitatii bonus unui membru")
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def removeinvites(self, interaction: discord.Interaction, membru: discord.Member, numar: int):
+        data = storage.get(interaction.guild_id, "invites", {})
+        members = data.get("members", {})
+        stats = members.setdefault(str(membru.id), _empty_stats())
+        stats["bonus"] -= numar
+        data["members"] = members
+        storage.set(interaction.guild_id, "invites", data)
+        await interaction.response.send_message(
+            f"➖ Am scazut **{numar}** invitatii bonus de la {membru.mention}. "
+            f"Total acum: **{invite_total(stats)}**.")
+
+    @app_commands.command(name="resetinvites", description="Reseteaza invitatiile (tot serverul sau un membru)")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def resetinvites(self, interaction: discord.Interaction, membru: discord.Member = None):
+        data = storage.get(interaction.guild_id, "invites", {})
+        if membru:
+            data.get("members", {}).pop(str(membru.id), None)
+            storage.set(interaction.guild_id, "invites", data)
+            await interaction.response.send_message(
+                f"🔄 Invitatiile lui {membru.mention} au fost resetate.")
+        else:
+            data["members"] = {}
+            data["vanity_count"] = 0
+            storage.set(interaction.guild_id, "invites", data)
+            await interaction.response.send_message(
+                "🔄 Tot leaderboardul a fost resetat. Concurs nou, start!")
+
+
+async def setup(bot: commands.Bot):
+    await bot.add_cog(Invites(bot))
