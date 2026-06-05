@@ -63,10 +63,12 @@ class Game(commands.Cog):
                         f"Interval: **{lo}–{hi}** · 🔒 Alegerea e privată"),
             color=discord.Color.green())
 
-    def _countdown_embed(self, sec):
-        return discord.Embed(title="⏳ Countdown",
-                             description=f"**{sec} secunde** rămase",
-                             color=discord.Color.orange())
+    def _countdown_embed(self, sec, lo=0, hi=100):
+        return discord.Embed(
+            title="⏳ Runda e activă!",
+            description=(f"📝 Scrie **/alege <număr>** (între **{lo}** și **{hi}**) ca să participi!\n"
+                        f"⏳ **{sec} secunde** rămase"),
+            color=discord.Color.orange())
 
     def _result_embed(self, rnd, winners, diff, total):
         return discord.Embed(
@@ -138,13 +140,14 @@ class Game(commands.Cog):
         cfg = _cfg(guild.id)
         st = self._state(guild.id)
         countdown = int(cfg.get("countdown", 60))
-        st.countdown_message = await channel.send(embed=self._countdown_embed(countdown))
+        lo, hi = int(cfg.get("min", 0)), int(cfg.get("max", 100))
+        st.countdown_message = await channel.send(embed=self._countdown_embed(countdown, lo, hi))
         try:
             while countdown > 0 and st.active:
                 await asyncio.sleep(1)
                 countdown -= 1
                 if countdown % 10 == 0 or countdown <= 5:
-                    await st.countdown_message.edit(embed=self._countdown_embed(countdown))
+                    await st.countdown_message.edit(embed=self._countdown_embed(countdown, lo, hi))
             if st.active:
                 await self.finalize(guild, channel)
         except asyncio.CancelledError:

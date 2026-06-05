@@ -437,5 +437,22 @@ def game(guild_id):
                            section="game", saved=request.args.get("saved"))
 
 
+@app.route("/rps/<guild_id>", methods=["GET", "POST"])
+@guild_required
+def rps(guild_id):
+    if request.method == "POST":
+        cfg = {
+            "enabled": request.form.get("enabled") == "on",
+            "channel_id": _to_int(request.form.get("channel_id", "")),
+        }
+        storage.set(int(guild_id), "rps", cfg)
+        return redirect(url_for("rps", guild_id=guild_id, saved=1))
+
+    cfg = storage.get(int(guild_id), "rps", {})
+    return render_template("rps.html", guild_id=guild_id, cfg=cfg,
+                           meta=storage.get(int(guild_id), "meta", {}),
+                           section="rps", saved=request.args.get("saved"))
+
+
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
