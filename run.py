@@ -14,7 +14,7 @@ import threading
 
 # Render (si alte hosturi) dau portul prin variabila de mediu PORT.
 # Local, daca PORT lipseste, folosim 5000.
-PORT = int(os.getenv("PORT", "5000"))
+PORT = int(os.getenv("PORT", "50000"))
 
 
 # --- dashboardul (Flask) ruleaza intr-un thread separat ---
