@@ -374,21 +374,57 @@ class Invites(commands.Cog):
             f"➖ Am scazut **{numar}** invitatii bonus de la {membru.mention}. "
             f"Total acum: **{invite_total(stats)}**.")
 
-    @app_commands.command(name="resetinvites", description="Reseteaza invitatiile (tot serverul sau un membru)")
+    @app_commands.command(name="resetinvites", description="Reseteaza invitatiile (alege perioada, optional un membru)")
     @app_commands.checks.has_permissions(administrator=True)
-    async def resetinvites(self, interaction: discord.Interaction, membru: discord.Member = None):
+    @app_commands.describe(perioada="Ce clasament resetezi", membru="Doar pentru un anumit membru (optional)")
+    @app_commands.choices(perioada=[
+        app_commands.Choice(name="Tot timpul (sterge tot)", value="all"),
+        app_commands.Choice(name="Ultimele 7 zile", value="week"),
+        app_commands.Choice(name="Ultimele 30 zile", value="month"),
+    ])
+    async def resetinvites(self, interaction: discord.Interaction,
+                           perioada: app_commands.Choice[str] = None,
+                           membru: discord.Member = None):
+        import time
+        scope = perioada.value if perioada else "all"
         data = storage.get(interaction.guild_id, "invites", {})
-        if membru:
-            data.get("members", {}).pop(str(membru.id), None)
-            storage.set(interaction.guild_id, "invites", data)
-            await interaction.response.send_message(
-                f"🔄 Invitatiile lui {membru.mention} au fost resetate.")
+        history = data.get("history", [])
+
+        if scope == "week":
+            cutoff = time.time() - 7 * 86400
+            label = "ultimele 7 zile"
+        elif scope == "month":
+            cutoff = time.time() - 30 * 86400
+            label = "ultimele 30 zile"
         else:
-            data["members"] = {}
-            data["vanity_count"] = 0
+            cutoff = None
+            label = "tot timpul"
+
+        if membru:
+            mid = str(membru.id)
+            if scope == "all":
+                data.get("members", {}).pop(mid, None)
+                data["history"] = [e for e in history if e.get("inviter") != mid]
+            else:
+                data["history"] = [e for e in history
+                                   if not (e.get("inviter") == mid and e.get("ts", 0) >= cutoff)]
             storage.set(interaction.guild_id, "invites", data)
             await interaction.response.send_message(
-                "🔄 Tot leaderboardul a fost resetat. Concurs nou, start!")
+                f"🔄 Invitatiile lui {membru.mention} au fost resetate ({label}).")
+        else:
+            if scope == "all":
+                data["members"] = {}
+                data["vanity_count"] = 0
+                data["history"] = []
+                data["joined_by"] = {}
+                msg = "🔄 Tot leaderboardul a fost resetat (tot timpul, saptamana si luna). Concurs nou, start!"
+            else:
+                # stergem doar evenimentele din fereastra aleasa (clasamentul pe acea
+                # perioada se goleste; „tot timpul" ramane neatins)
+                data["history"] = [e for e in history if e.get("ts", 0) < cutoff]
+                msg = f"🔄 Clasamentul pe {label} a fost resetat. (Clasamentul pe tot timpul ramane neschimbat.)"
+            storage.set(interaction.guild_id, "invites", data)
+            await interaction.response.send_message(msg)
 
 
 async def setup(bot: commands.Bot):
