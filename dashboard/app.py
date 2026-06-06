@@ -485,5 +485,45 @@ def massrole(guild_id):
                            section="massrole", sent=request.args.get("sent"))
 
 
+@app.route("/contest/<guild_id>", methods=["GET", "POST"])
+@guild_required
+def contest(guild_id):
+    gid = int(guild_id)
+    if request.method == "POST":
+        action = request.form.get("action")
+        c = storage.get(gid, "contest", {}) or {}
+        if action == "start" and not c.get("active"):
+            storage.set(gid, "contest", {
+                "active": True, "start_ts": _time.time(),
+                "name": request.form.get("name", "").strip() or "Concurs invitatii",
+                "started_by": None, "ended_ts": None,
+            })
+        elif action == "stop" and c.get("active"):
+            c["active"] = False
+            c["ended_ts"] = _time.time()
+            storage.set(gid, "contest", c)
+        return redirect(url_for("contest", guild_id=guild_id))
+
+    c = storage.get(gid, "contest", {}) or {}
+    standings = []
+    if c.get("active") or c.get("ended_ts"):
+        inv = storage.get(gid, "invites", {})
+        since = c.get("start_ts", 0)
+        counts = {}
+        for e in inv.get("history", []):
+            if e.get("ts", 0) < since or e.get("fake") or e.get("left"):
+                continue
+            iv = e.get("inviter")
+            if not iv or iv in ("vanity", "unknown"):
+                continue
+            counts[iv] = counts.get(iv, 0) + 1
+        ranked = sorted(((u, n) for u, n in counts.items() if n > 0),
+                        key=lambda x: x[1], reverse=True)[:10]
+        standings = [(resolve_name(gid, u) or f"User {u}", n) for u, n in ranked]
+    return render_template("contest.html", guild_id=guild_id, contest=c,
+                           standings=standings, meta=storage.get(gid, "meta", {}),
+                           section="contest")
+
+
 if __name__ == "__main__":
     app.run(debug=True, port=5000)

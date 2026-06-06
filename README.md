@@ -116,6 +116,20 @@ Urmărește cine pe cine invită. Categorii: **reale** (au rămas), **plecate**,
 | `/removeinvites <membru> <nr>` 🔒 | Scade invitații bonus |
 | `/resetinvites [perioadă] [membru]` 🔒 | Resetează clasamentul: tot timpul / 7 zile / 30 zile, opțional doar un membru |
 
+**🏁 Concurs de invitații** (sub-comenzi `/concurs`, sau din dashboard → „Concurs invite"):
+
+| Comandă | Ce face |
+|---|---|
+| `/concurs start [nume]` 🔒 | Pornește un concurs — numără invitațiile de acum încolo |
+| `/concurs clasament` 🔒 | Afișează clasamentul concursului curent (top 10) |
+| `/concurs stop` 🔒 | Încheie concursul și anunță câștigătorul |
+| `/concurs status` 🔒 | Spune dacă e un concurs activ și de când |
+
+Concursul numără doar invitațiile reale (exclude conturile plecate/false) strânse
+de la pornire, fără să afecteze clasamentul „tot timpul". Ideal pentru competiții
+cu start și final clar (spre deosebire de clasamentul pe 7/30 zile, care e o
+fereastră glisantă).
+
 ### 🧩 Embed builder
 Creezi embed-uri în dashboard (titlu, text, imagine, footer, culoare), le dai un nume, le postezi.
 
