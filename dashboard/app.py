@@ -454,5 +454,36 @@ def rps(guild_id):
                            section="rps", saved=request.args.get("saved"))
 
 
+import time as _time
+
+
+@app.route("/massrole/<guild_id>", methods=["GET", "POST"])
+@guild_required
+def massrole(guild_id):
+    if request.method == "POST":
+        action = request.form.get("action", "")
+        if action in ("give_all", "remove_all", "give_to", "remove_from"):
+            job = {
+                "id": uuid.uuid4().hex[:8],
+                "action": action,
+                "role_id": _to_int(request.form.get("role_id", "")),
+                "condition_role_id": _to_int(request.form.get("condition_role_id", "")),
+                "include_bots": request.form.get("include_bots") == "on",
+                "status": "pending",
+                "result": "",
+                "created_ts": _time.time(),
+            }
+            if job["role_id"]:
+                storage.set(int(guild_id), "massrole_job", job)
+        return redirect(url_for("massrole", guild_id=guild_id, sent=1))
+
+    roles = storage.get(int(guild_id), "roles", {}) or {}
+    job = storage.get(int(guild_id), "massrole_job", None)
+    return render_template("massrole.html", guild_id=guild_id,
+                           roles=roles.get("list", []), job=job,
+                           meta=storage.get(int(guild_id), "meta", {}),
+                           section="massrole", sent=request.args.get("sent"))
+
+
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
