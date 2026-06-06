@@ -36,6 +36,7 @@ from discord import app_commands
 from discord.ext import commands, tasks
 
 from utils import storage
+from utils.perms import bot_access
 
 log = logging.getLogger("bot")
 
@@ -305,7 +306,7 @@ class Notifications(commands.Cog):
         await interaction.response.send_message("\n".join(lines), ephemeral=True)
 
     @group.command(name="test", description="Trimite o notificare de test")
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @bot_access()
     async def test(self, interaction: discord.Interaction, id: str):
         subs = storage.get(interaction.guild_id, "notifications", {}).get("subscriptions", [])
         sub = next((s for s in subs if s.get("id") == id), None)

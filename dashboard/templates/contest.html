@@ -2,57 +2,81 @@
 {% block title %}Concurs invite · {{ meta.get('name','Server') }}{% endblock %}
 
 {% block extra_style %}
-    .panel { background:var(--card); border-radius:14px; padding:22px; max-width:600px; }
-    label { display:block; font-weight:600; margin:0 0 8px; font-size:12px; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); }
-    input[type=text] { width:100%; padding:11px; border-radius:8px; border:none; background:var(--input); color:var(--text); font-size:14px; font-family:inherit; }
-    button { border:none; padding:13px 26px; border-radius:8px; font-weight:600; cursor:pointer; font-size:15px; margin-top:16px; width:100%; color:#fff; }
+    .panel { background:var(--card); border-radius:14px; padding:22px; max-width:620px; }
+    label { display:block; font-weight:600; margin:16px 0 8px; font-size:12px; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); }
+    label:first-of-type { margin-top:0; }
+    input[type=text], input[type=number] { width:100%; padding:11px; border-radius:8px; border:none; background:var(--input); color:var(--text); font-size:14px; font-family:inherit; }
+    button { border:none; padding:13px 26px; border-radius:8px; font-weight:600; cursor:pointer; font-size:15px; margin-top:20px; width:100%; color:#fff; }
     button.start { background:#3ba55d; }
     button.stop { background:#ed4245; }
     .hint { color:var(--muted); font-size:13px; margin-top:12px; line-height:1.6; }
+    .hint code { background:var(--input); padding:2px 6px; border-radius:4px; }
+    .row2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
     .live { background:var(--input); border-radius:10px; padding:8px 16px; margin-top:18px; }
-    .row { display:flex; align-items:center; gap:12px; padding:10px 4px; border-bottom:1px solid var(--card); }
-    .row:last-child { border-bottom:none; }
+    .lrow { display:flex; align-items:center; gap:12px; padding:10px 4px; border-bottom:1px solid var(--card); }
+    .lrow:last-child { border-bottom:none; }
     .rank { width:34px; font-weight:700; font-size:16px; }
-    .nm { flex:1; }
-    .ct { font-weight:700; color:var(--accent); }
-    .badge { display:inline-block; padding:4px 12px; border-radius:20px; font-size:13px; font-weight:600; }
-    .on { background:#1e3a23; color:#3ba55d; }
-    .off { background:var(--input); color:var(--muted); }
+    .nm { flex:1; } .ct { font-weight:700; color:var(--accent); }
+    .badge { display:inline-block; padding:5px 14px; border-radius:20px; font-size:13px; font-weight:600; }
+    .on { background:#1e3a23; color:#3ba55d; } .sched { background:#3a2c1a; color:#f0b232; } .off { background:var(--input); color:var(--muted); }
+    .timer { font-size:22px; font-weight:700; margin:14px 0 4px; }
 {% endblock %}
 
 {% block content %}
   <div class="panel">
-    {% if contest.get('active') %}
-      <span class="badge on">🏁 Concurs activ: {{ contest.get('name') }}</span>
-      <form method="POST" style="margin-top:8px">
-        <input type="hidden" name="action" value="stop">
-        <button class="stop" type="submit">⏹️ Oprește concursul</button>
+    {% set st = contest.get('status') %}
+    {% if st == 'running' or st == 'scheduled' %}
+      {% if st == 'scheduled' %}
+        <span class="badge sched">🕒 Programat: {{ contest.get('name') }}</span>
+        {% if remaining is not none %}<div class="timer">Începe în {{ (remaining/3600)|round(1) }} ore</div>{% endif %}
+      {% else %}
+        <span class="badge on">🏁 Activ: {{ contest.get('name') }}</span>
+        {% if remaining is not none %}<div class="timer">Mai sunt {{ (remaining/3600)|round(1) }} ore</div>
+        {% else %}<div class="hint">Fără durată fixă — se oprește manual.</div>{% endif %}
+      {% endif %}
+      <form method="POST"><input type="hidden" name="action" value="stop">
+        <button class="stop" type="submit">⏹️ Oprește acum</button>
       </form>
-      <p class="hint">Clasamentul de mai jos numără invitațiile strânse de la pornirea concursului. Reîncarcă pagina pentru a actualiza.</p>
+      <p class="hint">La final, botul anunță automat câștigătorii și clasamentul în canalul setat. Reîncarcă pagina pentru a actualiza clasamentul.</p>
     {% else %}
       <span class="badge off">Niciun concurs activ</span>
-      <form method="POST" style="margin-top:14px">
+      <form method="POST" style="margin-top:8px">
         <input type="hidden" name="action" value="start">
         <label>Numele concursului</label>
         <input type="text" name="name" placeholder="ex: Concurs August" value="Concurs invitatii">
+
+        <label>Începe peste (ore) — 0 = acum</label>
+        <input type="number" name="start_delay" value="0" min="0" step="1">
+
+        <div class="row2">
+          <div><label>Durată — zile</label><input type="number" name="duration_days" value="7" min="0"></div>
+          <div><label>+ ore</label><input type="number" name="duration_hours" value="0" min="0"></div>
+        </div>
+        <p class="hint">Durată 0 = fără limită (se oprește manual). Ex: 7 zile = concurs de o săptămână.</p>
+
+        <label>ID canal pentru anunț final</label>
+        <input type="text" name="announce_channel_id" placeholder="unde se anunță câștigătorii">
+
+        <label>Câți câștigători se anunță</label>
+        <input type="number" name="winners_count" value="1" min="1">
+
         <button class="start" type="submit">🏁 Pornește concursul</button>
       </form>
-      <p class="hint">La pornire, clasamentul începe de la zero și numără doar invitațiile de după acest moment — fără să afecteze clasamentul „tot timpul". Poți gestiona și din Discord cu <code>/concurs start</code>, <code>/concurs clasament</code>, <code>/concurs stop</code>.</p>
+      <p class="hint">Concursul numără doar invitațiile reale (fără conturi plecate/false) de la pornire încoace, fără să afecteze clasamentul „tot timpul". Poți gestiona și din Discord cu <code>/concurs start</code>, <code>/concurs clasament</code>, <code>/concurs stop</code>.</p>
     {% endif %}
 
     {% if standings %}
       <div class="live">
         {% for name, n in standings %}
-          <div class="row">
+          <div class="lrow">
             <span class="rank">{% if loop.index==1 %}🥇{% elif loop.index==2 %}🥈{% elif loop.index==3 %}🥉{% else %}#{{ loop.index }}{% endif %}</span>
-            <span class="nm">{{ name }}</span>
-            <span class="ct">{{ n }}</span>
+            <span class="nm">{{ name }}</span><span class="ct">{{ n }}</span>
           </div>
         {% endfor %}
       </div>
-      {% if not contest.get('active') %}<p class="hint">🏆 Concurs încheiat. Câștigător: <b>{{ standings[0][0] }}</b> cu {{ standings[0][1] }} invitații.</p>{% endif %}
-    {% elif contest.get('active') %}
-      <div class="live"><div class="row"><span class="nm" style="color:var(--muted)">Încă nu a invitat nimeni.</span></div></div>
+      {% if st == 'ended' %}<p class="hint">🏆 Încheiat. Câștigător: <b>{{ standings[0][0] }}</b> cu {{ standings[0][1] }} invitații.</p>{% endif %}
+    {% elif st == 'running' %}
+      <div class="live"><div class="lrow"><span class="nm" style="color:var(--muted)">Încă nu a invitat nimeni.</span></div></div>
     {% endif %}
   </div>
 {% endblock %}

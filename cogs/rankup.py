@@ -29,6 +29,7 @@ from discord.ext import commands, tasks
 from datetime import datetime, timezone
 
 from utils import storage
+from utils.perms import bot_access
 
 DEFAULT_RANKS = ["🫡", "⭐", "⭐⭐", "⭐⭐⭐", "⚡", "⚡⚡", "⚡⚡⚡", "✨"]
 
@@ -186,7 +187,7 @@ class RankUp(commands.Cog):
     rankup = app_commands.Group(name="rankup", description="Rank-uri automate dupa vechime")
 
     @rankup.command(name="run", description="Aplica acum rangurile pe tot serverul")
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @bot_access()
     async def run_now(self, interaction: discord.Interaction):
         cfg = _cfg(interaction.guild_id)
         if not cfg.get("enabled"):
@@ -214,12 +215,6 @@ class RankUp(commands.Cog):
         e.add_field(name="Prima stea dupa", value=f"{cfg.get('first_star_days', 180)} zile", inline=True)
         e.add_field(name="Interval avansare", value=f"{cfg.get('interval_months', 6)} luni", inline=True)
         await interaction.response.send_message(embed=e, ephemeral=True)
-
-    @run_now.error
-    async def _err(self, interaction: discord.Interaction, error):
-        if isinstance(error, app_commands.MissingPermissions):
-            await interaction.response.send_message(
-                "Ai nevoie de permisiunea **Manage Server**.", ephemeral=True)
 
 
 async def setup(bot: commands.Bot):

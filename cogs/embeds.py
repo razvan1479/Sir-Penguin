@@ -28,6 +28,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from utils import storage
+from utils.perms import bot_access
 
 
 def _color_from_hex(value: str) -> discord.Color:
@@ -63,7 +64,7 @@ class Embeds(commands.Cog):
 
     @group.command(name="send", description="Posteaza un embed salvat pe server")
     @app_commands.describe(nume="Numele embed-ului din dashboard", canal="Unde sa-l postez")
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @bot_access()
     async def send(self, interaction: discord.Interaction, nume: str,
                    canal: discord.TextChannel = None):
         embeds = storage.get(interaction.guild_id, "embeds", {})
@@ -81,7 +82,7 @@ class Embeds(commands.Cog):
         await interaction.response.send_message(f"✅ Embed `{nume}` postat in {target.mention}.", ephemeral=True)
 
     @group.command(name="preview", description="Vezi un embed fara sa-l postezi")
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @bot_access()
     async def preview(self, interaction: discord.Interaction, nume: str):
         embeds = storage.get(interaction.guild_id, "embeds", {})
         data = embeds.get(nume)
@@ -100,7 +101,7 @@ class Embeds(commands.Cog):
         await interaction.response.send_message(f"**Embed-uri salvate:**\n{names}", ephemeral=True)
 
     @group.command(name="delete", description="Sterge un embed salvat")
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @bot_access()
     async def delete(self, interaction: discord.Interaction, nume: str):
         embeds = storage.get(interaction.guild_id, "embeds", {})
         if nume not in embeds:

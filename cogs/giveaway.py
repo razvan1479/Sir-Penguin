@@ -35,6 +35,7 @@ from discord import app_commands
 from discord.ext import commands, tasks
 
 from utils import storage
+from utils.perms import bot_access
 
 
 def _color_from_hex(value: str) -> discord.Color:
@@ -276,7 +277,7 @@ class Giveaway(commands.Cog):
     group = app_commands.Group(name="giveaway", description="Giveaway-uri cu buton")
 
     @group.command(name="start", description="Posteaza acum un giveaway (config din dashboard)")
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @bot_access()
     async def start(self, interaction: discord.Interaction):
         data = storage.get(interaction.guild_id, "giveaways", {})
         cfg = data.get("config", {})
@@ -291,7 +292,7 @@ class Giveaway(commands.Cog):
                 "Nu am putut posta (verifica canalul si permisiunile).", ephemeral=True)
 
     @group.command(name="end", description="Incheie acum un giveaway")
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @bot_access()
     async def end(self, interaction: discord.Interaction, message_id: str):
         data = storage.get(interaction.guild_id, "giveaways", {})
         active = data.get("active", {})
@@ -303,7 +304,7 @@ class Giveaway(commands.Cog):
         await self._finalize(interaction.guild, message_id)
 
     @group.command(name="reroll", description="Alege alt castigator pentru un giveaway incheiat")
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @bot_access()
     async def reroll(self, interaction: discord.Interaction, message_id: str):
         data = storage.get(interaction.guild_id, "giveaways", {})
         gw = data.get("ended", {}).get(message_id)

@@ -13,6 +13,7 @@ import logging
 
 import aiohttp
 import discord
+from discord import app_commands
 from discord.ext import commands
 from dotenv import load_dotenv
 
@@ -41,6 +42,23 @@ class MyBot(commands.Bot):
         # Doar incarcam modulele. Sincronizarea comenzilor se face AUTOMAT in
         # on_ready (_auto_sync), instant pe fiecare server. Nu rulezi nimic manual.
         await self.load_all_cogs()
+        self.tree.on_error = self._on_app_command_error
+
+    async def _on_app_command_error(self, interaction, error):
+        # mesaj prietenos cand cineva nu are acces la o comanda de management
+        if isinstance(error, app_commands.CheckFailure):
+            msg = ("⛔ Nu ai acces la aceasta comanda. Un admin iti poate da acces "
+                   "alegand un rol permis din dashboard, pagina Permisiuni.")
+            try:
+                if interaction.response.is_done():
+                    await interaction.followup.send(msg, ephemeral=True)
+                else:
+                    await interaction.response.send_message(msg, ephemeral=True)
+            except discord.HTTPException:
+                pass
+        else:
+            log.error("Eroare la comanda %s: %s",
+                      getattr(interaction.command, "qualified_name", "?"), error)
 
     async def load_all_cogs(self):
         cogs_dir = os.path.join(os.path.dirname(__file__), "cogs")

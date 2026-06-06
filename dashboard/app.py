@@ -492,21 +492,31 @@ def contest(guild_id):
     if request.method == "POST":
         action = request.form.get("action")
         c = storage.get(gid, "contest", {}) or {}
-        if action == "start" and not c.get("active"):
+        if action == "start" and c.get("status") not in ("scheduled", "running"):
+            now = _time.time()
+            start_delay_h = float(request.form.get("start_delay", "0") or 0)
+            dur_days = float(request.form.get("duration_days", "0") or 0)
+            dur_hours = float(request.form.get("duration_hours", "0") or 0)
+            start_ts = now + start_delay_h * 3600
+            dur = dur_days * 86400 + dur_hours * 3600
+            end_ts = (start_ts + dur) if dur > 0 else None
             storage.set(gid, "contest", {
-                "active": True, "start_ts": _time.time(),
+                "status": "scheduled" if start_ts > now + 5 else "running",
                 "name": request.form.get("name", "").strip() or "Concurs invitatii",
-                "started_by": None, "ended_ts": None,
+                "start_ts": start_ts,
+                "end_ts": end_ts,
+                "announce_channel_id": _to_int(request.form.get("announce_channel_id", "")),
+                "winners_count": _to_int(request.form.get("winners_count", "1")) or 1,
             })
-        elif action == "stop" and c.get("active"):
-            c["active"] = False
-            c["ended_ts"] = _time.time()
+        elif action == "stop" and c.get("status") in ("scheduled", "running"):
+            c["status"] = "ended"
+            c["end_ts"] = _time.time()
             storage.set(gid, "contest", c)
         return redirect(url_for("contest", guild_id=guild_id))
 
     c = storage.get(gid, "contest", {}) or {}
     standings = []
-    if c.get("active") or c.get("ended_ts"):
+    if c.get("status") in ("running", "ended"):
         inv = storage.get(gid, "invites", {})
         since = c.get("start_ts", 0)
         counts = {}
@@ -520,9 +530,34 @@ def contest(guild_id):
         ranked = sorted(((u, n) for u, n in counts.items() if n > 0),
                         key=lambda x: x[1], reverse=True)[:10]
         standings = [(resolve_name(gid, u) or f"User {u}", n) for u, n in ranked]
+
+    # timp ramas / pana la start, pentru afisare
+    remaining = None
+    if c.get("status") == "running" and c.get("end_ts"):
+        remaining = max(0, c["end_ts"] - _time.time())
+    elif c.get("status") == "scheduled":
+        remaining = max(0, c.get("start_ts", 0) - _time.time())
+
     return render_template("contest.html", guild_id=guild_id, contest=c,
-                           standings=standings, meta=storage.get(gid, "meta", {}),
-                           section="contest")
+                           standings=standings, remaining=remaining,
+                           meta=storage.get(gid, "meta", {}), section="contest")
+
+
+@app.route("/permissions/<guild_id>", methods=["GET", "POST"])
+@guild_required
+def permissions(guild_id):
+    gid = int(guild_id)
+    if request.method == "POST":
+        chosen = request.form.getlist("roles")  # lista de ID-uri bifate
+        storage.set(gid, "permissions", {"roles": chosen})
+        return redirect(url_for("permissions", guild_id=guild_id, saved=1))
+
+    roles = storage.get(gid, "roles", {}) or {}
+    cfg = storage.get(gid, "permissions", {}) or {}
+    return render_template("permissions.html", guild_id=guild_id,
+                           roles=roles.get("list", []), selected=cfg.get("roles", []),
+                           meta=storage.get(gid, "meta", {}),
+                           section="permissions", saved=request.args.get("saved"))
 
 
 if __name__ == "__main__":

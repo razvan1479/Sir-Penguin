@@ -35,9 +35,10 @@ import datetime
 
 import discord
 from discord import app_commands
-from discord.ext import commands
+from discord.ext import commands, tasks
 
 from utils import storage
+from utils.perms import bot_access
 
 # cont mai nou de atatea zile = considerat "fals" (anti-trisare)
 FAKE_DAYS = 7
@@ -58,6 +59,10 @@ class Invites(commands.Cog):
         self.bot = bot
         self.invite_cache: dict[int, dict[str, int]] = {}
         self.vanity_cache: dict[int, int] = {}
+        self.contest_loop.start()
+
+    def cog_unload(self):
+        self.contest_loop.cancel()
 
     # ------------------------------------------------------------- cache
     async def _cache_guild(self, guild: discord.Guild):
@@ -165,9 +170,10 @@ class Invites(commands.Cog):
             members = data.get("members", {})
             stats = members.setdefault(rec["inviter"], _empty_stats())
             if rec.get("fake"):
-                pass  # ramane "fals" - nu se rasplateste un cont fals care pleaca
+                pass  # cont fals care pleaca ramane "fals" - nu se penalizeaza suplimentar
             else:
-                stats["regular"] = max(0, stats["regular"] - 1)
+                # formula totalului scade deja "left", deci NU mai scadem si din
+                # "regular" (altfel s-ar penaliza de doua ori aceeasi plecare)
                 stats["left"] += 1
             data["members"] = members
         elif rec and rec["inviter"] == "vanity":
@@ -353,7 +359,7 @@ class Invites(commands.Cog):
 
     # ------------------------------------------------------------- comenzi admin
     @app_commands.command(name="addinvites", description="Adauga invitatii bonus unui membru")
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @bot_access()
     async def addinvites(self, interaction: discord.Interaction, membru: discord.Member, numar: int):
         data = storage.get(interaction.guild_id, "invites", {})
         members = data.get("members", {})
@@ -366,7 +372,7 @@ class Invites(commands.Cog):
             f"Total acum: **{invite_total(stats)}**.")
 
     @app_commands.command(name="removeinvites", description="Scade invitatii bonus unui membru")
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @bot_access()
     async def removeinvites(self, interaction: discord.Interaction, membru: discord.Member, numar: int):
         data = storage.get(interaction.guild_id, "invites", {})
         members = data.get("members", {})
@@ -379,7 +385,7 @@ class Invites(commands.Cog):
             f"Total acum: **{invite_total(stats)}**.")
 
     @app_commands.command(name="resetinvites", description="Reseteaza invitatiile (alege perioada, optional un membru)")
-    @app_commands.checks.has_permissions(administrator=True)
+    @bot_access()
     @app_commands.describe(perioada="Ce clasament resetezi", membru="Doar pentru un anumit membru (optional)")
     @app_commands.choices(perioada=[
         app_commands.Choice(name="Tot timpul (sterge tot)", value="all"),
@@ -431,91 +437,132 @@ class Invites(commands.Cog):
             await interaction.response.send_message(msg)
 
     # =================================================== CONCURS de invitatii
-    concurs = app_commands.Group(name="concurs", description="Concurs de invitatii (start/stop/clasament)",
-                                 default_permissions=discord.Permissions(manage_guild=True))
+    # contest = {status: scheduled|running|ended, name, start_ts, end_ts(None=manual),
+    #            announce_channel_id, winners_count}
+    concurs = app_commands.Group(name="concurs", description="Concurs de invitatii (start/stop/clasament)")
 
     def _contest(self, gid):
         return storage.get(gid, "contest", {}) or {}
 
     def _contest_board(self, gid):
-        """Clasamentul concursului curent (de la start incoace), top 10."""
+        """Clasamentul concursului (de la start incoace), top 10."""
         c = self._contest(gid)
-        if not c.get("active"):
-            return None
+        if c.get("status") not in ("running", "ended"):
+            return []
         counts = self._count_since(gid, c.get("start_ts", 0))
-        ranked = sorted([(u, n) for u, n in counts.items() if n > 0],
-                        key=lambda x: x[1], reverse=True)[:10]
-        return ranked
+        return sorted([(u, n) for u, n in counts.items() if n > 0],
+                      key=lambda x: x[1], reverse=True)[:10]
 
-    @concurs.command(name="start", description="Porneste un concurs de invitatii de acum")
+    def _board_lines(self, ranked):
+        out = []
+        for i, (uid, n) in enumerate(ranked, 1):
+            medal = {1: "🥇", 2: "🥈", 3: "🥉"}.get(i, f"`#{i}`")
+            out.append(f"{medal} <@{uid}> — **{n}** invitatii")
+        return "\n".join(out)
+
+    def _final_embed(self, c, ranked):
+        wc = max(1, int(c.get("winners_count", 1)))
+        winners = ranked[:wc]
+        win_txt = ", ".join(f"<@{u}> (**{n}**)" for u, n in winners) if winners else "nimeni"
+        return discord.Embed(
+            title=f"🏆 {c.get('name','Concurs')} · REZULTAT FINAL",
+            description=f"🎉 Castigator(i): {win_txt}\n\n{self._board_lines(ranked) or 'Nicio invitatie.'}",
+            color=discord.Color.gold())
+
+    # ------- bucla care porneste/incheie concursurile programate -------
+    @tasks.loop(seconds=30)
+    async def contest_loop(self):
+        import time
+        now = time.time()
+        for guild in self.bot.guilds:
+            c = self._contest(guild.id)
+            status = c.get("status")
+            if status == "scheduled" and now >= c.get("start_ts", 0):
+                c["status"] = "running"
+                storage.set(guild.id, "contest", c)
+                ch = guild.get_channel(int(c["announce_channel_id"])) if c.get("announce_channel_id") else None
+                if ch:
+                    try:
+                        await ch.send(f"🏁 Concursul **{c.get('name')}** a inceput! Invitati cat mai multi membri!")
+                    except discord.HTTPException:
+                        pass
+            elif status == "running" and c.get("end_ts") and now >= c["end_ts"]:
+                ranked = self._contest_board(guild.id)
+                c["status"] = "ended"
+                storage.set(guild.id, "contest", c)
+                ch = guild.get_channel(int(c["announce_channel_id"])) if c.get("announce_channel_id") else None
+                if ch:
+                    try:
+                        await ch.send(embed=self._final_embed(c, ranked))
+                    except discord.HTTPException:
+                        pass
+
+    @contest_loop.before_loop
+    async def _before_contest(self):
+        await self.bot.wait_until_ready()
+
+    @concurs.command(name="start", description="Porneste un concurs de invitatii de acum (fara durata fixa)")
+    @bot_access()
     async def concurs_start(self, interaction: discord.Interaction, nume: str = "Concurs invitatii"):
         import time
-        existing = self._contest(interaction.guild_id)
-        if existing.get("active"):
+        if self._contest(interaction.guild_id).get("status") in ("scheduled", "running"):
             return await interaction.response.send_message(
-                "Exista deja un concurs activ. Opreste-l intai cu `/concurs stop`.", ephemeral=True)
+                "Exista deja un concurs activ/programat. Opreste-l cu `/concurs stop`.", ephemeral=True)
         storage.set(interaction.guild_id, "contest", {
-            "active": True, "start_ts": time.time(), "name": nume,
-            "started_by": interaction.user.id, "ended_ts": None,
+            "status": "running", "name": nume, "start_ts": time.time(),
+            "end_ts": None, "announce_channel_id": None, "winners_count": 1,
         })
         await interaction.response.send_message(
-            f"🏁 **{nume}** a inceput! De acum se numara invitatiile.\n"
-            f"Vezi clasamentul oricand cu `/concurs clasament`.")
+            f"🏁 **{nume}** a inceput! Vezi clasamentul cu `/concurs clasament`.\n"
+            f"💡 Pentru concurs cu durata fixa si anunt automat, foloseste dashboardul.")
 
     @concurs.command(name="clasament", description="Clasamentul concursului curent")
     async def concurs_board(self, interaction: discord.Interaction):
         c = self._contest(interaction.guild_id)
-        if not c.get("active"):
+        if c.get("status") not in ("running", "ended"):
             return await interaction.response.send_message(
-                "Nu e niciun concurs activ acum. Porneste unul cu `/concurs start`.", ephemeral=True)
+                "Nu e niciun concurs activ. Porneste cu `/concurs start` sau din dashboard.", ephemeral=True)
         ranked = self._contest_board(interaction.guild_id)
         if not ranked:
             return await interaction.response.send_message(
-                f"🏁 **{c.get('name')}** — inca nu a invitat nimeni. Hai, start!")
-        lines = []
-        for i, (uid, n) in enumerate(ranked, 1):
-            medal = {1: "🥇", 2: "🥈", 3: "🥉"}.get(i, f"`#{i}`")
-            lines.append(f"{medal} <@{uid}> — **{n}** invitatii")
+                f"🏁 **{c.get('name')}** — inca nu a invitat nimeni.")
         embed = discord.Embed(title=f"🏁 {c.get('name')} · Clasament",
-                              description="\n".join(lines), color=discord.Color.gold())
+                              description=self._board_lines(ranked), color=discord.Color.gold())
         await interaction.response.send_message(embed=embed)
 
-    @concurs.command(name="stop", description="Opreste concursul si anunta castigatorul")
+    @concurs.command(name="stop", description="Opreste concursul acum si anunta castigatorul")
+    @bot_access()
     async def concurs_stop(self, interaction: discord.Interaction):
         import time
         c = self._contest(interaction.guild_id)
-        if not c.get("active"):
-            return await interaction.response.send_message(
-                "Nu e niciun concurs activ.", ephemeral=True)
+        if c.get("status") not in ("running", "scheduled"):
+            return await interaction.response.send_message("Nu e niciun concurs activ.", ephemeral=True)
         ranked = self._contest_board(interaction.guild_id)
-        c["active"] = False
-        c["ended_ts"] = time.time()
+        c["status"] = "ended"
+        c["end_ts"] = time.time()
         storage.set(interaction.guild_id, "contest", c)
-
         if not ranked:
             return await interaction.response.send_message(
                 f"🏁 **{c.get('name')}** s-a incheiat, dar nu a invitat nimeni. 📭")
-        winner_uid, winner_n = ranked[0]
-        lines = []
-        for i, (uid, n) in enumerate(ranked, 1):
-            medal = {1: "🥇", 2: "🥈", 3: "🥉"}.get(i, f"`#{i}`")
-            lines.append(f"{medal} <@{uid}> — **{n}** invitatii")
-        embed = discord.Embed(
-            title=f"🏆 {c.get('name')} · REZULTAT FINAL",
-            description=f"Castigator: <@{winner_uid}> cu **{winner_n}** invitatii! 🎉\n\n" + "\n".join(lines),
-            color=discord.Color.gold())
-        await interaction.response.send_message(embed=embed)
+        await interaction.response.send_message(embed=self._final_embed(c, ranked))
 
-    @concurs.command(name="status", description="Vezi daca e un concurs activ")
+    @concurs.command(name="status", description="Vezi starea concursului")
     async def concurs_status(self, interaction: discord.Interaction):
         import time
         c = self._contest(interaction.guild_id)
-        if not c.get("active"):
+        st = c.get("status")
+        if st == "scheduled":
+            mins = (c.get("start_ts", 0) - time.time()) / 60
+            msg = f"🕒 **{c.get('name')}** e programat sa inceapa peste **{mins:.0f} minute**."
+        elif st == "running":
+            if c.get("end_ts"):
+                left = (c["end_ts"] - time.time()) / 3600
+                msg = f"🏁 **{c.get('name')}** e activ. Mai sunt **{left:.1f} ore**."
+            else:
+                msg = f"🏁 **{c.get('name')}** e activ (fara durata fixa)."
+        else:
             return await interaction.response.send_message("Niciun concurs activ.", ephemeral=True)
-        days = (time.time() - c.get("start_ts", 0)) / 86400
-        await interaction.response.send_message(
-            f"🏁 **{c.get('name')}** e activ de **{days:.1f} zile**. Clasament: `/concurs clasament`.",
-            ephemeral=True)
+        await interaction.response.send_message(msg, ephemeral=True)
 
 
 async def setup(bot: commands.Bot):

@@ -20,6 +20,7 @@ from discord import app_commands
 from discord.ext import commands, tasks
 
 from utils import storage
+from utils.perms import has_bot_access
 
 
 class MassRole(commands.Cog):
@@ -29,6 +30,9 @@ class MassRole(commands.Cog):
 
     def cog_unload(self):
         self.job_loop.cancel()
+
+    async def interaction_check(self, interaction):
+        return has_bot_access(interaction)
 
     # ----------------------------------------------- sync roluri -> storage
     def _store_roles(self, guild: discord.Guild):
@@ -137,8 +141,7 @@ class MassRole(commands.Cog):
         await self.bot.wait_until_ready()
 
     # ----------------------------------------------- comenzi slash
-    massrole = app_commands.Group(name="massrole", description="Roluri in masa",
-                                  default_permissions=discord.Permissions(manage_roles=True))
+    massrole = app_commands.Group(name="massrole", description="Roluri in masa")
 
     async def _run(self, interaction, action, role, condition, include_bots):
         prob = self._bot_problem(interaction.guild, role) or \

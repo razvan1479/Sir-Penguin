@@ -18,6 +18,7 @@ Hostat 24/7, cu auto-deploy din GitHub.
 - **Piatra-Foarfeca-Hartie** — meci 1v1 cu buton de rematch
 - **Roluri în masă** — dă/scoate roluri la tot serverul sau pe condiții
 - **Dashboard web** — configurezi tot din browser, cu login prin contul tău de Discord
+- **Permisiuni** — alegi din dashboard ce roluri (mai multe) pot folosi comenzile botului
 
 ---
 
@@ -120,10 +121,22 @@ Urmărește cine pe cine invită. Categorii: **reale** (au rămas), **plecate**,
 
 | Comandă | Ce face |
 |---|---|
-| `/concurs start [nume]` 🔒 | Pornește un concurs — numără invitațiile de acum încolo |
+| `/concurs start [nume]` 🔒 | Pornește un concurs simplu — numără invitațiile de acum încolo (fără durată fixă) |
 | `/concurs clasament` 🔒 | Afișează clasamentul concursului curent (top 10) |
-| `/concurs stop` 🔒 | Încheie concursul și anunță câștigătorul |
-| `/concurs status` 🔒 | Spune dacă e un concurs activ și de când |
+| `/concurs stop` 🔒 | Încheie concursul acum și anunță câștigătorul |
+| `/concurs status` 🔒 | Starea concursului (programat / activ / timp rămas) |
+
+**Concurs cu durată și anunț automat (din dashboard → „Concurs invite"):**
+În dashboard poți configura un concurs complet:
+- **Numele** concursului
+- **Când începe** — acum sau programat peste X ore
+- **Durata** — în zile + ore (ex: 7 zile); 0 = fără limită, se oprește manual
+- **Canalul** unde se anunță rezultatul
+- **Câți câștigători** se anunță
+
+Botul pornește singur concursul programat la ora stabilită și, când expiră durata,
+**anunță automat câștigătorii + clasamentul** în canalul ales. Vezi clasamentul
+live și în dashboard pe durata concursului.
 
 Concursul numără doar invitațiile reale (exclude conturile plecate/false) strânse
 de la pornire, fără să afecteze clasamentul „tot timpul". Ideal pentru competiții
@@ -230,6 +243,17 @@ Login-ul cere OAuth2 configurat (vezi `.env`) și adresa din `DISCORD_REDIRECT_U
 adăugată identic în Developer Portal → OAuth2 → Redirects.
 
 ---
+
+## 🔑 Cine poate folosi botul (permisiuni)
+
+În dashboard, pagina **„Permisiuni"** (sus în meniu), per server, alegi ce roluri pot
+folosi comenzile de management (welcome, giveaway, roluri în masă, concurs, embed, etc.).
+Poți bifa **mai multe roluri** deodată.
+
+- **Administratorii** și **proprietarul** serverului au mereu acces, chiar dacă nu bifezi nimic.
+- Oricine are **unul** dintre rolurile bifate poate folosi comenzile.
+- Cine nu are acces primește un mesaj scurt când încearcă o comandă de management.
+- Comenzile publice (ex: `/avatar`, `/alege`, `/rps`, `/leaderboard`) rămân pentru toți.
 
 ## ➕ Cum adaugi un modul nou
 

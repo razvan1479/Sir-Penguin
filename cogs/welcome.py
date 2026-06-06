@@ -28,6 +28,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from utils import storage
+from utils.perms import bot_access
 
 
 def _color_from_hex(value: str) -> discord.Color:
@@ -41,15 +42,19 @@ class Welcome(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    async def _build_embed(self, member, cfg, inviter_info=None):
+    def _welcome_text(self, member, cfg):
         raw = cfg.get("message") or "Bun venit {user} pe {server}!"
-        text = (raw
+        return (raw
                 .replace("{user}", member.mention)
                 .replace("{username}", member.display_name)
                 .replace("{server}", member.guild.name)
                 .replace("{count}", str(member.guild.member_count)))
 
-        embed = discord.Embed(description=text, color=_color_from_hex(cfg.get("color", "#5865f2")))
+    async def _build_embed(self, member, cfg, inviter_info=None):
+        # Embedul e DOAR pentru vizual (avatar, banner, invitator). Textul de
+        # bun venit (cu tagul) se trimite ca mesaj normal, ca sa apara tagul o
+        # singura data si sa-l notifice efectiv pe noul membru.
+        embed = discord.Embed(color=_color_from_hex(cfg.get("color", "#5865f2")))
         embed.set_author(name=f"{member.display_name} a intrat!", icon_url=member.display_avatar.url)
 
         if cfg.get("show_avatar", True):
@@ -67,7 +72,6 @@ class Welcome(commands.Cog):
         if cfg.get("show_inviter", True) and inviter_info:
             t = inviter_info.get("type")
             if t == "personal" and inviter_info.get("inviter_id"):
-                # cate invitatii are acum cel care a invitat (pentru "flex")
                 from cogs.invites import invite_total
                 members = storage.get(member.guild.id, "invites", {}).get("members", {})
                 total = invite_total(members.get(str(inviter_info["inviter_id"]), {}))
@@ -91,8 +95,10 @@ class Welcome(commands.Cog):
         channel = member.guild.get_channel(int(cfg["channel_id"]))
         if channel is None:
             return
+        text = self._welcome_text(member, cfg)
         embed = await self._build_embed(member, cfg, inviter_info)
-        await channel.send(content=member.mention, embed=embed)
+        await channel.send(content=text, embed=embed,
+                           allowed_mentions=discord.AllowedMentions(users=True))
 
     @commands.Cog.listener()
     async def on_member_join(self, member):
@@ -110,18 +116,21 @@ class Welcome(commands.Cog):
     group = app_commands.Group(name="welcome", description="Setari mesaj de bun venit")
 
     @group.command(name="test", description="Trimite un mesaj de test")
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @bot_access()
     async def test(self, interaction):
         cfg = storage.get(interaction.guild_id, "welcome", {})
         if not cfg.get("enabled"):
             return await interaction.response.send_message(
                 "Welcome e dezactivat. Activeaza-l din dashboard.", ephemeral=True)
         fake = {"type": "personal", "inviter_id": interaction.user.id, "inviter_name": str(interaction.user)}
+        text = self._welcome_text(interaction.user, cfg)
         embed = await self._build_embed(interaction.user, cfg, fake)
-        await interaction.response.send_message(embed=embed)
+        await interaction.response.send_message(
+            content=text, embed=embed,
+            allowed_mentions=discord.AllowedMentions(users=True))
 
     @group.command(name="channel", description="Seteaza rapid canalul de bun venit")
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @bot_access()
     async def channel(self, interaction, canal: discord.TextChannel):
         cfg = storage.get(interaction.guild_id, "welcome", {})
         cfg["channel_id"] = canal.id

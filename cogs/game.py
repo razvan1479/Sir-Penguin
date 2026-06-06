@@ -26,6 +26,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from utils import storage
+from utils.perms import bot_access
 
 
 def _cfg(gid) -> dict:
@@ -81,7 +82,7 @@ class Game(commands.Cog):
 
     # ----------------------------------------------------- /randome
     @app_commands.command(name="randome", description="Pregateste o runda noua de joc")
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @bot_access()
     async def randome(self, interaction: discord.Interaction):
         cfg = _cfg(interaction.guild_id)
         if not cfg.get("enabled"):
@@ -128,12 +129,6 @@ class Game(commands.Cog):
 
         await interaction.response.send_message(
             f"🔒 Alegerea ta (**{numar}**) a fost salvata.", ephemeral=True)
-
-    @randome.error
-    async def _randome_err(self, interaction: discord.Interaction, error):
-        if isinstance(error, app_commands.MissingPermissions):
-            await interaction.response.send_message(
-                "Ai nevoie de permisiunea **Manage Server** ca sa pornesti jocul.", ephemeral=True)
 
     # ----------------------------------------------------- timer + final
     async def round_timer(self, guild, channel):
