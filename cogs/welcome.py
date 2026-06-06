@@ -51,10 +51,10 @@ class Welcome(commands.Cog):
                 .replace("{count}", str(member.guild.member_count)))
 
     async def _build_embed(self, member, cfg, inviter_info=None):
-        # Embedul e DOAR pentru vizual (avatar, banner, invitator). Textul de
-        # bun venit (cu tagul) se trimite ca mesaj normal, ca sa apara tagul o
-        # singura data si sa-l notifice efectiv pe noul membru.
-        embed = discord.Embed(color=_color_from_hex(cfg.get("color", "#5865f2")))
+        # Textul de bun venit (cu tagul) sta IN embed. Nu mai trimitem o
+        # mentiune separata deasupra -> tagul apare o singura data, in mesaj.
+        text = self._welcome_text(member, cfg)
+        embed = discord.Embed(description=text, color=_color_from_hex(cfg.get("color", "#5865f2")))
         embed.set_author(name=f"{member.display_name} a intrat!", icon_url=member.display_avatar.url)
 
         if cfg.get("show_avatar", True):
@@ -95,10 +95,9 @@ class Welcome(commands.Cog):
         channel = member.guild.get_channel(int(cfg["channel_id"]))
         if channel is None:
             return
-        text = self._welcome_text(member, cfg)
         embed = await self._build_embed(member, cfg, inviter_info)
-        await channel.send(content=text, embed=embed,
-                           allowed_mentions=discord.AllowedMentions(users=True))
+        # fara "content" -> nu mai apare tagul separat deasupra embedului
+        await channel.send(embed=embed)
 
     @commands.Cog.listener()
     async def on_member_join(self, member):
@@ -123,11 +122,8 @@ class Welcome(commands.Cog):
             return await interaction.response.send_message(
                 "Welcome e dezactivat. Activeaza-l din dashboard.", ephemeral=True)
         fake = {"type": "personal", "inviter_id": interaction.user.id, "inviter_name": str(interaction.user)}
-        text = self._welcome_text(interaction.user, cfg)
         embed = await self._build_embed(interaction.user, cfg, fake)
-        await interaction.response.send_message(
-            content=text, embed=embed,
-            allowed_mentions=discord.AllowedMentions(users=True))
+        await interaction.response.send_message(embed=embed)
 
     @group.command(name="channel", description="Seteaza rapid canalul de bun venit")
     @bot_access()
