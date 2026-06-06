@@ -1,12 +1,14 @@
 """
-cogs/avatar.py — comenzi /avatar si /banner.
+cogs/avatar.py — comenzi pentru avatare si bannere.
 
-Arata avatarul sau bannerul unui user, cu linkuri de descarcare in mai multe
-formate (PNG, JPG, WEBP si GIF daca e animat).
+Arata avatarul/bannerul unui user SAU iconita/bannerul serverului, cu linkuri
+de descarcare in mai multe formate (PNG, JPG, WEBP si GIF daca e animat).
 
 Comenzi:
-  /avatar [user]   - avatarul (al tau daca nu specifici pe cineva)
-  /banner [user]   - bannerul
+  /avatar [user]    - avatarul unui user (al tau daca nu specifici)
+  /banner [user]    - bannerul unui user
+  /serveravatar     - iconita (avatarul) serverului
+  /serverbanner     - bannerul serverului
 """
 
 import discord
@@ -65,6 +67,36 @@ class AvatarCog(commands.Cog):
         asset = full.banner
         embed = discord.Embed(
             title=f"🎨 Bannerul lui {target.display_name}",
+            description="📥 **Descarca:** " + _download_links(asset),
+            color=discord.Color.blurple(),
+        )
+        embed.set_image(url=asset.replace(size=1024).url)
+        await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(name="serveravatar", description="Arata iconita (avatarul) serverului")
+    async def serveravatar(self, interaction: discord.Interaction):
+        guild = interaction.guild
+        if not guild or not guild.icon:
+            return await interaction.response.send_message(
+                "Acest server nu are o iconita setata. 🤷", ephemeral=True)
+        asset = guild.icon
+        embed = discord.Embed(
+            title=f"🖼️ Iconita serverului {guild.name}",
+            description="📥 **Descarca:** " + _download_links(asset),
+            color=discord.Color.blurple(),
+        )
+        embed.set_image(url=asset.replace(size=1024).url)
+        await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(name="serverbanner", description="Arata bannerul serverului")
+    async def serverbanner(self, interaction: discord.Interaction):
+        guild = interaction.guild
+        if not guild or not guild.banner:
+            return await interaction.response.send_message(
+                "Acest server nu are banner (necesita un nivel de boost). 🤷", ephemeral=True)
+        asset = guild.banner
+        embed = discord.Embed(
+            title=f"🎨 Bannerul serverului {guild.name}",
             description="📥 **Descarca:** " + _download_links(asset),
             color=discord.Color.blurple(),
         )

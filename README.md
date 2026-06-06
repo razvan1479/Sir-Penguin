@@ -152,6 +152,8 @@ Platforme: YouTube (direct), Twitch (cere credențiale în `.env`), Kick, TikTok
 |---|---|
 | `/avatar [user]` | Avatarul cuiva, cu linkuri PNG/JPG/WEBP (și GIF dacă e animat) |
 | `/banner [user]` | Bannerul cuiva, aceleași formate |
+| `/serveravatar` | Iconița (avatarul) serverului, cu linkuri de descărcare |
+| `/serverbanner` | Bannerul serverului, cu linkuri de descărcare |
 
 ### ⏫ Rank-uri auto
 Rang după vechimea pe server: pune emoji-ul potrivit la finalul nickname-ului și
