@@ -124,7 +124,7 @@ class Giveaway(commands.Cog):
         if cfg.get("required_role_id"):
             desc += f"**Doar pentru:** <@&{cfg['required_role_id']}>\n"
         if host_id:
-            desc += f"🎤 **Organizat de:** <@{host_id}>\n"
+            desc += f"✍ **Organizat de:** <@{host_id}>\n"
         desc += "\nApasa butonul de mai jos ca sa participi!"
         embed = discord.Embed(
             title=cfg.get("title", "🎉 GIVEAWAY 🎉"),
