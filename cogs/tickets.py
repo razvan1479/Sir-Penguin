@@ -311,9 +311,6 @@ class Tickets(commands.Cog):
             return await interaction.response.send_message("Doar echipa de suport poate face asta.", ephemeral=True)
 
         target = None
-        if interaction.data.get("resolved"):  # fallback
-            pass
-        # incercam sa rezolvam mention/id
         raw = tinta.strip("<@&!#> ")
         if raw.isdigit():
             target = interaction.guild.get_member(int(raw)) or interaction.guild.get_role(int(raw))
