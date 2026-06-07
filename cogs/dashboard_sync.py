@@ -30,18 +30,45 @@ class DashboardSync(commands.Cog):
             "updated": time.time(),
         })
 
+    def _save_channels(self, guild: discord.Guild):
+        """Scrie categoriile si canalele text, pentru dropdown-urile din dashboard."""
+        if guild is None:
+            return
+        cats, texts = [], []
+        for ch in guild.channels:
+            if isinstance(ch, discord.CategoryChannel):
+                cats.append({"id": str(ch.id), "name": ch.name})
+            elif isinstance(ch, discord.TextChannel):
+                texts.append({"id": str(ch.id), "name": ch.name,
+                              "category": str(ch.category_id) if ch.category_id else None})
+        storage.set(guild.id, "channels", {"categories": cats, "texts": texts})
+
     @commands.Cog.listener()
     async def on_ready(self):
         for g in self.bot.guilds:
             self._save(g)
+            self._save_channels(g)
 
     @commands.Cog.listener()
     async def on_guild_join(self, guild):
         self._save(guild)
+        self._save_channels(guild)
 
     @commands.Cog.listener()
     async def on_guild_update(self, before, after):
         self._save(after)
+
+    @commands.Cog.listener()
+    async def on_guild_channel_create(self, channel):
+        self._save_channels(channel.guild)
+
+    @commands.Cog.listener()
+    async def on_guild_channel_delete(self, channel):
+        self._save_channels(channel.guild)
+
+    @commands.Cog.listener()
+    async def on_guild_channel_update(self, before, after):
+        self._save_channels(after.guild)
 
     @commands.Cog.listener()
     async def on_member_join(self, member):

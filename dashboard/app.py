@@ -604,5 +604,55 @@ def massdm(guild_id):
                            meta=storage.get(gid, "meta", {}), section="massdm")
 
 
+@app.route("/tickets/<guild_id>", methods=["GET", "POST"])
+@guild_required
+def tickets(guild_id):
+    gid = int(guild_id)
+    data = storage.get(gid, "tickets", {}) or {}
+    if request.method == "POST":
+        action = request.form.get("action")
+        if action == "panel":
+            data["panel"] = {
+                "title": request.form.get("title", ""),
+                "description": request.form.get("description", ""),
+                "color": request.form.get("color", "#5865f2"),
+                "image": request.form.get("image", ""),
+                "thumbnail": request.form.get("thumbnail", ""),
+            }
+            data["log_channel_id"] = _to_int(request.form.get("log_channel_id", ""))
+            storage.set(gid, "tickets", data)
+        elif action == "add_type":
+            data.setdefault("types", []).append({
+                "id": uuid.uuid4().hex[:8],
+                "label": request.form.get("label", "").strip() or "Ticket",
+                "emoji": request.form.get("emoji", "").strip(),
+                "button_color": request.form.get("button_color", "blurple"),
+                "support_roles": request.form.getlist("support_roles"),
+                "category_id": _to_int(request.form.get("category_id", "")),
+                "open_message": request.form.get("open_message", ""),
+                "ping_support": request.form.get("ping_support") == "on",
+                "one_per_user": request.form.get("one_per_user") == "on",
+                "btn_close": request.form.get("btn_close") == "on",
+                "btn_close_reason": request.form.get("btn_close_reason") == "on",
+                "btn_claim": request.form.get("btn_claim") == "on",
+            })
+            storage.set(gid, "tickets", data)
+        elif action == "del_type":
+            tid = request.form.get("type_id")
+            data["types"] = [t for t in data.get("types", []) if t.get("id") != tid]
+            storage.set(gid, "tickets", data)
+        return redirect(url_for("tickets", guild_id=guild_id, saved=1))
+
+    roles = storage.get(gid, "roles", {}) or {}
+    channels = storage.get(gid, "channels", {}) or {}
+    return render_template("tickets.html", guild_id=guild_id, data=data,
+                           panel=data.get("panel", {}), types=data.get("types", []),
+                           roles=roles.get("list", []),
+                           categories=channels.get("categories", []),
+                           text_channels=channels.get("texts", []),
+                           meta=storage.get(gid, "meta", {}),
+                           section="tickets", saved=request.args.get("saved"))
+
+
 if __name__ == "__main__":
     app.run(debug=True, port=5000)

@@ -20,6 +20,7 @@ Hostat 24/7, cu auto-deploy din GitHub.
 - **Dashboard web** — configurezi tot din browser, cu login prin contul tău de Discord
 - **Permisiuni** — alegi din dashboard ce roluri (mai multe) pot folosi comenzile botului
 - **Mesaje DM în masă** — trimite un mesaj în DM membrilor, eșalonat (1/minut), cu preview și progres
+- **Tickete** — sistem de tickete cu panou, tipuri multiple, canale private, claim, transcript
 
 ---
 
@@ -263,6 +264,27 @@ pe cei cu DM închise (nu reîncearcă).
 > ⚠️ **Important:** DM-urile în masă nesolicitate sunt considerate spam de Discord și
 > pot duce la ban-ul botului. Eșalonarea reduce riscul, dar nu îl elimină. Folosește doar
 > pentru mesaje relevante membrilor și pe propria răspundere.
+
+## 🎫 Tickete
+
+Sistem de tickete configurabil (în stil Ticket Tool), din dashboard (pagina „Tickete"):
+
+**Panoul** (aspect configurabil): titlu, descriere, culoare, imagine mare (banner),
+thumbnail. Îl postezi cu `/ticket_panel` în canalul dorit.
+
+**Tipuri de tickete** — adaugi câte vrei, fiecare cu:
+- nume pe buton (denumit cum vrei) + emoji + culoare buton
+- rolurile care văd ticketul (echipa de suport, mai multe roluri)
+- categoria în care se creează canalul
+- mesajul afișat la deschidere (cu `{user}`, `{server}`)
+- ce butoane apar (bifezi tu): 🔒 Închide, 📝 Închide cu motiv, 🙋 Claim
+- opțiuni: un singur ticket/persoană, ping la suport la deschidere
+
+**În ticket:** canal privat vizibil doar pentru deschizător + suport; butoanele
+configurate; la închidere se salvează un **transcript HTML** în canalul de loguri,
+apoi canalul se șterge.
+
+Comenzi: `/ticket_panel` (postează panoul), `/add` și `/remove` (membru/rol în ticket).
 
 ## 🔑 Cine poate folosi botul (permisiuni)
 
