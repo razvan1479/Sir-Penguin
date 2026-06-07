@@ -19,6 +19,7 @@ Hostat 24/7, cu auto-deploy din GitHub.
 - **Roluri în masă** — dă/scoate roluri la tot serverul sau pe condiții
 - **Dashboard web** — configurezi tot din browser, cu login prin contul tău de Discord
 - **Permisiuni** — alegi din dashboard ce roluri (mai multe) pot folosi comenzile botului
+- **Mesaje DM în masă** — trimite un mesaj în DM membrilor, eșalonat (1/minut), cu preview și progres
 
 ---
 
@@ -246,6 +247,22 @@ Login-ul cere OAuth2 configurat (vezi `.env`) și adresa din `DISCORD_REDIRECT_U
 adăugată identic în Developer Portal → OAuth2 → Redirects.
 
 ---
+
+## ✉️ Mesaje DM în masă
+
+Trimite un mesaj privat (DM) membrilor serverului, **eșalonat** ca să reducă riscul de spam.
+Se configurează din dashboard (pagina „Mesaje DM"):
+- scrii mesajul, cu **previzualizare** cum va arăta în DM
+- alegi pauza între mesaje (implicit 60 sec = 1/minut, minim 10 sec) și limita pe zi
+- opțional, doar către un anumit rol
+- vezi progresul live (trimise / sărite / azi) și ai buton Start/Stop
+
+Comenzi: `/dm_masa` (pornește) și `/dm_stop` (oprește). Botul sare automat boții și
+pe cei cu DM închise (nu reîncearcă).
+
+> ⚠️ **Important:** DM-urile în masă nesolicitate sunt considerate spam de Discord și
+> pot duce la ban-ul botului. Eșalonarea reduce riscul, dar nu îl elimină. Folosește doar
+> pentru mesaje relevante membrilor și pe propria răspundere.
 
 ## 🔑 Cine poate folosi botul (permisiuni)
 

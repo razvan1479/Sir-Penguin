@@ -560,5 +560,40 @@ def permissions(guild_id):
                            section="permissions", saved=request.args.get("saved"))
 
 
+@app.route("/massdm/<guild_id>", methods=["GET", "POST"])
+@guild_required
+def massdm(guild_id):
+    gid = int(guild_id)
+    cur = storage.get(gid, "massdm", {}).get("campaign", {}) or {}
+    if request.method == "POST":
+        action = request.form.get("action")
+        if action == "save":
+            cur.update(
+                message=request.form.get("message", ""),
+                footer=request.form.get("footer", ""),
+                role_id=_to_int(request.form.get("role_id", "")) or None,
+                delay_seconds=max(10, _to_int(request.form.get("delay_seconds", "60")) or 60),
+                daily_limit=max(1, _to_int(request.form.get("daily_limit", "50")) or 50),
+            )
+            cur.setdefault("status", "stopped")
+            storage.set(gid, "massdm", {"campaign": cur})
+        elif action == "start" and cur.get("status") != "running" and cur.get("message"):
+            # botul construieste coada de destinatari la primul tick (are membrii
+            # in memorie) - asa nu stocam toata lista in fisier
+            cur.update(status="running", sent=0, failed=0, sent_today=0,
+                       day=_time.strftime("%Y-%m-%d"), last_ts=0,
+                       build_queue=True, queue=[], total=0)
+            storage.set(gid, "massdm", {"campaign": cur})
+        elif action == "stop":
+            cur["status"] = "stopped"
+            storage.set(gid, "massdm", {"campaign": cur})
+        return redirect(url_for("massdm", guild_id=guild_id))
+
+    roles = storage.get(gid, "roles", {}) or {}
+    return render_template("massdm.html", guild_id=guild_id, camp=cur,
+                           roles=roles.get("list", []),
+                           meta=storage.get(gid, "meta", {}), section="massdm")
+
+
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
