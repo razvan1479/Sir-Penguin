@@ -2,71 +2,81 @@
 {% block title %}Rank-uri auto · {{ meta.get('name','Server') }}{% endblock %}
 
 {% block extra_style %}
-    .panel { background:var(--card); border-radius:14px; padding:22px; max-width:680px; }
-    label { display:block; font-weight:600; margin:18px 0 8px; font-size:12px; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); }
+    .panel { background:var(--card); border-radius:14px; padding:22px; max-width:720px; }
+    label { display:block; font-weight:600; margin:16px 0 8px; font-size:12px; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); }
     label:first-of-type { margin-top:0; }
-    input[type=text], input[type=number] { width:100%; padding:11px; border-radius:8px; border:none; background:var(--input); color:var(--text); font-size:14px; font-family:inherit; }
-    .toggle { display:flex; align-items:center; gap:10px; margin:4px 0 8px; cursor:pointer; }
+    input[type=text], input[type=number], select { padding:10px; border-radius:8px; border:none; background:var(--input); color:var(--text); font-size:14px; font-family:inherit; box-sizing:border-box; }
+    .toggle { display:flex; align-items:center; gap:10px; margin:4px 0; cursor:pointer; }
     .toggle input { width:18px; height:18px; accent-color:var(--accent); }
-    .hint { color:var(--muted); font-size:12px; margin-top:6px; }
-    .hint code { background:var(--input); padding:2px 6px; border-radius:4px; }
-    .row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; }
-    @media (max-width:700px){ .row{ grid-template-columns:1fr; } }
-    button.save { background:var(--accent); color:#fff; border:none; padding:13px 26px; border-radius:8px; font-weight:600; cursor:pointer; font-size:15px; margin-top:24px; width:100%; }
-    .sep { height:1px; background:var(--input); margin:22px 0; border:none; }
-    .group-title { font-size:13px; font-weight:700; color:var(--text); margin-bottom:4px; }
+    .hint { color:var(--muted); font-size:12px; margin-top:6px; line-height:1.5; }
+    .tier-head, .tier { display:grid; grid-template-columns:90px 110px 1fr 40px; gap:10px; align-items:center; }
+    .tier-head { font-size:11px; text-transform:uppercase; color:var(--muted); margin:14px 0 6px; letter-spacing:.4px; }
+    .tier { margin-bottom:8px; }
+    .tier input, .tier select { width:100%; }
+    .del { background:#ed4245; color:#fff; border:none; border-radius:8px; height:38px; cursor:pointer; font-size:16px; }
+    .addrow { background:var(--input); color:var(--text); border:1px dashed var(--muted); padding:11px; border-radius:8px; width:100%; cursor:pointer; font-size:14px; margin-top:6px; }
+    button.save { background:var(--accent); color:#fff; border:none; padding:13px 26px; border-radius:8px; font-weight:600; cursor:pointer; font-size:15px; margin-top:22px; width:100%; }
+    .empty-roles { background:var(--input); border-radius:8px; padding:14px; color:var(--muted); font-size:13px; margin-top:8px; }
 {% endblock %}
 
 {% block content %}
-  {% if saved %}<div class="saved">✓ Salvat! Botul foloseste deja noile setari.</div>{% endif %}
+  {% if saved %}<div class="saved">✓ Salvat! Dă /rankup run pe server ca să aplici acum.</div>{% endif %}
 
   <form class="panel" method="POST">
     <label class="toggle">
       <input type="checkbox" name="enabled" {% if cfg.get('enabled') %}checked{% endif %}>
-      <span>Activeaza rank-urile automate</span>
+      <span>Activează rank-urile automate</span>
     </label>
-    <p class="hint">Botul verifica la fiecare 24h (si la pornire). Poti rula si manual cu <code>/rankup run</code>.</p>
 
-    <hr class="sep">
-    <div class="group-title">🏷️ Ranguri (emoji)</div>
-    <label>Lista de ranguri, separate prin virgula</label>
-    <input type="text" name="ranks" value="{{ (cfg.get('ranks') or ['🫡','⭐','⭐⭐','⭐⭐⭐','⚡','⚡⚡','⚡⚡⚡','✨'])|join(', ') }}">
-    <p class="hint">In ordine, de la cel mai mic la cel mai mare. Se adauga la finalul nickname-ului.</p>
+    <label>ID canal pentru loguri (opțional)</label>
+    <input type="text" name="log_channel_id" style="width:100%" value="{{ cfg.get('log_channel_id','') if cfg.get('log_channel_id') is not none else '' }}" placeholder="unde se anunță avansările">
 
-    <hr class="sep">
-    <div class="group-title">⏱️ Vechime</div>
-    <div class="row">
-      <div>
-        <label>Primul rang dupa (zile)</label>
-        <input type="number" name="min_days" value="{{ cfg.get('min_days', 30) }}">
-      </div>
-      <div>
-        <label>Urcare la rang 2 dupa (zile)</label>
-        <input type="number" name="first_star_days" value="{{ cfg.get('first_star_days', 180) }}">
-      </div>
-      <div>
-        <label>Apoi, la fiecare (luni)</label>
-        <input type="number" name="interval_months" value="{{ cfg.get('interval_months', 6) }}">
-      </div>
+    <label>Treptele de rank</label>
+    <p class="hint">Adaugă câte trepte vrei. Fiecare: de la câte <b>zile</b> se obține, un <b>emoji</b> (opțional, apare la finalul nickname-ului) și un <b>rol</b> (opțional). Membrul primește rolul celei mai înalte trepte atinse și pierde rolul treptei anterioare.</p>
+
+    {% if not roles %}
+      <div class="empty-roles">⚠️ Botul nu a sincronizat încă rolurile — vei putea alege rolul după ce repornește. Poți seta totuși zilele și emoji-urile acum.</div>
+    {% endif %}
+
+    <div class="tier-head">
+      <span>Zile</span><span>Emoji</span><span>Rol</span><span></span>
     </div>
-    <p class="hint">Sub primul prag = niciun rang. Intre praguri = primul rang. Apoi avanseaza cu cate un rang la intervalul setat.</p>
+    <div id="tiers">
+      {% for t in cfg.get('tiers', []) %}
+      <div class="tier">
+        <input type="number" name="tier_days" value="{{ t.days }}" min="0" placeholder="ex: 30">
+        <input type="text" name="tier_emoji" value="{{ t.emoji }}" placeholder="⭐">
+        <select name="tier_role">
+          <option value="">— fără rol —</option>
+          {% for r in roles %}{% if r.assignable %}<option value="{{ r.id }}" {% if t.role_id|string==r.id %}selected{% endif %}>{{ r.name }}</option>{% endif %}{% endfor %}
+        </select>
+        <button type="button" class="del" onclick="this.parentElement.remove()">✕</button>
+      </div>
+      {% endfor %}
+    </div>
+    <button type="button" class="addrow" onclick="addTier()">➕ Adaugă o treaptă</button>
 
-    <hr class="sep">
-    <div class="group-title">🎭 Roluri</div>
-    <label>ID rol primar (ranguri mici)</label>
-    <input type="text" name="first_role_id" value="{{ cfg.get('first_role_id', '') if cfg.get('first_role_id') is not none else '' }}" placeholder="ex: 123456789012345678">
-    <label>ID rol veteran (ranguri mari)</label>
-    <input type="text" name="ultimate_role_id" value="{{ cfg.get('ultimate_role_id', '') if cfg.get('ultimate_role_id') is not none else '' }}" placeholder="ex: 123456789012345678">
-    <label>De la al catelea rang se da rolul veteran (index)</label>
-    <input type="number" name="ultimate_rank_index" value="{{ cfg.get('ultimate_rank_index', 4) }}">
-    <p class="hint">Index incepe de la 0. Cu rangurile implicite, <code>4</code> = de la ⚡ in sus primesc rolul veteran, iar sub el primesc rolul primar. Lasa gol ID-urile daca nu vrei roluri.</p>
-
-    <hr class="sep">
-    <div class="group-title">📋 Logare</div>
-    <label>ID canal pentru loguri</label>
-    <input type="text" name="log_channel_id" value="{{ cfg.get('log_channel_id', '') if cfg.get('log_channel_id') is not none else '' }}" placeholder="ex: 123456789012345678">
-    <p class="hint">Aici se anunta schimbarile de rank/rol. Lasa gol daca nu vrei loguri.</p>
-
-    <button class="save" type="submit">Salveaza</button>
+    <button class="save" type="submit">Salvează</button>
   </form>
+
+  <template id="tierTpl">
+    <div class="tier">
+      <input type="number" name="tier_days" min="0" placeholder="ex: 30">
+      <input type="text" name="tier_emoji" placeholder="⭐">
+      <select name="tier_role">
+        <option value="">— fără rol —</option>
+        {% for r in roles %}{% if r.assignable %}<option value="{{ r.id }}">{{ r.name }}</option>{% endif %}{% endfor %}
+      </select>
+      <button type="button" class="del" onclick="this.parentElement.remove()">✕</button>
+    </div>
+  </template>
+
+  <script>
+    function addTier(){
+      const tpl = document.getElementById('tierTpl');
+      document.getElementById('tiers').appendChild(tpl.content.cloneNode(true));
+    }
+    // daca nu exista nicio treapta, punem una goala
+    if(!document.querySelector('#tiers .tier')){ addTier(); }
+  </script>
 {% endblock %}

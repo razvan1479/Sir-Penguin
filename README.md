@@ -187,10 +187,10 @@ Platforme: YouTube (direct), Twitch (cere credențiale în `.env`), Kick, TikTok
 | `/serverbanner` | Bannerul serverului, cu linkuri de descărcare |
 
 ### ⏫ Rank-uri auto
-Rang după vechimea pe server: pune emoji-ul potrivit la finalul nickname-ului și
-dă/scoate roluri (rol „primar" pentru ranguri mici, rol „veteran" de la un rang
-în sus). Verifică la 24h și la pornire. Tot e configurabil din dashboard (ranguri,
-praguri de zile/luni, rolurile, canalul de loguri).
+Rang după vechimea pe server. Definești **câte trepte vrei** în dashboard, fiecare cu
+pragul ei de **zile**, un **emoji** (pus la finalul nickname-ului) și un **rol**.
+Membrul primește rolul + emoji-ul celei mai înalte trepte atinse și pierde rolul
+treptei anterioare (promovare). Verifică la 24h și la pornire.
 
 | Comandă | Ce face |
 |---|---|
