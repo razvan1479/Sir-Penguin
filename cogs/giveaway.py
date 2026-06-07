@@ -116,12 +116,15 @@ class Giveaway(commands.Cog):
         self.ticker.cancel()
 
     # ------------------------------------------------------------- embed
-    def _build_embed(self, cfg, prize, winners, end_ts, count=0) -> discord.Embed:
+    def _build_embed(self, cfg, prize, winners, end_ts, count=0, host_id=None) -> discord.Embed:
         desc = (f"**Premiu:** {prize}\n"
                 f"**Castigatori:** {winners}\n"
-                f"**Se termina:** <t:{end_ts}:R>\n")
+                f"⏰ **Se termina:** <t:{end_ts}:R>\n"
+                f"📅 **Exact la:** <t:{end_ts}:F>\n")
         if cfg.get("required_role_id"):
             desc += f"**Doar pentru:** <@&{cfg['required_role_id']}>\n"
+        if host_id:
+            desc += f"🎤 **Organizat de:** <@{host_id}>\n"
         desc += "\nApasa butonul de mai jos ca sa participi!"
         embed = discord.Embed(
             title=cfg.get("title", "🎉 GIVEAWAY 🎉"),
@@ -132,15 +135,17 @@ class Giveaway(commands.Cog):
         return embed
 
     # ------------------------------------------------------------- postare
-    async def _post_giveaway(self, guild, cfg):
+    async def _post_giveaway(self, guild, cfg, host_id=None):
         channel = guild.get_channel(int(cfg["channel_id"])) if cfg.get("channel_id") else None
         if channel is None:
             return None
         prize = cfg.get("prize") or "Premiu"
         winners = cfg.get("winners", 1)
         end_ts = int(time.time()) + cfg.get("duration_minutes", 60) * 60
+        if host_id is None:
+            host_id = cfg.get("host_id")
 
-        embed = self._build_embed(cfg, prize, winners, end_ts, count=0)
+        embed = self._build_embed(cfg, prize, winners, end_ts, count=0, host_id=host_id)
         view = GiveawayView(cfg.get("button_label") or "🎉 Particip")
         required = cfg.get("required_role_id")
 
@@ -167,6 +172,7 @@ class Giveaway(commands.Cog):
         active[str(msg.id)] = {
             "channel_id": channel.id, "prize": prize, "end_ts": end_ts,
             "winners": winners, "participants": [], "required_role_id": required,
+            "host_id": host_id,
         }
         data["active"] = active
         storage.set(guild.id, "giveaways", data)
@@ -284,7 +290,11 @@ class Giveaway(commands.Cog):
         if not cfg.get("channel_id"):
             return await interaction.response.send_message(
                 "Configureaza intai giveaway-ul in dashboard (canal, premiu, durata).", ephemeral=True)
-        msg = await self._post_giveaway(interaction.guild, cfg)
+        # retinem cine a dat start (apare ca "Organizat de" si la postarile recurente)
+        cfg["host_id"] = interaction.user.id
+        data["config"] = cfg
+        storage.set(interaction.guild_id, "giveaways", data)
+        msg = await self._post_giveaway(interaction.guild, cfg, host_id=interaction.user.id)
         if msg:
             await interaction.response.send_message(f"✅ Giveaway postat: {msg.jump_url}", ephemeral=True)
         else:

@@ -155,8 +155,11 @@ Creezi embed-uri în dashboard (titlu, text, imagine, footer, culoare), le dai u
 
 ### 🎁 Giveaway
 Embed cu buton de înscriere, counter live, se încheie singur la timp, alege
-câștigătorii automat. Configurabil din dashboard (canal, premiu, durată, nr.
-câștigători, text buton, culoare, ping `@everyone`, restricție pe rol, recurență).
+câștigătorii automat. Afișează cine a organizat giveaway-ul („Organizat de @…",
+cel care dă `/giveaway start"), cronometrul live (`se termină în…", actualizat
+automat de Discord) și ora exactă de final. Configurabil din dashboard (canal,
+premiu, durată, nr. câștigători, text buton, culoare, ping `@everyone`,
+restricție pe rol, recurență).
 
 | Comandă | Ce face |
 |---|---|
