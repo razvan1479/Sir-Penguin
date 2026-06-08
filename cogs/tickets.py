@@ -16,7 +16,7 @@ Date (cheia "tickets"):
 {
   "panel": {title, description, color, image, thumbnail},
   "log_channel_id": "...",
-  "counter": 0,
+  "counters": { "<type_id>": 0 },   # numaratoare SEPARATA pe fiecare tip
   "types": [ {id,label,emoji,button_color,support_roles[],category_id,
               open_message,ping_support,one_per_user,
               btn_close,btn_close_reason,btn_claim} ],
@@ -163,8 +163,10 @@ class Tickets(commands.Cog):
             overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True)
 
         category = guild.get_channel(int(t["category_id"])) if t.get("category_id") else None
-        number = data.get("counter", 0) + 1
-        data["counter"] = number
+        # numaratoare SEPARATA pentru fiecare tip de ticket
+        counters = data.setdefault("counters", {})
+        number = counters.get(type_id, 0) + 1
+        counters[type_id] = number
         name = f"{_sanitize(t.get('label','ticket'))}-{number:04d}"
 
         try:
