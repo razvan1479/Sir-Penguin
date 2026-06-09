@@ -43,11 +43,10 @@ class Welcome(commands.Cog):
         self.bot = bot
 
     def _welcome_text(self, member, cfg):
-        # textul din embed foloseste numele afisat (nu mentiunea bruta), ca sa nu
-        # apara niciodata <@id>. Tagul real (cu ping) e pus separat in content.
+        # mentiunea (cu tag) apare si in embed; tagul real cu ping e si in content
         raw = cfg.get("message") or "Bun venit {user} pe {server}!"
         return (raw
-                .replace("{user}", member.display_name)
+                .replace("{user}", member.mention)
                 .replace("{username}", member.display_name)
                 .replace("{server}", member.guild.name)
                 .replace("{count}", str(member.guild.member_count)))
