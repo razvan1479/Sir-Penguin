@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Backup server · {{ meta.get('name','Server') }}{% endblock %}
+
+{% block extra_style %}
+    .panel { background:var(--card); border-radius:14px; padding:22px; max-width:680px; margin-bottom:18px; }
+    h3 { margin:0 0 14px; font-size:16px; }
+    .bk { display:flex; justify-content:space-between; align-items:center; background:var(--input); border-radius:10px; padding:14px 16px; margin-bottom:10px; }
+    .bk b { font-size:15px; } .bk .meta { color:var(--muted); font-size:12px; margin-top:3px; }
+    .actions { display:flex; gap:8px; }
+    a.btn, button { border:none; padding:9px 16px; border-radius:8px; font-weight:600; cursor:pointer; font-size:13px; color:#fff; text-decoration:none; display:inline-block; }
+    .view { background:var(--accent); } .apply { background:#3ba55d; } .del { background:#ed4245; }
+    .empty { background:var(--input); border-radius:10px; padding:18px; color:var(--muted); text-align:center; }
+    .warn { background:#3a2c1a; color:#f0b232; border-radius:9px; padding:12px 14px; font-size:13px; line-height:1.6; margin-bottom:18px; }
+    .info { background:#1e2a3a; color:#5b8fd6; border-radius:9px; padding:12px 14px; font-size:13px; margin-bottom:14px; }
+    .status { border-radius:9px; padding:12px 14px; font-size:14px; margin-bottom:14px; }
+    .st-done{background:#1e3a23;color:#3ba55d}.st-error,.st-needs_confirm{background:#3a1e1e;color:#ed4245}.st-pending,.st-running{background:#3a2c1a;color:#f0b232}
+    .roles { display:flex; flex-wrap:wrap; gap:7px; margin:8px 0 14px; }
+    .rchip { padding:5px 11px; border-radius:14px; font-size:13px; font-weight:600; color:#fff; }
+    .tree { font-size:14px; line-height:1.9; }
+    .cat { font-weight:700; color:var(--text); margin-top:8px; }
+    .ch { color:var(--muted); padding-left:18px; }
+    input[type=text]{ width:100%; padding:10px; border-radius:8px; border:none; background:var(--input); color:var(--text); box-sizing:border-box; font-family:inherit; margin-top:8px; }
+    select{ padding:9px; border-radius:8px; border:none; background:var(--input); color:var(--text); font-family:inherit; }
+{% endblock %}
+
+{% block content %}
+  <div class="info">
+    💾 <b>Backup la structura serverului</b> — salvează roluri, categorii, canale și permisiuni.
+    Scrie <b>/backup</b> pe serverul pe care vrei să-l salvezi, apoi aici îl poți previzualiza și aplica pe alt server.
+    <br><small>Nu se pot copia mesajele, membrii sau istoricul (limită Discord).</small>
+  </div>
+
+  {% if apply_status %}
+    <div class="status st-{{ apply_status.status }}">
+      {% if apply_status.status=='done' %}✅ {{ apply_status.result }}
+      {% elif apply_status.status=='needs_confirm' %}⚠️ {{ apply_status.result }}
+      {% elif apply_status.status=='error' %}❌ {{ apply_status.result }}
+      {% else %}⏳ Se procesează aplicarea... reîncarcă pagina.{% endif %}
+    </div>
+  {% endif %}
+
+  {% if preview %}
+  <div class="panel">
+    <h3>👁️ Preview: {{ preview.name }}</h3>
+    <div class="meta" style="color:var(--muted);font-size:12px;margin-bottom:10px">
+      Sursă: {{ preview.source_name }} · {{ preview.roles|length }} roluri · {{ preview.channels|length }} canale
+    </div>
+
+    <b>Roluri:</b>
+    <div class="roles">
+      {% for r in preview.roles|reverse %}
+        <span class="rchip" style="background:#{{ '%06x'|format(r.color) if r.color else '99aab5' }}">{{ r.name }}</span>
+      {% endfor %}
+    </div>
+
+    <b>Structura canalelor:</b>
+    <div class="tree">
+      {% for cat in preview.categories %}
+        <div class="cat">📁 {{ cat.name }}</div>
+        {% for ch in preview.channels if ch.category==cat.name %}
+          <div class="ch">{% if ch.type=='voice' %}🔊{% else %}#{% endif %} {{ ch.name }}</div>
+        {% endfor %}
+      {% endfor %}
+      {% set orphans = preview.channels|selectattr('category','none')|list %}
+      {% if orphans %}<div class="cat">📁 (fără categorie)</div>{% for ch in orphans %}<div class="ch">{% if ch.type=='voice' %}🔊{% else %}#{% endif %} {{ ch.name }}</div>{% endfor %}{% endif %}
+    </div>
+
+    <hr style="border:none;border-top:1px solid var(--input);margin:18px 0">
+    <div class="warn">
+      ⚠️ Dacă aplici pe un server care are deja canale/roluri, acestea vor fi <b>șterse</b> și înlocuite (ireversibil).
+      Pe un server gol/proaspăt se aplică direct, fără confirmare.
+    </div>
+    <form method="POST">
+      <input type="hidden" name="action" value="apply">
+      <input type="hidden" name="backup_id" value="{{ preview.id }}">
+      <label style="font-size:13px;color:var(--muted)">Dacă serverul curent <b>{{ meta.get('name') }}</b> are deja conținut, scrie-i numele exact ca să confirmi:</label>
+      <input type="text" name="confirm" placeholder="{{ meta.get('name') }}">
+      <button class="apply" type="submit" style="margin-top:12px;width:100%">📥 Aplică acest backup pe {{ meta.get('name') }}</button>
+    </form>
+  </div>
+  {% endif %}
+
+  <div class="panel">
+    <h3>📦 Backup-urile tale ({{ backups|length }})</h3>
+    {% if not backups %}
+      <div class="empty">Niciun backup încă. Scrie <b>/backup</b> pe un server ca să salvezi structura lui.</div>
+    {% else %}
+      {% for b in backups %}
+      <div class="bk">
+        <div>
+          <b>{{ b.name }}</b>
+          <div class="meta">{{ b.source_name }} · {{ b.n_roles }} roluri · {{ b.n_categories }} categorii · {{ b.n_channels }} canale</div>
+        </div>
+        <div class="actions">
+          <a class="btn view" href="/backups/{{ guild_id }}?preview={{ b.id }}">👁️ Preview</a>
+          <form method="POST" onsubmit="return confirm('Ștergi acest backup?')" style="margin:0">
+            <input type="hidden" name="action" value="delete"><input type="hidden" name="backup_id" value="{{ b.id }}">
+            <button class="del" type="submit">🗑️</button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    {% endif %}
+  </div>
+{% endblock %}

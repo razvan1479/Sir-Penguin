@@ -654,5 +654,41 @@ def tickets(guild_id):
                            section="tickets", saved=request.args.get("saved"))
 
 
+@app.route("/backups/<guild_id>", methods=["GET", "POST"])
+@guild_required
+def backups(guild_id):
+    gid = int(guild_id)
+    index = storage.get(0, "backup_index", {}) or {}
+    # doar backup-urile create de acest user (sau de pe acest server)
+    mine = {bid: m for bid, m in index.items()
+            if m and (m.get("owner_id") == session["user"]["id"] or m.get("source_guild_id") == str(gid))}
+
+    if request.method == "POST":
+        action = request.form.get("action")
+        bid = request.form.get("backup_id")
+        if action == "delete" and bid in index:
+            index.pop(bid, None)
+            storage.set(0, "backup_index", index)
+            storage.set(0, f"backup:{bid}", None)
+        elif action == "apply" and bid:
+            # marcam o cerere de aplicare pe care botul o executa
+            storage.set(gid, "backup_apply", {
+                "backup_id": bid, "status": "pending",
+                "confirm": request.form.get("confirm", ""),
+                "requested_ts": _time.time(), "result": ""})
+        return redirect(url_for("backups", guild_id=guild_id))
+
+    preview = None
+    pid = request.args.get("preview")
+    if pid:
+        preview = storage.get(0, f"backup:{pid}", None)
+
+    apply_status = storage.get(gid, "backup_apply", None)
+    return render_template("backups.html", guild_id=guild_id,
+                           backups=sorted(mine.values(), key=lambda m: -m.get("created_ts", 0)),
+                           preview=preview, apply_status=apply_status,
+                           meta=storage.get(gid, "meta", {}), section="backups")
+
+
 if __name__ == "__main__":
     app.run(debug=True, port=5000)

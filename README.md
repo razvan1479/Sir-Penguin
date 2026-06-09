@@ -21,6 +21,7 @@ Hostat 24/7, cu auto-deploy din GitHub.
 - **Permisiuni** — alegi din dashboard ce roluri (mai multe) pot folosi comenzile botului
 - **Mesaje DM în masă** — trimite un mesaj în DM membrilor, eșalonat (1/minut), cu preview și progres
 - **Tickete** — sistem de tickete cu panou, tipuri multiple, canale private, claim, transcript
+- **Backup server** — salvezi structura serverului (roluri/canale) și o aplici pe alt server
 
 ---
 
@@ -285,6 +286,23 @@ configurate; la închidere se salvează un **transcript HTML** în canalul de lo
 apoi canalul se șterge.
 
 Comenzi: `/ticket_panel` (postează panoul), `/add` și `/remove` (membru/rol în ticket).
+
+## 💾 Backup / clonare server
+
+Salvează structura unui server și aplic-o pe altul (din dashboard, pagina „Backup server"):
+
+- Scrie **/backup** pe serverul de salvat → se salvează roluri, categorii, canale,
+  permisiunile pe canale și emoji-urile (cât încap).
+- În dashboard vezi lista backup-urilor, cu **preview** (rolurile colorate + arborele
+  de categorii/canale) înainte să aplici.
+- Alegi pe ce server (unde e botul cu Administrator) să aplici structura.
+
+**Aplicarea:** pe un server gol/proaspăt se aplică direct. Pe un server care are deja
+canale/roluri, trebuie să scrii numele exact al serverului pentru a confirma (structura
+existentă e ștearsă și înlocuită — ireversibil).
+
+> Nu se pot copia mesajele, membrii sau istoricul (limită Discord). Botul aplică doar pe
+> servere unde e deja invitat cu permisiunea Administrator.
 
 ## 🔑 Cine poate folosi botul (permisiuni)
 
