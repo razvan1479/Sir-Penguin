@@ -24,9 +24,11 @@ Schema unui backup:
 overwrites: [{role_name, allow, deny}]  (doar pe roluri, mapate dupa nume)
 """
 
+import io
 import time
 import secrets
 
+import aiohttp
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
@@ -130,21 +132,54 @@ class Backup(commands.Cog):
             entry = {"name": ch.name, "category": ch.category.name if ch.category else None,
                      "position": ch.position, "overwrites": _serialize_overwrites(ch)}
             if isinstance(ch, discord.TextChannel):
-                entry.update(type="text", topic=ch.topic, nsfw=ch.nsfw,
-                             slowmode=ch.slowmode_delay)
+                # canalele de anunturi (news) sunt TextChannel cu is_news()=True
+                is_news = ch.is_news() if hasattr(ch, "is_news") else False
+                entry.update(type="news" if is_news else "text", topic=ch.topic,
+                             nsfw=ch.nsfw, slowmode=ch.slowmode_delay)
             elif isinstance(ch, discord.VoiceChannel):
                 entry.update(type="voice", user_limit=ch.user_limit, bitrate=ch.bitrate)
+            elif isinstance(ch, getattr(discord, "StageChannel", ())):
+                entry.update(type="stage", bitrate=ch.bitrate, user_limit=ch.user_limit)
+            elif isinstance(ch, getattr(discord, "ForumChannel", ())):
+                tags = []
+                for tag in getattr(ch, "available_tags", []) or []:
+                    tags.append({"name": tag.name,
+                                 "emoji": str(tag.emoji) if getattr(tag, "emoji", None) else None,
+                                 "moderated": getattr(tag, "moderated", False)})
+                entry.update(type="forum", topic=ch.topic, nsfw=ch.nsfw, tags=tags)
             else:
                 continue
             channels.append(entry)
 
-        emojis = [{"name": e.name, "url": str(e.url)} for e in guild.emojis]
+        emojis = [{"name": e.name, "url": str(e.url), "animated": e.animated} for e in guild.emojis]
+        stickers = [{"name": s.name, "description": s.description or "",
+                     "emoji": getattr(s, "emoji", "") or "⭐", "url": str(s.url)}
+                    for s in getattr(guild, "stickers", [])]
+
+        def _cname(ch):
+            return ch.name if ch else None
+
+        settings = {
+            "verification_level": guild.verification_level.value,
+            "default_notifications": guild.default_notifications.value,
+            "explicit_content_filter": guild.explicit_content_filter.value,
+            "afk_timeout": guild.afk_timeout,
+            "afk_channel": _cname(guild.afk_channel),
+            "system_channel": _cname(guild.system_channel),
+            "system_channel_flags": guild.system_channel_flags.value,
+            "rules_channel": _cname(guild.rules_channel),
+            "public_updates_channel": _cname(guild.public_updates_channel),
+            "icon": str(guild.icon.url) if guild.icon else None,
+            "banner": str(guild.banner.url) if guild.banner else None,
+            "splash": str(guild.splash.url) if guild.splash else None,
+        }
 
         return {
             "id": secrets.token_hex(5), "name": name,
             "source_guild_id": str(guild.id), "source_name": guild.name,
             "created_ts": time.time(),
-            "roles": roles, "categories": categories, "channels": channels, "emojis": emojis,
+            "roles": roles, "categories": categories, "channels": channels,
+            "emojis": emojis, "stickers": stickers, "settings": settings,
         }
 
     @app_commands.command(name="backup", description="Salveaza structura acestui server ca backup")
@@ -161,12 +196,14 @@ class Backup(commands.Cog):
                            "source_guild_id": snap["source_guild_id"], "created_ts": snap["created_ts"],
                            "owner_id": str(interaction.user.id),
                            "n_roles": len(snap["roles"]), "n_channels": len(snap["channels"]),
-                           "n_categories": len(snap["categories"])}
+                           "n_categories": len(snap["categories"]),
+                           "n_emojis": len(snap["emojis"]), "n_stickers": len(snap["stickers"])}
         _save_index(idx)
         await interaction.followup.send(
             f"✅ Backup salvat: **{name}**\n"
             f"📦 {len(snap['roles'])} roluri · {len(snap['categories'])} categorii · "
-            f"{len(snap['channels'])} canale · {len(snap['emojis'])} emoji-uri\n"
+            f"{len(snap['channels'])} canale · {len(snap['emojis'])} emoji-uri · "
+            f"{len(snap['stickers'])} stickere · setarile serverului\n"
             f"Vezi-le si aplica-le din dashboard → Backup-uri.", ephemeral=True)
 
     # ----------------------------------------------------- aplicare
@@ -235,26 +272,144 @@ class Backup(commands.Cog):
                 report["errors"] += 1
 
         # 4) canale
+        chan_map = {}  # name -> obiect canal creat (pentru setarile serverului)
         for chd in sorted(snap.get("channels", []), key=lambda x: x["position"]):
             try:
                 cat = cat_map.get(chd.get("category"))
                 ow = build_overwrites(chd.get("overwrites", []))
-                if chd["type"] == "text":
-                    await guild.create_text_channel(
+                new_ch = None
+                if chd["type"] in ("text", "news"):
+                    new_ch = await guild.create_text_channel(
                         name=chd["name"], category=cat, overwrites=ow,
                         topic=chd.get("topic"), nsfw=chd.get("nsfw", False),
                         slowmode_delay=chd.get("slowmode", 0), reason="Backup apply")
-                else:
-                    await guild.create_voice_channel(
+                    if chd["type"] == "news":
+                        try:
+                            await new_ch.edit(type=discord.ChannelType.news)
+                        except (discord.HTTPException, TypeError, AttributeError):
+                            pass
+                elif chd["type"] == "voice":
+                    new_ch = await guild.create_voice_channel(
                         name=chd["name"], category=cat, overwrites=ow,
                         user_limit=chd.get("user_limit", 0),
                         bitrate=min(chd.get("bitrate", 64000), guild.bitrate_limit),
                         reason="Backup apply")
+                elif chd["type"] == "stage":
+                    new_ch = await guild.create_stage_channel(
+                        name=chd["name"], category=cat, overwrites=ow, reason="Backup apply")
+                elif chd["type"] == "forum":
+                    new_ch = await self._create_forum(guild, chd, cat, ow)
+                else:
+                    continue
+                if new_ch is not None:
+                    chan_map[chd["name"]] = new_ch
                 report["channels"] += 1
+            except (discord.HTTPException, AttributeError, TypeError):
+                report["errors"] += 1
+
+        # 5) emoji-uri (descarcate de pe CDN si re-incarcate)
+        for ed in snap.get("emojis", []):
+            data = await self._download(ed.get("url"))
+            if not data:
+                report["errors"] += 1
+                continue
+            try:
+                await guild.create_custom_emoji(name=ed["name"], image=data, reason="Backup apply")
+                report["emojis"] = report.get("emojis", 0) + 1
+            except discord.HTTPException:
+                report["errors"] += 1  # depasit limita serverului / nume invalid
+
+        # 6) stickere
+        for sd in snap.get("stickers", []):
+            data = await self._download(sd.get("url"))
+            if not data:
+                report["errors"] += 1
+                continue
+            try:
+                file = discord.File(io.BytesIO(data), filename="sticker.png")
+                await guild.create_sticker(name=sd["name"], description=sd.get("description", ""),
+                                           emoji=sd.get("emoji", "⭐"), file=file, reason="Backup apply")
+                report["stickers"] = report.get("stickers", 0) + 1
             except discord.HTTPException:
                 report["errors"] += 1
 
+        # 7) setarile serverului
+        await self._apply_settings(guild, snap.get("settings", {}), chan_map)
+
         return report
+
+    async def _download(self, url):
+        if not url:
+            return None
+        try:
+            async with aiohttp.ClientSession() as s:
+                async with s.get(url) as r:
+                    if r.status == 200:
+                        return await r.read()
+        except Exception:
+            return None
+        return None
+
+    async def _apply_settings(self, guild, s, chan_map):
+        if not s:
+            return
+        kw = {}
+        try:
+            kw["verification_level"] = discord.VerificationLevel(s["verification_level"])
+            kw["default_notifications"] = discord.NotificationLevel(s["default_notifications"])
+            kw["explicit_content_filter"] = discord.ContentFilter(s["explicit_content_filter"])
+        except (ValueError, KeyError):
+            pass
+        if s.get("afk_timeout") is not None:
+            kw["afk_timeout"] = s["afk_timeout"]
+        if s.get("afk_channel") and chan_map.get(s["afk_channel"]):
+            kw["afk_channel"] = chan_map[s["afk_channel"]]
+        if s.get("system_channel") and chan_map.get(s["system_channel"]):
+            kw["system_channel"] = chan_map[s["system_channel"]]
+        try:
+            if s.get("system_channel_flags") is not None:
+                kw["system_channel_flags"] = discord.SystemChannelFlags._from_value(s["system_channel_flags"])
+        except Exception:
+            pass
+        # iconita / banner / splash (descarcate)
+        for key in ("icon", "banner", "splash"):
+            if s.get(key):
+                data = await self._download(s[key])
+                if data:
+                    kw[key] = data
+        try:
+            await guild.edit(reason="Backup apply", **kw)
+        except (discord.HTTPException, TypeError):
+            pass
+        # canale community (doar daca serverul tinta e Community)
+        comm = {}
+        if s.get("rules_channel") and chan_map.get(s["rules_channel"]):
+            comm["rules_channel"] = chan_map[s["rules_channel"]]
+        if s.get("public_updates_channel") and chan_map.get(s["public_updates_channel"]):
+            comm["public_updates_channel"] = chan_map[s["public_updates_channel"]]
+        if comm:
+            try:
+                await guild.edit(reason="Backup apply", **comm)
+            except (discord.HTTPException, TypeError):
+                pass
+
+    async def _create_forum(self, guild, chd, cat, ow):
+        # construim tag-urile forumului (daca versiunea de discord.py le suporta)
+        tags = []
+        for td in chd.get("tags", []) or []:
+            try:
+                emoji = td.get("emoji") or None
+                tags.append(discord.ForumTag(name=td["name"], emoji=emoji,
+                                             moderated=td.get("moderated", False)))
+            except Exception:
+                tags.append(discord.ForumTag(name=td["name"]))
+        kwargs = dict(name=chd["name"], category=cat, overwrites=ow,
+                      topic=chd.get("topic"), nsfw=chd.get("nsfw", False), reason="Backup apply")
+        try:
+            return await guild.create_forum(available_tags=tags, **kwargs)
+        except TypeError:
+            # versiune mai veche fara available_tags -> cream forumul fara tag-uri
+            return await guild.create_forum(**kwargs)
 
 
 async def setup(bot: commands.Bot):

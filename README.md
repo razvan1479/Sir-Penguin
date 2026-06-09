@@ -291,8 +291,11 @@ Comenzi: `/ticket_panel` (postează panoul), `/add` și `/remove` (membru/rol î
 
 Salvează structura unui server și aplic-o pe altul (din dashboard, pagina „Backup server"):
 
-- Scrie **/backup** pe serverul de salvat → se salvează roluri, categorii, canale,
-  permisiunile pe canale și emoji-urile (cât încap).
+- Scrie **/backup** pe serverul de salvat → se salvează roluri (cu ordinea corectă),
+  categorii, toate tipurile de canale (text, voce, anunțuri, forum cu tag-uri, stage),
+  permisiunile pe canale, emoji-urile, stickerele și setările serverului (nivel de
+  verificare, notificări, filtru conținut, canal AFK + timeout, canal de sistem,
+  canale community, iconiță/banner/splash).
 - În dashboard vezi lista backup-urilor, cu **preview** (rolurile colorate + arborele
   de categorii/canale) înainte să aplici.
 - Alegi pe ce server (unde e botul cu Administrator) să aplici structura.
