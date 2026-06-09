@@ -43,9 +43,11 @@ class Welcome(commands.Cog):
         self.bot = bot
 
     def _welcome_text(self, member, cfg):
+        # textul din embed foloseste numele afisat (nu mentiunea bruta), ca sa nu
+        # apara niciodata <@id>. Tagul real (cu ping) e pus separat in content.
         raw = cfg.get("message") or "Bun venit {user} pe {server}!"
         return (raw
-                .replace("{user}", member.mention)
+                .replace("{user}", member.display_name)
                 .replace("{username}", member.display_name)
                 .replace("{server}", member.guild.name)
                 .replace("{count}", str(member.guild.member_count)))
@@ -96,8 +98,9 @@ class Welcome(commands.Cog):
         if channel is None:
             return
         embed = await self._build_embed(member, cfg, inviter_info)
-        # fara "content" -> nu mai apare tagul separat deasupra embedului
-        await channel.send(embed=embed)
+        # tagul real (cu ping) in content -> se afiseaza mereu cu nume, e clickable
+        await channel.send(content=member.mention, embed=embed,
+                           allowed_mentions=discord.AllowedMentions(users=True))
 
     @commands.Cog.listener()
     async def on_member_join(self, member):
@@ -123,7 +126,9 @@ class Welcome(commands.Cog):
                 "Welcome e dezactivat. Activeaza-l din dashboard.", ephemeral=True)
         fake = {"type": "personal", "inviter_id": interaction.user.id, "inviter_name": str(interaction.user)}
         embed = await self._build_embed(interaction.user, cfg, fake)
-        await interaction.response.send_message(embed=embed)
+        await interaction.response.send_message(
+            content=interaction.user.mention, embed=embed,
+            allowed_mentions=discord.AllowedMentions(users=True))
 
     @group.command(name="channel", description="Seteaza rapid canalul de bun venit")
     @bot_access()
