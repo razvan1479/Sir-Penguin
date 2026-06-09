@@ -193,9 +193,11 @@ class Backup(commands.Cog):
                 except discord.HTTPException:
                     report["errors"] += 1
 
-        # 2) roluri (de jos in sus, ca pozitia sa iasa corect)
+        # roluri: le cream de la cel mai INALT la cel mai jos. Discord pune fiecare
+        # rol nou jos (deasupra lui @everyone) si le impinge pe cele dinainte in sus,
+        # deci primul creat ajunge cel mai sus -> ordinea iese corecta.
         role_map = {}  # name -> Role
-        for rd in sorted(snap.get("roles", []), key=lambda x: x["position"]):
+        for rd in sorted(snap.get("roles", []), key=lambda x: x["position"], reverse=True):
             try:
                 role = await guild.create_role(
                     name=rd["name"], colour=discord.Colour(rd["color"]),
