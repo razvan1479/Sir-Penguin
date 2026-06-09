@@ -101,7 +101,9 @@ class Backup(commands.Cog):
                     storage.set(guild.id, "backup_apply", job)
                     continue
 
-            report = await self.apply_backup(guild, snap, wipe=not empty)
+            # stergem MEREU ce exista inainte de a recrea (inclusiv canalele implicite
+            # de pe un server proaspat), ca rezultatul sa fie curat 1:1
+            report = await self.apply_backup(guild, snap, wipe=True)
             job.update(status="done",
                        result=f"Gata! {report['roles']} roluri, {report['categories']} categorii, "
                               f"{report['channels']} canale create ({report['errors']} erori).")
@@ -208,9 +210,10 @@ class Backup(commands.Cog):
 
     # ----------------------------------------------------- aplicare
     async def is_empty_guild(self, guild: discord.Guild) -> bool:
-        """Server 'gol/proaspat': fara roluri custom si <=2 canale implicite."""
+        """Server 'gol/proaspat': fara roluri custom si doar canalele implicite.
+        Un server nou creat are ~4 intrari (2 categorii + general + General)."""
         custom_roles = [r for r in guild.roles if not r.is_default() and not r.managed]
-        return len(custom_roles) == 0 and len(guild.channels) <= 2
+        return len(custom_roles) == 0 and len(guild.channels) <= 4
 
     async def apply_backup(self, guild: discord.Guild, snap: dict, wipe: bool) -> dict:
         report = {"roles": 0, "categories": 0, "channels": 0, "errors": 0}
