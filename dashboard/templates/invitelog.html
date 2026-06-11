@@ -11,6 +11,7 @@
     .who { font-weight:600; }
     .arrow { color:var(--muted); }
     .inv { font-weight:600; color:#9bb7ff; }
+    .count { background:#1e3a23; color:#3ba55d; font-size:11px; font-weight:700; padding:2px 9px; border-radius:10px; }
     .vanity { color:#f0b232; font-weight:600; }
     .unknown { color:var(--muted); font-style:italic; }
     .code { background:var(--card); padding:2px 8px; border-radius:6px; font-size:12px; font-family:ui-monospace,monospace; color:var(--muted); }
@@ -41,6 +42,7 @@
             <span class="unknown">necunoscut</span>
           {% else %}
             <span class="inv">{{ r.inviter_name }}</span>
+            {% if r.inviter_total is not none %}<span class="count">{{ r.inviter_total }} inv</span>{% endif %}
           {% endif %}
           {% if r.code %}<span class="code">{{ r.code }}</span>{% endif %}
           {% if r.fake %}<span class="tag fake">cont nou</span>{% endif %}

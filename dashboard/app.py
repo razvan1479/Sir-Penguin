@@ -697,8 +697,15 @@ def invitelog(guild_id):
     data = storage.get(gid, "invites", {}) or {}
     history = data.get("history", [])
     joined_by = data.get("joined_by", {})
+    members = data.get("members", {})
 
-    # cei care au plecat (nu mai sunt in joined_by)
+    def _total(key):
+        st = members.get(str(key))
+        if not st:
+            return None
+        return (st.get("regular", 0) + st.get("bonus", 0)
+                - st.get("left", 0) - st.get("fake", 0))
+
     rows = []
     for h in reversed(history):  # cele mai noi primele
         mid = h.get("member")
@@ -708,6 +715,7 @@ def invitelog(guild_id):
             "member_id": mid,
             "inviter": inviter,
             "inviter_name": h.get("inviter_name"),
+            "inviter_total": _total(inviter) if inviter not in ("vanity", "unknown") else None,
             "code": h.get("code"),
             "ts": h.get("ts"),
             "fake": h.get("fake", False),
