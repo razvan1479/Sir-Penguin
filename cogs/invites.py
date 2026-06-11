@@ -151,9 +151,11 @@ class Invites(commands.Cog):
             inviter_key = "unknown"
 
         joined_by[str(member.id)] = {"inviter": inviter_key, "code": info.get("code"), "fake": is_fake}
-        # istoricul cu data (pentru leaderboard pe saptamana / luna)
-        history.append({"member": str(member.id), "inviter": inviter_key,
-                        "ts": time.time(), "fake": is_fake, "left": False})
+        # istoricul cu data + nume (pentru leaderboard pe saptamana/luna si jurnalul din dashboard)
+        history.append({"member": str(member.id), "member_name": str(member),
+                        "inviter": inviter_key, "inviter_name": info.get("inviter_name"),
+                        "code": info.get("code"), "ts": time.time(),
+                        "fake": is_fake, "left": False})
 
         data["members"] = members
         data["joined_by"] = joined_by

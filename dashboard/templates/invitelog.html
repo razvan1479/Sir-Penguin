@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Jurnal invitatii · {{ meta.get('name','Server') }}{% endblock %}
+
+{% block extra_style %}
+    .panel { background:var(--card); border-radius:14px; padding:22px; }
+    h3 { margin:0 0 6px; font-size:16px; }
+    .sub { color:var(--muted); font-size:13px; margin:0 0 16px; }
+    .empty { background:var(--input); border-radius:10px; padding:20px; color:var(--muted); text-align:center; }
+    .log { display:flex; flex-direction:column; gap:8px; }
+    .row { display:flex; align-items:center; gap:12px; background:var(--input); border-radius:10px; padding:12px 14px; flex-wrap:wrap; }
+    .who { font-weight:600; }
+    .arrow { color:var(--muted); }
+    .inv { font-weight:600; color:#9bb7ff; }
+    .vanity { color:#f0b232; font-weight:600; }
+    .unknown { color:var(--muted); font-style:italic; }
+    .code { background:var(--card); padding:2px 8px; border-radius:6px; font-size:12px; font-family:ui-monospace,monospace; color:var(--muted); }
+    .time { color:var(--muted); font-size:12px; margin-left:auto; }
+    .tag { font-size:11px; padding:2px 8px; border-radius:10px; font-weight:600; }
+    .tag.fake { background:#3a2c1a; color:#f0b232; }
+    .tag.left { background:#3a1e1e; color:#ed4245; }
+    .search { width:100%; padding:11px; border-radius:8px; border:none; background:var(--input); color:var(--text); font-size:14px; box-sizing:border-box; margin-bottom:14px; font-family:inherit; }
+{% endblock %}
+
+{% block content %}
+  <div class="panel">
+    <h3>📜 Jurnal invitatii</h3>
+    <p class="sub">Cine pe cine a invitat, cu ce cod si cand. Total inregistrari: {{ total }}.</p>
+
+    {% if not rows %}
+      <div class="empty">Inca nu sunt invitatii inregistrate. Pe masura ce intra membri, apar aici.</div>
+    {% else %}
+      <input class="search" id="q" type="text" placeholder="🔍 Cauta dupa nume sau cod..." onkeyup="filter()">
+      <div class="log" id="log">
+        {% for r in rows %}
+        <div class="row" data-s="{{ (r.member_name ~ ' ' ~ (r.inviter_name or '') ~ ' ' ~ (r.code or ''))|lower }}">
+          <span class="who">{{ r.member_name }}</span>
+          <span class="arrow">a fost invitat de</span>
+          {% if r.inviter == 'vanity' %}
+            <span class="vanity">🔗 link vanity</span>
+          {% elif r.inviter == 'unknown' or not r.inviter_name %}
+            <span class="unknown">necunoscut</span>
+          {% else %}
+            <span class="inv">{{ r.inviter_name }}</span>
+          {% endif %}
+          {% if r.code %}<span class="code">{{ r.code }}</span>{% endif %}
+          {% if r.fake %}<span class="tag fake">cont nou</span>{% endif %}
+          {% if r.left %}<span class="tag left">a plecat</span>{% endif %}
+          {% if r.ts %}<span class="time" data-ts="{{ r.ts }}"></span>{% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </div>
+
+  <script>
+    // timp relativ ("acum 2 zile")
+    function rel(ts){
+      const d = Math.floor(Date.now()/1000 - ts);
+      if (d < 60) return 'acum cateva secunde';
+      if (d < 3600) return 'acum ' + Math.floor(d/60) + ' min';
+      if (d < 86400) return 'acum ' + Math.floor(d/3600) + ' h';
+      return 'acum ' + Math.floor(d/86400) + ' zile';
+    }
+    document.querySelectorAll('.time').forEach(function(el){
+      el.textContent = rel(parseFloat(el.dataset.ts));
+    });
+    function filter(){
+      const q = document.getElementById('q').value.toLowerCase();
+      document.querySelectorAll('#log .row').forEach(function(r){
+        r.style.display = r.dataset.s.includes(q) ? '' : 'none';
+      });
+    }
+  </script>
+{% endblock %}
