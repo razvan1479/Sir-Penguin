@@ -140,10 +140,28 @@ class Invites(commands.Cog):
         age = datetime.datetime.now(datetime.timezone.utc) - member.created_at
         is_fake = age.days < FAKE_DAYS
 
+        credited = data.get("credited", {})  # member_id -> inviterul care a primit creditul prima data
+        rejoin = False
+
         if info["type"] == "personal" and info["inviter_id"]:
             inviter_key = str(info["inviter_id"])
-            stats = members.setdefault(inviter_key, _empty_stats())
-            stats["fake" if is_fake else "regular"] += 1
+            if str(member.id) in credited:
+                # ANTI-ABUZ: persoana a mai fost invitata o data -> NU dam credit din nou
+                # (cineva intra, iese si e re-invitat ca sa creasca artificial contorul)
+                rejoin = True
+                first_inviter = credited[str(member.id)]
+                # daca se intoarce la acelasi invitator, anulam penalizarea de plecare
+                if first_inviter == inviter_key and not is_fake:
+                    st = members.setdefault(inviter_key, _empty_stats())
+                    if st.get("left", 0) > 0:
+                        st["left"] -= 1
+                inviter_key = first_inviter  # creditul ramane la primul invitator
+            else:
+                # prima data cand e invitata aceasta persoana -> credit normal
+                stats = members.setdefault(inviter_key, _empty_stats())
+                stats["fake" if is_fake else "regular"] += 1
+                credited[str(member.id)] = inviter_key
+                data["credited"] = credited
         elif info["type"] == "vanity":
             inviter_key = "vanity"
             data["vanity_count"] = data.get("vanity_count", 0) + 1
@@ -151,9 +169,11 @@ class Invites(commands.Cog):
             inviter_key = "unknown"
 
         joined_by[str(member.id)] = {"inviter": inviter_key, "code": info.get("code"), "fake": is_fake}
-        # istoricul cu data (pentru leaderboard pe saptamana / luna)
-        history.append({"member": str(member.id), "inviter": inviter_key,
-                        "ts": time.time(), "fake": is_fake, "left": False})
+        # istoricul cu data + nume (pentru leaderboard pe saptamana/luna si jurnalul din dashboard)
+        history.append({"member": str(member.id), "member_name": str(member),
+                        "inviter": inviter_key, "inviter_name": info.get("inviter_name"),
+                        "code": info.get("code"), "ts": time.time(),
+                        "fake": is_fake, "left": False, "rejoin": rejoin})
 
         data["members"] = members
         data["joined_by"] = joined_by
