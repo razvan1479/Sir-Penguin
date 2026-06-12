@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Permisiuni · {{ meta.get('name','Server') }}{% endblock %}
+
+{% block extra_style %}
+    .panel { background:var(--card); border-radius:14px; padding:22px; max-width:600px; }
+    .intro { color:var(--muted); font-size:14px; line-height:1.6; margin-bottom:18px; }
+    .roles { display:flex; flex-direction:column; gap:8px; max-height:440px; overflow-y:auto; }
+    .role { display:flex; align-items:center; gap:12px; padding:11px 14px; background:var(--input); border-radius:9px; cursor:pointer; }
+    .role input { width:18px; height:18px; accent-color:var(--accent); }
+    .dot { width:12px; height:12px; border-radius:50%; flex-shrink:0; }
+    .rname { flex:1; font-weight:500; }
+    button.save { background:var(--accent); color:#fff; border:none; padding:13px 26px; border-radius:8px; font-weight:600; cursor:pointer; font-size:15px; margin-top:20px; width:100%; }
+    .empty { background:var(--input); border-radius:10px; padding:20px; color:var(--muted); text-align:center; }
+    .note { background:#2b2416; border-radius:8px; padding:12px 14px; color:#f0b232; font-size:13px; margin-top:16px; line-height:1.5; }
+{% endblock %}
+
+{% block content %}
+  {% if saved %}<div class="saved">✓ Salvat! Rolurile alese pot folosi acum botul.</div>{% endif %}
+
+  <div class="panel">
+    <p class="intro">
+      Alege ce roluri pot folosi comenzile de management ale botului (welcome, giveaway,
+      roluri, concurs, etc.). Poți bifa <b>mai multe roluri</b>.<br>
+      Administratorii și proprietarul serverului au mereu acces, chiar dacă nu bifezi nimic.
+    </p>
+
+    {% if not roles %}
+      <div class="empty">Botul nu a sincronizat încă rolurile. Asigură-te că e online și reîncarcă pagina.</div>
+    {% else %}
+    <form method="POST">
+      <div class="roles">
+        {% for r in roles %}
+          {% if not r.default %}
+          <label class="role">
+            <input type="checkbox" name="roles" value="{{ r.id }}" {% if r.id in selected %}checked{% endif %}>
+            <span class="dot" style="background:{{ r.color }}"></span>
+            <span class="rname">{{ r.name }}</span>
+          </label>
+          {% endif %}
+        {% endfor %}
+      </div>
+      <button class="save" type="submit">Salvează</button>
+    </form>
+    <div class="note">
+      ⚠️ Dă acces doar rolurilor de încredere — cine are unul dintre aceste roluri va putea
+      folosi comenzi puternice (ex: roluri în masă, giveaway, reset invitații).
+    </div>
+    {% endif %}
+  </div>
+{% endblock %}

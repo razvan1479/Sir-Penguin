@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bot Dashboard</title>
+  <style>
+    :root { --bg:#1a1b1e; --card:#2b2d31; --accent:#5865f2; --text:#dbdee1; --muted:#949ba4; }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { font-family:system-ui,sans-serif; background:var(--bg); color:var(--text); padding:32px 24px; }
+    .wrap { max-width:780px; margin:0 auto; }
+
+    .topbar { display:flex; align-items:center; justify-content:space-between; margin-bottom:32px; }
+    .me { display:flex; align-items:center; gap:10px; }
+    .me img { width:38px; height:38px; border-radius:50%; }
+    .me .av { width:38px; height:38px; border-radius:50%; background:var(--accent); display:flex; align-items:center; justify-content:center; font-weight:700; color:#fff; }
+    .me b { font-size:15px; }
+    .logout { color:var(--muted); text-decoration:none; font-size:14px; border:1px solid #3a3c41; padding:7px 14px; border-radius:8px; }
+    .logout:hover { color:var(--text); border-color:var(--muted); }
+
+    h2 { font-size:14px; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); margin:26px 0 14px; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(230px,1fr)); gap:14px; }
+    .server { background:var(--card); border-radius:14px; padding:18px; display:flex; align-items:center; gap:14px;
+              text-decoration:none; color:var(--text); border:2px solid transparent; transition:.15s; }
+    .server:hover { border-color:var(--accent); transform:translateY(-2px); }
+    .ava { width:52px; height:52px; border-radius:50%; flex-shrink:0; object-fit:cover; background:var(--accent);
+           display:flex; align-items:center; justify-content:center; font-size:20px; font-weight:700; color:#fff; }
+    .server .name { font-weight:600; font-size:15px; line-height:1.2; word-break:break-word; }
+    .server .meta { color:var(--muted); font-size:13px; margin-top:3px; display:flex; align-items:center; gap:5px; }
+    .dot { width:8px; height:8px; border-radius:50%; background:#3ba55d; display:inline-block; }
+    .server.add { opacity:.75; }
+    .server.add .ava { background:#404249; }
+    .server.add .meta { color:var(--accent); }
+    .empty { color:var(--muted); }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div class="me">
+      {% if user.avatar %}<img src="{{ user.avatar }}" alt="">
+      {% else %}<div class="av">{{ user.name[0]|upper }}</div>{% endif %}
+      <b>{{ user.name }}</b>
+    </div>
+    <a class="logout" href="/logout">Deconectare</a>
+  </div>
+
+  {% if guilds %}
+  <h2>Serverele tale (cu botul)</h2>
+  <div class="grid">
+    {% for g in guilds %}
+    <a class="server" href="/guild/{{ g.id }}">
+      {% if g.icon %}<img class="ava" src="{{ g.icon }}" alt="">
+      {% else %}<div class="ava">{{ g.name[0]|upper }}</div>{% endif %}
+      <div>
+        <div class="name">{{ g.name }}</div>
+        <div class="meta"><span class="dot"></span>{% if g.members is not none %}{{ g.members }} membri{% else %}configureaza{% endif %}</div>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="empty">Botul nu e inca pe niciunul dintre serverele tale. Adauga-l mai jos.</p>
+  {% endif %}
+
+  {% if not_added %}
+  <h2>Servere unde poti adauga botul</h2>
+  <div class="grid">
+    {% for g in not_added %}
+    <a class="server add" href="{{ invite_url }}" target="_blank">
+      {% if g.icon %}<img class="ava" src="{{ g.icon }}" alt="">
+      {% else %}<div class="ava">{{ g.name[0]|upper }}</div>{% endif %}
+      <div>
+        <div class="name">{{ g.name }}</div>
+        <div class="meta">+ Adauga botul</div>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+</body>
+</html>

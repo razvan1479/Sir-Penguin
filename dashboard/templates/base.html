@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Dashboard{% endblock %}</title>
+  <style>
+    :root { --bg:#1a1b1e; --card:#2b2d31; --input:#1e1f22; --accent:#5865f2; --gold:#f0b232; --text:#dbdee1; --muted:#949ba4; }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { font-family:system-ui,sans-serif; background:var(--bg); color:var(--text); padding:36px 24px; }
+    .wrap { max-width:1360px; margin:0 auto; }
+    a.back { color:var(--accent); text-decoration:none; font-size:14px; }
+    .server-header { display:flex; align-items:center; gap:14px; margin:14px 0 22px; }
+    .server-header .icon, .server-header .icon-fallback { width:56px; height:56px; border-radius:50%; flex-shrink:0; }
+    .server-header .icon { object-fit:cover; }
+    .server-header .icon-fallback { background:var(--accent); display:flex; align-items:center; justify-content:center; font-size:22px; font-weight:700; color:#fff; }
+    .server-header h1 { font-size:24px; margin:0; }
+    .server-header .sub { color:var(--muted); font-size:14px; margin-top:3px; }
+
+    .layout { display:grid; grid-template-columns:230px 1fr 300px; gap:24px; align-items:start; }
+    .layout.no-help { grid-template-columns:230px 1fr; }
+
+    .help { background:var(--card); border-radius:14px; padding:16px; position:sticky; top:24px; max-height:calc(100vh - 48px); overflow-y:auto; }
+    .help h2 { font-size:14px; margin:0 0 4px; display:flex; align-items:center; gap:8px; }
+    .help .hsub { color:var(--muted); font-size:11.5px; margin:0 0 12px; line-height:1.5; }
+    .help .hgroup { font-size:11px; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); margin:14px 0 6px; padding-bottom:4px; border-bottom:1px solid var(--input); }
+    .help .cmd { margin-bottom:8px; }
+    .help .cmd code { background:var(--input); color:#a9c7ff; padding:2px 6px; border-radius:5px; font-size:12px; font-family:ui-monospace,monospace; }
+    .help .cmd .d { color:var(--muted); font-size:11.5px; margin-top:2px; line-height:1.45; }
+    .help::-webkit-scrollbar { width:8px; } .help::-webkit-scrollbar-thumb { background:var(--input); border-radius:4px; }
+
+    .sidebar { background:var(--card); border-radius:14px; padding:12px; position:sticky; top:24px; }
+    .side-title { font-size:12px; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); padding:6px 10px 8px; margin-top:14px; }
+    .side-title:first-child { margin-top:0; }
+    .nav { display:flex; align-items:center; gap:11px; padding:11px 12px; border-radius:8px; text-decoration:none; color:var(--text); font-size:15px; font-weight:500; margin-bottom:2px; }
+    .nav:hover { background:var(--input); }
+    .nav.active { background:var(--accent); color:#fff; }
+    .nav .ic { font-size:18px; width:22px; text-align:center; }
+
+    .saved { background:#248046; color:#fff; padding:8px 14px; border-radius:8px; display:inline-block; margin-bottom:16px; font-size:14px; }
+
+    /* TELEFON: o singura coloana, meniul curge normal cu pagina (nu lipit),
+       ca sa nu mai intre continutul sub el cand derulezi. */
+    @media (max-width:1100px){
+      .layout { grid-template-columns:230px 1fr; }
+      .help { display:none; }
+    }
+    @media (max-width:880px){
+      .layout { grid-template-columns:1fr; }
+      .sidebar { position:static !important; top:auto !important; margin-bottom:18px; }
+    }
+    {% block extra_style %}{% endblock %}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="/">&larr; Inapoi la servere</a>
+
+  <div class="server-header">
+    {% if meta and meta.get('icon') %}<img class="icon" src="{{ meta.get('icon') }}" alt="">
+    {% elif meta and meta.get('name') %}<div class="icon-fallback">{{ meta.get('name')[0]|upper }}</div>
+    {% else %}<div class="icon-fallback">?</div>{% endif %}
+    <div>
+      <h1>{{ meta.get('name') if meta and meta.get('name') else 'Server' }}</h1>
+      <div class="sub">{% if meta and meta.get('members') is not none %}{{ meta.get('members') }} membri · {% endif %}ID: {{ guild_id }}</div>
+    </div>
+  </div>
+
+  {% set CMD_SECTIONS = ['welcome','embeds','notifications','leaderboard','contest','tickets','massrole','massdm','giveaway','rankup','backups','game','rps'] %}
+  <div class="layout {% if section not in CMD_SECTIONS %}no-help{% endif %}">
+    <aside class="sidebar">
+      <p class="side-title">⚙️ General</p>
+      <a class="nav {% if section=='permissions' %}active{% endif %}" href="/permissions/{{ guild_id }}"><span class="ic">🔑</span> Permisiuni</a>
+      <a class="nav {% if section=='welcome' %}active{% endif %}" href="/guild/{{ guild_id }}"><span class="ic">👋</span> Bun venit</a>
+      <a class="nav {% if section=='embeds' %}active{% endif %}" href="/embeds/{{ guild_id }}"><span class="ic">🧩</span> Embed builder</a>
+      <a class="nav {% if section=='notifications' %}active{% endif %}" href="/notifications/{{ guild_id }}"><span class="ic">🔔</span> Notificari</a>
+
+      <p class="side-title">📨 Invitatii</p>
+      <a class="nav {% if section=='leaderboard' %}active{% endif %}" href="/leaderboard/{{ guild_id }}"><span class="ic">🏆</span> Leaderboard</a>
+      <a class="nav {% if section=='invitelog' %}active{% endif %}" href="/invitelog/{{ guild_id }}"><span class="ic">📜</span> Jurnal invitatii</a>
+      <a class="nav {% if section=='contest' %}active{% endif %}" href="/contest/{{ guild_id }}"><span class="ic">🏁</span> Concurs invite</a>
+
+      <p class="side-title">🛠️ Management</p>
+      <a class="nav {% if section=='tickets' %}active{% endif %}" href="/tickets/{{ guild_id }}"><span class="ic">🎫</span> Tickete</a>
+      <a class="nav {% if section=='massrole' %}active{% endif %}" href="/massrole/{{ guild_id }}"><span class="ic">🎭</span> Roluri in masa</a>
+      <a class="nav {% if section=='massdm' %}active{% endif %}" href="/massdm/{{ guild_id }}"><span class="ic">✉️</span> Mesaje DM</a>
+      <a class="nav {% if section=='giveaway' %}active{% endif %}" href="/giveaway/{{ guild_id }}"><span class="ic">🎁</span> Giveaway</a>
+      <a class="nav {% if section=='rankup' %}active{% endif %}" href="/rankup/{{ guild_id }}"><span class="ic">⏫</span> Rank-uri auto</a>
+      <a class="nav {% if section=='backups' %}active{% endif %}" href="/backups/{{ guild_id }}"><span class="ic">💾</span> Backup server</a>
+
+      <p class="side-title">🎮 Distractie</p>
+      <a class="nav {% if section=='game' %}active{% endif %}" href="/game/{{ guild_id }}"><span class="ic">🎲</span> Joc numere</a>
+      <a class="nav {% if section=='rps' %}active{% endif %}" href="/rps/{{ guild_id }}"><span class="ic">✊</span> Piatra-foarfeca</a>
+    </aside>
+
+    <main>{% block content %}{% endblock %}</main>
+
+    {% if section in CMD_SECTIONS %}
+    <aside class="help">
+      <h2>📖 Comenzi</h2>
+      <p class="hsub">Comenzile pentru pagina asta. Scrie <code>/</code> în Discord ca să le vezi și acolo.</p>
+
+      {% if section=='welcome' %}
+        <div class="hgroup">👋 Bun venit</div>
+        <div class="cmd"><code>/welcome test</code><div class="d">Trimite un mesaj de test de bun venit</div></div>
+        <div class="cmd"><code>/welcome channel</code><div class="d">Setează rapid canalul de bun venit</div></div>
+
+      {% elif section=='embeds' %}
+        <div class="hgroup">🧩 Embed</div>
+        <div class="cmd"><code>/embed send</code><div class="d">Postează un embed salvat pe server</div></div>
+        <div class="cmd"><code>/embed preview</code><div class="d">Vezi un embed fără să-l postezi</div></div>
+        <div class="cmd"><code>/embed list</code><div class="d">Lista embed-urilor salvate</div></div>
+        <div class="cmd"><code>/embed delete</code><div class="d">Șterge un embed salvat</div></div>
+
+      {% elif section=='notifications' %}
+        <div class="hgroup">🔔 Notificări</div>
+        <div class="cmd"><code>/notify list</code><div class="d">Creatorii urmăriți pe server</div></div>
+        <div class="cmd"><code>/notify test</code><div class="d">Trimite o notificare de test</div></div>
+        <div class="hgroup">🖼️ Avatar &amp; utilitare</div>
+        <div class="cmd"><code>/avatar</code><div class="d">Arată avatarul unui user</div></div>
+        <div class="cmd"><code>/banner</code><div class="d">Arată bannerul unui user</div></div>
+        <div class="cmd"><code>/serveravatar</code><div class="d">Arată iconița serverului</div></div>
+        <div class="cmd"><code>/serverbanner</code><div class="d">Arată bannerul serverului</div></div>
+
+      {% elif section=='leaderboard' %}
+        <div class="hgroup">📨 Invitații</div>
+        <div class="cmd"><code>/invites</code><div class="d">Vezi numărul și detalierea invitațiilor</div></div>
+        <div class="cmd"><code>/inviter</code><div class="d">Cine a invitat un membru</div></div>
+        <div class="cmd"><code>/invitedlist</code><div class="d">Lista celor invitați de cineva</div></div>
+        <div class="cmd"><code>/invitecodes</code><div class="d">Codurile de invitație ale cuiva</div></div>
+        <div class="cmd"><code>/findlink</code><div class="d">Unul dintre linkurile tale de invitație</div></div>
+        <div class="cmd"><code>/leaderboard</code><div class="d">Clasamentul invitatorilor</div></div>
+        <div class="cmd"><code>/addinvites</code><div class="d">Adaugă invitații bonus unui membru (admin)</div></div>
+        <div class="cmd"><code>/removeinvites</code><div class="d">Scade invitații bonus unui membru (admin)</div></div>
+        <div class="cmd"><code>/resetinvites</code><div class="d">Resetează invitațiile, pe perioadă (admin)</div></div>
+
+      {% elif section=='contest' %}
+        <div class="hgroup">🏁 Concurs invitații</div>
+        <div class="cmd"><code>/concurs start</code><div class="d">Pornește un concurs de invitații (admin)</div></div>
+        <div class="cmd"><code>/concurs clasament</code><div class="d">Clasamentul concursului curent</div></div>
+        <div class="cmd"><code>/concurs status</code><div class="d">Vezi starea concursului</div></div>
+        <div class="cmd"><code>/concurs stop</code><div class="d">Oprește concursul și anunță câștigătorul (admin)</div></div>
+
+      {% elif section=='tickets' %}
+        <div class="hgroup">🎫 Tickete</div>
+        <div class="cmd"><code>/ticket_panel</code><div class="d">Postează panoul de tickete în acest canal (admin)</div></div>
+        <div class="cmd"><code>/add</code><div class="d">Adaugă un membru/rol în ticketul curent (staff)</div></div>
+        <div class="cmd"><code>/remove</code><div class="d">Scoate un membru/rol din ticketul curent (staff)</div></div>
+
+      {% elif section=='massrole' %}
+        <div class="hgroup">🎭 Roluri în masă</div>
+        <div class="cmd"><code>/massrole give_all</code><div class="d">Dă un rol TUTUROR membrilor</div></div>
+        <div class="cmd"><code>/massrole remove_all</code><div class="d">Scoate un rol de la TOȚI membrii</div></div>
+        <div class="cmd"><code>/massrole give_to</code><div class="d">Dă un rol celor care au deja un anumit rol</div></div>
+        <div class="cmd"><code>/massrole remove_from</code><div class="d">Scoate un rol de la cei cu un anumit rol</div></div>
+
+      {% elif section=='massdm' %}
+        <div class="hgroup">✉️ Mesaje DM</div>
+        <div class="cmd"><code>/dm_masa</code><div class="d">Pornește campania de DM eșalonat (config în dashboard)</div></div>
+        <div class="cmd"><code>/dm_stop</code><div class="d">Oprește campania de DM în masă</div></div>
+
+      {% elif section=='giveaway' %}
+        <div class="hgroup">🎁 Giveaway</div>
+        <div class="cmd"><code>/giveaway start</code><div class="d">Postează acum un giveaway (config în dashboard)</div></div>
+        <div class="cmd"><code>/giveaway end</code><div class="d">Încheie acum un giveaway</div></div>
+        <div class="cmd"><code>/giveaway reroll</code><div class="d">Alege alt câștigător pentru un giveaway încheiat</div></div>
+
+      {% elif section=='rankup' %}
+        <div class="hgroup">⏫ Rank-uri auto</div>
+        <div class="cmd"><code>/rankup run</code><div class="d">Aplică acum rangurile pe tot serverul (admin)</div></div>
+        <div class="cmd"><code>/rankup status</code><div class="d">Vezi configurația rank-urilor</div></div>
+
+      {% elif section=='backups' %}
+        <div class="hgroup">💾 Backup server</div>
+        <div class="cmd"><code>/backup</code><div class="d">Salvează structura acestui server ca backup (admin)</div></div>
+
+      {% elif section=='game' %}
+        <div class="hgroup">🎲 Joc numere</div>
+        <div class="cmd"><code>/randome</code><div class="d">Pregătește o rundă nouă de joc (admin)</div></div>
+        <div class="cmd"><code>/alege</code><div class="d">Alege un număr (privat)</div></div>
+
+      {% elif section=='rps' %}
+        <div class="hgroup">✊ Piatra-foarfecă</div>
+        <div class="cmd"><code>/rps</code><div class="d">Piatra / Foarfecă / Hârtie cu un adversar</div></div>
+      {% endif %}
+    </aside>
+    {% endif %}
+  </div>
+</div>
+{% block scripts %}{% endblock %}
+</body>
+</html>

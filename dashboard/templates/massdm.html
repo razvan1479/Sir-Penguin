@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Mesaje DM · {{ meta.get('name','Server') }}{% endblock %}
+
+{% block extra_style %}
+    .panel { background:var(--card); border-radius:14px; padding:22px; max-width:640px; }
+    label { display:block; font-weight:600; margin:16px 0 8px; font-size:12px; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); }
+    label:first-of-type { margin-top:0; }
+    textarea, input[type=text], input[type=number], select { width:100%; padding:11px; border-radius:8px; border:none; background:var(--input); color:var(--text); font-size:14px; font-family:inherit; box-sizing:border-box; }
+    textarea { min-height:120px; resize:vertical; }
+    .row2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+    button { border:none; padding:12px 22px; border-radius:8px; font-weight:600; cursor:pointer; font-size:14px; margin-top:16px; color:#fff; }
+    button.save { background:var(--accent); }
+    button.start { background:#3ba55d; width:100%; }
+    button.stop { background:#ed4245; width:100%; }
+    .hint { color:var(--muted); font-size:12px; margin-top:6px; line-height:1.5; }
+    .warn { background:#3a2c1a; color:#f0b232; border-radius:9px; padding:12px 14px; font-size:13px; line-height:1.6; margin-bottom:18px; }
+    .preview { background:#36393f; border-radius:10px; padding:14px 16px; margin-top:10px; border-left:4px solid var(--accent); }
+    .preview .dm-head { color:#b9bbbe; font-size:12px; margin-bottom:6px; }
+    .preview .dm-body { color:#dcddde; white-space:pre-wrap; font-size:14px; line-height:1.5; }
+    .prog { background:var(--input); border-radius:10px; padding:16px; margin-top:18px; }
+    .bar { height:10px; background:var(--card); border-radius:6px; overflow:hidden; margin:10px 0; }
+    .fill { height:100%; background:var(--accent); }
+    .stat { display:flex; justify-content:space-between; font-size:13px; color:var(--muted); }
+    .badge { display:inline-block; padding:5px 14px; border-radius:20px; font-size:13px; font-weight:600; }
+    .on { background:#1e3a23; color:#3ba55d; } .off { background:var(--input); color:var(--muted); }
+{% endblock %}
+
+{% block content %}
+  <div class="warn">
+    ⚠️ <b>Atenție:</b> mesajele DM în masă pot fi văzute de Discord ca spam și pot duce la
+    ban-ul botului. Trimitem rar (1 la fiecare {{ camp.get('delay_seconds', 60) }} sec) și sărim
+    automat boții și pe cei cu DM închise. Folosește cu cap și doar mesaje relevante pentru membri.
+  </div>
+
+  <div class="panel">
+    {% set st = camp.get('status') %}
+    {% if st == 'running' %}<span class="badge on">📤 Campanie activă</span>
+    {% else %}<span class="badge off">Inactiv</span>{% endif %}
+
+    <form method="POST" style="margin-top:8px">
+      <input type="hidden" name="action" value="save">
+      <label>Mesajul (cum îl vor primi în DM)</label>
+      <textarea name="message" placeholder="Salut! Avem un eveniment nou pe server...">{{ camp.get('message','') }}</textarea>
+
+      <label>Footer (opțional, lasă gol dacă nu vrei)</label>
+      <input type="text" name="footer" value="{{ camp.get('footer','') }}" placeholder="gol = fără footer">
+
+      <label>Trimite doar către rolul (opțional)</label>
+      <select name="role_id">
+        <option value="">Toți membrii (fără boți)</option>
+        {% for r in roles %}
+          {% if not r.default %}<option value="{{ r.id }}" {% if camp.get('role_id')|string==r.id %}selected{% endif %}>{{ r.name }}</option>{% endif %}
+        {% endfor %}
+      </select>
+
+      <div class="row2">
+        <div>
+          <label>Pauză între mesaje (sec)</label>
+          <input type="number" name="delay_seconds" value="{{ camp.get('delay_seconds', 60) }}" min="10">
+        </div>
+        <div>
+          <label>Limită pe zi</label>
+          <input type="number" name="daily_limit" value="{{ camp.get('daily_limit', 50) }}" min="1">
+        </div>
+      </div>
+      <p class="hint">Minim 10 sec între mesaje. Recomandat: 60 sec (1/minut). Limita zilnică oprește trimiterea până a doua zi.</p>
+
+      <button class="save" type="submit">💾 Salvează</button>
+    </form>
+
+    {% if camp.get('message') %}
+    <label>Previzualizare</label>
+    <div class="preview">
+      <div class="dm-head">📩 Mesaj direct de la bot</div>
+      <div class="dm-body">{{ camp.get('message') }}{% if camp.get('footer') %}
+
+<i>{{ camp.get('footer') }}</i>{% endif %}</div>
+    </div>
+    {% endif %}
+
+    {% if st == 'running' or st == 'done' or st == 'stopped' %}
+      {% set total = camp.get('total', 0) %}
+      {% set done = camp.get('sent', 0) + camp.get('failed', 0) %}
+      <div class="prog">
+        <div class="stat"><span>Progres</span><span>{{ done }} / {{ total }}</span></div>
+        <div class="bar"><div class="fill" style="width: {{ (100 * done / total)|round if total else 0 }}%"></div></div>
+        <div class="stat">
+          <span>✅ Trimise: {{ camp.get('sent', 0) }}</span>
+          <span>⏭️ Sărite/eșuate: {{ camp.get('failed', 0) }}</span>
+          <span>📅 Azi: {{ camp.get('sent_today', 0) }}/{{ camp.get('daily_limit', 50) }}</span>
+        </div>
+      </div>
+      <p class="hint">Reîncarcă pagina ca să vezi progresul actualizat.</p>
+    {% endif %}
+
+    <form method="POST">
+      {% if st == 'running' %}
+        <input type="hidden" name="action" value="stop">
+        <button class="stop" type="submit">🛑 Oprește campania</button>
+      {% else %}
+        <input type="hidden" name="action" value="start">
+        <button class="start" type="submit">📤 Pornește trimiterea</button>
+      {% endif %}
+    </form>
+  </div>
+{% endblock %}

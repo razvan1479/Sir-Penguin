@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Embed builder · {{ meta.get('name','Server') }}{% endblock %}
+
+{% block extra_style %}
+    .saved-list { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:18px; }
+    .chip { background:var(--card); border-radius:8px; padding:8px 12px; font-size:14px; display:flex; align-items:center; gap:8px; }
+    .chip a { color:var(--text); text-decoration:none; }
+    .chip .del { color:#f23f43; cursor:pointer; background:none; border:none; font-size:14px; }
+    .new { background:var(--accent); color:#fff; border-radius:8px; padding:8px 12px; font-size:14px; text-decoration:none; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; align-items:start; }
+    @media (max-width:1200px){ .grid{ grid-template-columns:1fr; } }
+    .panel { background:var(--card); border-radius:14px; padding:22px; }
+    label { display:block; font-weight:600; margin:16px 0 7px; font-size:12px; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); }
+    label:first-of-type { margin-top:0; }
+    input[type=text], textarea, input[type=color] { width:100%; padding:11px; border-radius:8px; border:none; background:var(--input); color:var(--text); font-size:14px; font-family:inherit; }
+    textarea { min-height:160px; resize:vertical; line-height:1.5; }
+    input[type=color]{ height:44px; padding:4px; cursor:pointer; }
+    .hint { color:var(--muted); font-size:12px; margin-top:5px; }
+    .hint code { background:var(--input); padding:1px 5px; border-radius:4px; }
+    button.save { background:var(--accent); color:#fff; border:none; padding:13px 26px; border-radius:8px; font-weight:600; cursor:pointer; font-size:15px; margin-top:20px; width:100%; }
+    .preview-title { font-size:12px; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); margin-bottom:12px; }
+    .embed { background:#2b2d31; border-radius:4px; border-left:4px solid var(--accent); padding:14px 16px; position:relative; }
+    .e-title { color:#f2f3f5; font-size:16px; font-weight:600; margin-bottom:8px; max-width:88%; }
+    .e-desc { color:#dbdee1; font-size:14px; line-height:1.5; max-width:88%; }
+    .e-desc ul { margin:4px 0 4px 4px; list-style:none; }
+    .e-desc li { padding-left:14px; position:relative; }
+    .e-desc li:before { content:"•"; position:absolute; left:0; color:#b5bac1; }
+    .e-thumb { position:absolute; top:14px; right:16px; width:72px; height:72px; border-radius:6px; object-fit:cover; background:#1e1f22; }
+    .e-image { width:100%; border-radius:6px; margin-top:12px; display:block; }
+    .e-footer { color:#b5bac1; font-size:12px; margin-top:12px; }
+    .cmd { color:var(--muted); font-size:13px; margin-top:14px; }
+    .cmd code { background:var(--input); padding:2px 6px; border-radius:4px; color:#dbdee1; }
+{% endblock %}
+
+{% block content %}
+  {% if saved %}<div class="saved">✓ Salvat! In Discord: /embed send {{ edit_name }}</div>{% endif %}
+
+  <div class="saved-list">
+    {% for n in embeds %}
+    <span class="chip">
+      <a href="/embeds/{{ guild_id }}?edit={{ n }}">📄 {{ n }}</a>
+      <form method="POST" style="display:inline" onsubmit="return confirm('Sterg embed-ul {{ n }}?')">
+        <input type="hidden" name="action" value="delete"><input type="hidden" name="name" value="{{ n }}">
+        <button class="del" title="Sterge">✕</button>
+      </form>
+    </span>
+    {% endfor %}
+    <a class="new" href="/embeds/{{ guild_id }}">+ Embed nou</a>
+  </div>
+
+  <div class="grid">
+    <form class="panel" method="POST">
+      <label>Nume (identificator)</label>
+      <input type="text" name="name" id="name" placeholder="ex: regulament" value="{{ edit_name }}" required>
+      <p class="hint">Cu el postezi: <code>/embed send NUME</code>. Fara spatii.</p>
+
+      <label>Titlu</label>
+      <input type="text" name="title" id="title" placeholder="📜 Regulament General" value="{{ current.get('title','') }}">
+
+      <label>Text (descriere)</label>
+      <textarea name="description" id="description" placeholder="**1. Dispozitii Generale**&#10;• Regula 1&#10;• Regula 2">{{ current.get('description','') }}</textarea>
+      <p class="hint">Markdown: <code>**ingrosat**</code> <code>*inclinat*</code> · linie noua = Enter · bullet: incepe randul cu <code>•</code> sau <code>-</code></p>
+
+      <label>Culoare</label>
+      <input type="color" name="color" id="color" value="{{ current.get('color','#1abc9c') }}">
+
+      <label>Imagine / GIF (link)</label>
+      <input type="text" name="image" id="image" placeholder="https://...png sau .gif" value="{{ current.get('image','') }}">
+      <p class="hint">Imaginea mare de jos. Urca poza pe Discord, click dreapta → Copiaza link.</p>
+
+      <label>Thumbnail (link, optional)</label>
+      <input type="text" name="thumbnail" id="thumbnail" placeholder="https://..." value="{{ current.get('thumbnail','') }}">
+
+      <label>Footer (optional)</label>
+      <input type="text" name="footer" id="footer" placeholder="Prin participare confirmi ca accepti regulamentul." value="{{ current.get('footer','') }}">
+
+      <button class="save" type="submit">💾 Salveaza embed</button>
+    </form>
+
+    <div class="panel">
+      <p class="preview-title">Previzualizare</p>
+      <div class="embed" id="embed">
+        <img class="e-thumb" id="pv-thumb" src="" alt="">
+        <div class="e-title" id="pv-title"></div>
+        <div class="e-desc" id="pv-desc"></div>
+        <img class="e-image" id="pv-image" src="" alt="">
+        <div class="e-footer" id="pv-footer"></div>
+      </div>
+      <p class="cmd">Dupa salvare, in Discord: <code>/embed send {{ edit_name or 'NUME' }} #canal</code></p>
+    </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const $ = id => document.getElementById(id);
+  function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function fmt(s){ return s.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\*(.+?)\*/g,'<em>$1</em>').replace(/__(.+?)__/g,'<u>$1</u>'); }
+  function md(text){
+    let lines = esc(text).split('\n'), html='', inList=false;
+    for (let ln of lines){
+      let t = ln.trim();
+      if (t.startsWith('•')||t.startsWith('-')||t.startsWith('*')){
+        if(!inList){ html+='<ul>'; inList=true; }
+        html += '<li>'+fmt(t.replace(/^[•\-\*]\s?/,''))+'</li>';
+      } else { if(inList){ html+='</ul>'; inList=false; } html += fmt(ln)+'<br>'; }
+    }
+    if(inList) html+='</ul>';
+    return html;
+  }
+  function render(){
+    $('embed').style.borderLeftColor = $('color').value;
+    const title=$('title').value;
+    $('pv-title').innerHTML=fmt(esc(title)); $('pv-title').style.display=title?'block':'none';
+    $('pv-desc').innerHTML=md($('description').value);
+    const img=$('image').value.trim(); $('pv-image').src=img; $('pv-image').style.display=img?'block':'none';
+    const thumb=$('thumbnail').value.trim(); $('pv-thumb').src=thumb; $('pv-thumb').style.display=thumb?'block':'none';
+    const ft=$('footer').value; $('pv-footer').textContent=ft; $('pv-footer').style.display=ft?'block':'none';
+  }
+  ['title','description','color','image','thumbnail','footer'].forEach(id=>$(id).addEventListener('input',render));
+  $('pv-image').onerror=()=>$('pv-image').style.display='none';
+  $('pv-thumb').onerror=()=>$('pv-thumb').style.display='none';
+  render();
+</script>
+{% endblock %}
