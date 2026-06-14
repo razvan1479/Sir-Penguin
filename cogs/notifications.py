@@ -198,19 +198,39 @@ class Notifications(commands.Cog):
         if not user:
             return None
         try:
-            async with self.session.get(f"https://www.tiktok.com/@{user}") as r:
+            async with self.session.get(
+                    f"https://www.tiktok.com/@{user}",
+                    headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                                           "AppleWebKit/537.36 (KHTML, like Gecko) "
+                                           "Chrome/120.0 Safari/537.36"}) as r:
                 if r.status != 200:
                     return None
                 html = await r.text()
         except aiohttp.ClientError:
             return None
+
+        # video nou
+        vid = None
         m = re.search(r'/video/(\d+)', html)
-        if not m:
-            return None
-        vid = m.group(1)
+        if m:
+            vid = m.group(1)
+
+        # live (best-effort): cautam indicii de live in JSON-ul paginii
+        is_live = False
+        rm = re.search(r'"roomId":"(\d+)"', html)
+        if rm and rm.group(1) not in ("0", ""):
+            is_live = True
+        compact = html.replace(" ", "")
+        if '"isLive":true' in compact or '"liveRoomId":"' in html or '"LiveRoom"' in html:
+            is_live = True
+
         return {"id": vid, "title": "Videoclip nou pe TikTok",
-                "url": f"https://www.tiktok.com/@{user}/video/{vid}",
-                "author": "@" + user, "thumb": None}
+                "url": (f"https://www.tiktok.com/@{user}/video/{vid}" if vid
+                        else f"https://www.tiktok.com/@{user}"),
+                "author": "@" + user, "thumb": None,
+                "is_live": is_live,
+                "live_title": "🔴 Live pe TikTok",
+                "live_url": f"https://www.tiktok.com/@{user}/live"}
 
     # =============================================================== POLLER
     @tasks.loop(minutes=5)
@@ -239,6 +259,29 @@ class Notifications(commands.Cog):
             return
         info = await provider(sub)
         if info is None:
+            return
+
+        if sub["platform"] == "tiktok":
+            # TikTok: tratam AMBELE - si live, si video nou
+            if not sub.get("initialized"):
+                sub["was_live"] = info.get("is_live", False)
+                sub["last_video_id"] = info.get("id")
+                sub["initialized"] = True
+                return
+            # tranzitie live (doar la trecerea din offline in live)
+            live = info.get("is_live", False)
+            if live and not sub.get("was_live"):
+                live_info = {"author": info.get("author"),
+                             "title": info.get("live_title", "🔴 Live pe TikTok"),
+                             "url": info.get("live_url", info.get("url")),
+                             "thumb": info.get("thumb")}
+                await self._notify(guild, sub, live_info, is_live=True)
+            sub["was_live"] = live
+            # video nou
+            vid = info.get("id")
+            if vid and vid != sub.get("last_video_id"):
+                sub["last_video_id"] = vid
+                await self._notify(guild, sub, info, is_live=False)
             return
 
         if sub["platform"] in LIVE_PLATFORMS:
