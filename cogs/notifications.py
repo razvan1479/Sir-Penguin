@@ -262,7 +262,8 @@ class Notifications(commands.Cog):
             return
 
         if sub["platform"] == "tiktok":
-            # TikTok: tratam AMBELE - si live, si video nou
+            # TikTok: respectam ce a ales userul (live / video / ambele)
+            mode = sub.get("tiktok_mode", "both")
             if not sub.get("initialized"):
                 sub["was_live"] = info.get("is_live", False)
                 sub["last_video_id"] = info.get("id")
@@ -270,7 +271,7 @@ class Notifications(commands.Cog):
                 return
             # tranzitie live (doar la trecerea din offline in live)
             live = info.get("is_live", False)
-            if live and not sub.get("was_live"):
+            if mode in ("both", "live") and live and not sub.get("was_live"):
                 live_info = {"author": info.get("author"),
                              "title": info.get("live_title", "🔴 Live pe TikTok"),
                              "url": info.get("live_url", info.get("url")),
@@ -279,9 +280,11 @@ class Notifications(commands.Cog):
             sub["was_live"] = live
             # video nou
             vid = info.get("id")
-            if vid and vid != sub.get("last_video_id"):
+            if mode in ("both", "video") and vid and vid != sub.get("last_video_id"):
                 sub["last_video_id"] = vid
                 await self._notify(guild, sub, info, is_live=False)
+            elif vid:
+                sub["last_video_id"] = vid  # tinem evidenta chiar daca nu anuntam
             return
 
         if sub["platform"] in LIVE_PLATFORMS:

@@ -379,6 +379,7 @@ def notifications(guild_id):
                 "discord_channel_id": dch,
                 "message": request.form.get("message", "").strip(),
                 "role_id": _to_int(request.form.get("role_id", "")),
+                "tiktok_mode": request.form.get("tiktok_mode", "both"),
                 "identifier": None,
                 "initialized": False,
             })
