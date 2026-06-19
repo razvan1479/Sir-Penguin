@@ -1,0 +1,20 @@
+name: Deploy Sir-Penguin
+
+# Se declanseaza automat la fiecare push pe ramura main
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Conectare SSH la server si rulare deploy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            cd ~/Sir-Penguin
+            bash deploy.sh
