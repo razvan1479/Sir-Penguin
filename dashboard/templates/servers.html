@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Servere bot</title>
+  <style>
+    :root { --bg:#1e1f22; --card:#2b2d31; --input:#1e1f22; --text:#f2f3f5; --muted:#949ba4; --accent:#5865f2; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--text); font-family:'gg sans',system-ui,sans-serif; }
+    .wrap { max-width:760px; margin:0 auto; padding:30px 20px; }
+    .back { color:var(--muted); text-decoration:none; font-size:14px; }
+    h1 { font-size:24px; margin:14px 0 4px; }
+    .sub { color:var(--muted); font-size:14px; margin:0 0 22px; }
+    .status { border-radius:9px; padding:12px 14px; font-size:14px; margin-bottom:16px; }
+    .st-done{background:#1e3a23;color:#3ba55d}.st-error{background:#3a1e1e;color:#ed4245}.st-pending{background:#3a2c1a;color:#f0b232}
+    .srv { display:flex; align-items:center; gap:14px; background:var(--card); border-radius:12px; padding:14px 16px; margin-bottom:10px; }
+    .ic { width:48px; height:48px; border-radius:50%; background:var(--input); flex-shrink:0; object-fit:cover; display:flex; align-items:center; justify-content:center; font-size:20px; color:var(--muted); }
+    .info { flex:1; min-width:0; }
+    .info b { font-size:16px; }
+    .meta { color:var(--muted); font-size:13px; margin-top:3px; }
+    .tag { font-size:11px; padding:2px 8px; border-radius:10px; font-weight:600; margin-left:6px; }
+    .tag.mine { background:#1e3a23; color:#3ba55d; }
+    .tag.no { background:#3a2c1a; color:#f0b232; }
+    button { background:#ed4245; color:#fff; border:none; padding:10px 16px; border-radius:8px; font-weight:600; cursor:pointer; font-size:14px; }
+    .empty { background:var(--card); border-radius:12px; padding:24px; color:var(--muted); text-align:center; }
+    .note { background:#1e2a3a; color:#5b8fd6; border-radius:9px; padding:12px 14px; font-size:13px; margin-bottom:18px; line-height:1.6; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <a class="back" href="/">&larr; Inapoi</a>
+    <h1>🤖 Serverele botului</h1>
+    <p class="sub">Toate serverele pe care e Sir-Penguin. Poti scoate botul de pe oricare.</p>
+
+    <div class="note">
+      Aici vezi <b>toate</b> serverele pe care e botul, inclusiv cele pe care poate nu mai esti tu.
+      Daca ai iesit de pe un server dar botul a ramas, il poti scoate de aici.
+    </div>
+
+    {% if leave_status and leave_status.status %}
+      <div class="status st-{{ leave_status.status }}">
+        {% if leave_status.status=='done' %}✅ {{ leave_status.result }}
+        {% elif leave_status.status=='error' %}❌ {{ leave_status.result }}
+        {% else %}⏳ Se proceseaza... reincarca pagina in cateva secunde.{% endif %}
+      </div>
+    {% endif %}
+
+    {% if not servers %}
+      <div class="empty">Lista se incarca... reincarca pagina in ~20 secunde (botul o actualizeaza periodic).</div>
+    {% else %}
+      {% for s in servers %}
+      <div class="srv">
+        {% if s.icon %}<img class="ic" src="{{ s.icon }}" alt="">{% else %}<div class="ic">🏠</div>{% endif %}
+        <div class="info">
+          <b>{{ s.name }}</b>
+          {% if s.i_manage %}<span class="tag mine">esti pe el</span>{% else %}<span class="tag no">nu esti pe el</span>{% endif %}
+          <div class="meta">{{ s.members }} membri · ID {{ s.id }}{% if s.owner %} · owner: {{ s.owner }}{% endif %}</div>
+        </div>
+        <form method="POST" onsubmit="return confirm('Sigur scoti botul de pe „{{ s.name }}”? Va trebui reinvitat ca sa revina.')">
+          <input type="hidden" name="action" value="leave">
+          <input type="hidden" name="guild_id" value="{{ s.id }}">
+          <button type="submit">🚪 Scoate botul</button>
+        </form>
+      </div>
+      {% endfor %}
+    {% endif %}
+  </div>
+</body>
+</html>

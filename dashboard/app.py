@@ -727,5 +727,26 @@ def invitelog(guild_id):
                            section="invitelog")
 
 
+@app.route("/servers", methods=["GET", "POST"])
+def servers():
+    if "user" not in session:
+        return redirect(url_for("index"))
+    if request.method == "POST":
+        gid = request.form.get("guild_id", "")
+        if request.form.get("action") == "leave" and gid.isdigit():
+            storage.set(0, "leave_request", {
+                "guild_id": gid, "status": "pending", "result": ""})
+        return redirect(url_for("servers"))
+
+    bot_servers = storage.get(0, "bot_servers", []) or []
+    # doar serverele unde userul are acces (le gestioneaza) - din sesiune
+    my_ids = {str(g["id"]) for g in session.get("guilds", [])}
+    for s in bot_servers:
+        s["i_manage"] = str(s["id"]) in my_ids
+    leave_status = storage.get(0, "leave_request", None)
+    return render_template("servers.html", servers=bot_servers,
+                           leave_status=leave_status, section="servers")
+
+
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
