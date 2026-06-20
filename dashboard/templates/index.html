@@ -68,7 +68,7 @@
   <h2>Servere unde poti adauga botul</h2>
   <div class="grid">
     {% for g in not_added %}
-    <a class="server add" href="{{ invite_url }}" target="_blank">
+    <a class="server add" href="{{ invite_url }}{% if invite_url %}&guild_id={{ g.id }}{% endif %}" target="_blank">
       {% if g.icon %}<img class="ava" src="{{ g.icon }}" alt="">
       {% else %}<div class="ava">{{ g.name[0]|upper }}</div>{% endif %}
       <div>

@@ -58,9 +58,13 @@ http.mount("https://", _LaxAdapter())
 
 # ============================================================== helperi
 def _bot_guilds():
-    """ID-urile serverelor in care e botul (au 'meta' scris de bot)."""
+    """ID-urile serverelor in care e botul ACUM (lista live scrisa de bot)."""
+    servers = storage.get(0, "bot_servers", None)
+    if servers:
+        return {str(s["id"]) for s in servers}
+    # fallback (daca botul nu a scris inca lista live): pe baza datelor 'meta'
     return {gid for gid, d in storage.all_data().items()
-            if not gid.startswith("_") and d.get("meta")}
+            if not gid.startswith("_") and gid != "0" and d.get("meta")}
 
 
 def login_required(f):
