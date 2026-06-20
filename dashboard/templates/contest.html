@@ -37,7 +37,7 @@
       <form method="POST"><input type="hidden" name="action" value="stop">
         <button class="stop" type="submit">⏹️ Oprește acum</button>
       </form>
-      <p class="hint">La final, botul anunță automat câștigătorii și clasamentul în canalul setat. Reîncarcă pagina pentru a actualiza clasamentul.</p>
+      <p class="hint">La final, botul anunță automat câștigătorii și clasamentul în canalul setat. Clasamentul se actualizează automat.</p>
     {% else %}
       <span class="badge off">Niciun concurs activ</span>
       <form method="POST" style="margin-top:8px">
@@ -77,6 +77,9 @@
       {% if st == 'ended' %}<p class="hint">🏆 Încheiat. Câștigător: <b>{{ standings[0][0] }}</b> cu {{ standings[0][1] }} invitații.</p>{% endif %}
     {% elif st == 'running' %}
       <div class="live"><div class="lrow"><span class="nm" style="color:var(--muted)">Încă nu a invitat nimeni.</span></div></div>
+    {% endif %}
+    {% if st == 'running' or st == 'scheduled' %}
+      <script>setTimeout(function(){ location.reload(); }, 30000);</script>
     {% endif %}
   </div>
 {% endblock %}

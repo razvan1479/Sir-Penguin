@@ -35,8 +35,11 @@
       {% if apply_status.status=='done' %}✅ {{ apply_status.result }}
       {% elif apply_status.status=='needs_confirm' %}⚠️ {{ apply_status.result }}
       {% elif apply_status.status=='error' %}❌ {{ apply_status.result }}
-      {% else %}⏳ Se procesează aplicarea... reîncarcă pagina.{% endif %}
+      {% else %}⏳ Se procesează aplicarea...{% endif %}
     </div>
+    {% if apply_status.status in ['pending','running'] %}
+      <script>setTimeout(function(){ location.reload(); }, 3000);</script>
+    {% endif %}
   {% endif %}
 
   {% if preview %}

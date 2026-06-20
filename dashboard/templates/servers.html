@@ -42,8 +42,11 @@
       <div class="status st-{{ leave_status.status }}">
         {% if leave_status.status=='done' %}✅ {{ leave_status.result }}
         {% elif leave_status.status=='error' %}❌ {{ leave_status.result }}
-        {% else %}⏳ Se proceseaza... reincarca pagina in cateva secunde.{% endif %}
+        {% else %}⏳ Se proceseaza...{% endif %}
       </div>
+      {% if leave_status.status=='pending' %}
+        <script>setTimeout(function(){ location.reload(); }, 3000);</script>
+      {% endif %}
     {% endif %}
 
     {% if not servers %}
@@ -66,5 +69,13 @@
       {% endfor %}
     {% endif %}
   </div>
+  <script>
+    // se reimprospateaza singur cat timp scoaterea botului e in lucru
+    (function(){
+      if (document.querySelector('.st-pending')) {
+        setTimeout(function(){ location.reload(); }, 4000);
+      }
+    })();
+  </script>
 </body>
 </html>

@@ -25,8 +25,11 @@
     <div class="status st-{{ job.status }}">
       {% if job.status=='done' %}✅ Ultima actiune: {{ job.result }}
       {% elif job.status=='error' %}⚠️ Eroare: {{ job.result }}
-      {% else %}⏳ In curs de procesare... (reincarca pagina){% endif %}
+      {% else %}⏳ In curs de procesare...{% endif %}
     </div>
+    {% if job.status in ['pending','running'] %}
+      <script>setTimeout(function(){ location.reload(); }, 4000);</script>
+    {% endif %}
   {% endif %}
 
   {% if not roles %}

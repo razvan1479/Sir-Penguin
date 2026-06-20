@@ -188,5 +188,16 @@
   </div>
 </div>
 {% block scripts %}{% endblock %}
+<script>
+  // Auto-refresh inteligent: reincarca pagina DOAR cat timp exista ceva "in lucru"
+  // (o stare pending/running sau un element marcat cu data-refresh="1").
+  // Se opreste singur cand procesul s-a terminat (done/error).
+  (function(){
+    var inProgress = document.querySelector('.st-pending, .st-running, [data-refresh="1"]');
+    if (inProgress) {
+      setTimeout(function(){ location.reload(); }, 4000);
+    }
+  })();
+</script>
 </body>
 </html>

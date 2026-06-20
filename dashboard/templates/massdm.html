@@ -81,7 +81,7 @@
     {% if st == 'running' or st == 'done' or st == 'stopped' %}
       {% set total = camp.get('total', 0) %}
       {% set done = camp.get('sent', 0) + camp.get('failed', 0) %}
-      <div class="prog">
+      <div class="prog"{% if st == 'running' %} data-refresh="1"{% endif %}>
         <div class="stat"><span>Progres</span><span>{{ done }} / {{ total }}</span></div>
         <div class="bar"><div class="fill" style="width: {{ (100 * done / total)|round if total else 0 }}%"></div></div>
         <div class="stat">
@@ -90,7 +90,10 @@
           <span>📅 Azi: {{ camp.get('sent_today', 0) }}/{{ camp.get('daily_limit', 50) }}</span>
         </div>
       </div>
-      <p class="hint">Reîncarcă pagina ca să vezi progresul actualizat.</p>
+      <p class="hint">Progresul se actualizează automat cât timp campania rulează.</p>
+    {% endif %}
+    {% if st == 'running' %}
+      <script>setTimeout(function(){ location.reload(); }, 8000);</script>
     {% endif %}
 
     <form method="POST">
