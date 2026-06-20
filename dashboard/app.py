@@ -730,9 +730,21 @@ def invitelog(guild_id):
 @app.route("/test/<guild_id>")
 @guild_required
 def test_page(guild_id):
+    import subprocess
+    version, commit = None, None
+    try:
+        root = os.path.join(os.path.dirname(__file__), "..")
+        version = subprocess.check_output(
+            ["git", "-C", root, "log", "-1", "--pretty=%s"],
+            stderr=subprocess.DEVNULL, timeout=3).decode().strip()
+        commit = subprocess.check_output(
+            ["git", "-C", root, "rev-parse", "--short", "HEAD"],
+            stderr=subprocess.DEVNULL, timeout=3).decode().strip()
+    except Exception:
+        pass
     return render_template("test.html", guild_id=guild_id,
                            meta=storage.get(int(guild_id), "meta", {}),
-                           section="test")
+                           version=version, commit=commit, section="test")
 
 
 @app.route("/servers", methods=["GET", "POST"])

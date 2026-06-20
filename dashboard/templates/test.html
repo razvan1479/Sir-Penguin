@@ -21,7 +21,10 @@
     <h3>🧪 Pagina de test</h3>
     <p class="sub">Foloseste pagina asta ca sa verifici ca modificarile ajung pe server prin auto-deploy.</p>
 
-    <div class="ver">Versiune test: 1</div>
+    <div class="ver">
+      {% if version %}Versiune pe server: {{ version }}{% else %}Versiune: necunoscuta{% endif %}
+    </div>
+    {% if commit %}<div class="sub" style="margin-top:-14px">commit <code>{{ commit }}</code></div>{% endif %}
 
     <div>
       <button class="btn" onclick="document.getElementById('out').textContent = '✅ Merge! Ora: ' + new Date().toLocaleTimeString()">
@@ -32,11 +35,12 @@
 
     <div class="hint">
       <b>Cum testezi auto-deploy-ul:</b><br>
-      1. Schimba numarul de mai sus (ex. din <code>Versiune test: 1</code> in <code>2</code>) in fisierul
-      <code>dashboard/templates/test.html</code>.<br>
-      2. Da commit + push (sau Sync).<br>
+      Versiunea de mai sus e luata direct din Git, de pe server — adica e exact mesajul ultimului
+      commit care ruleaza acum.<br>
+      1. Pe calculator, fa o modificare si da commit cu un mesaj nou (ex. <code>v21 test</code>).<br>
+      2. Push (sau Sync).<br>
       3. Asteapta ~30 secunde, apoi reincarca pagina cu <b>Ctrl+Shift+R</b>.<br>
-      Daca numarul s-a schimbat aici, inseamna ca auto-deploy-ul functioneaza. 🎉
+      Daca versiunea de aici s-a schimbat in mesajul tau nou, auto-deploy-ul functioneaza. 🎉
     </div>
   </div>
 {% endblock %}
