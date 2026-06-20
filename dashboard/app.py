@@ -727,6 +727,14 @@ def invitelog(guild_id):
                            section="invitelog")
 
 
+@app.route("/test/<guild_id>")
+@guild_required
+def test_page(guild_id):
+    return render_template("test.html", guild_id=guild_id,
+                           meta=storage.get(int(guild_id), "meta", {}),
+                           section="test")
+
+
 @app.route("/servers", methods=["GET", "POST"])
 def servers():
     if "user" not in session:

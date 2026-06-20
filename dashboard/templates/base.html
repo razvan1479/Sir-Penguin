@@ -91,6 +91,7 @@
       <p class="side-title">🎮 Distractie</p>
       <a class="nav {% if section=='game' %}active{% endif %}" href="/game/{{ guild_id }}"><span class="ic">🎲</span> Joc numere</a>
       <a class="nav {% if section=='rps' %}active{% endif %}" href="/rps/{{ guild_id }}"><span class="ic">✊</span> Piatra-foarfeca</a>
+      <a class="nav {% if section=='test' %}active{% endif %}" href="/test/{{ guild_id }}"><span class="ic">🧪</span> Test</a>
     </aside>
 
     <main>{% block content %}{% endblock %}</main>

@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Test · {{ meta.get('name','Server') }}{% endblock %}
+
+{% block extra_style %}
+    .panel { background:var(--card); border-radius:14px; padding:26px; text-align:center; }
+    h3 { margin:0 0 6px; font-size:18px; }
+    .sub { color:var(--muted); font-size:14px; margin:0 0 22px; line-height:1.6; }
+    .ver { display:inline-block; background:#1e3a23; color:#3ba55d; font-weight:700;
+           font-size:22px; padding:10px 22px; border-radius:12px; margin-bottom:22px; }
+    .btn { background:var(--accent); color:#fff; border:none; padding:13px 26px;
+           border-radius:10px; font-size:15px; font-weight:600; cursor:pointer; }
+    .btn:hover { filter:brightness(1.1); }
+    .out { margin-top:20px; font-size:16px; min-height:24px; color:var(--text); }
+    .hint { margin-top:24px; background:var(--input); border-radius:10px; padding:14px 16px;
+            font-size:13px; color:var(--muted); text-align:left; line-height:1.7; }
+    code { background:var(--bg); padding:2px 7px; border-radius:5px; font-size:12px; }
+{% endblock %}
+
+{% block content %}
+  <div class="panel">
+    <h3>🧪 Pagina de test</h3>
+    <p class="sub">Foloseste pagina asta ca sa verifici ca modificarile ajung pe server prin auto-deploy.</p>
+
+    <div class="ver">Versiune test: 1</div>
+
+    <div>
+      <button class="btn" onclick="document.getElementById('out').textContent = '✅ Merge! Ora: ' + new Date().toLocaleTimeString()">
+        Apasa-ma
+      </button>
+    </div>
+    <div class="out" id="out"></div>
+
+    <div class="hint">
+      <b>Cum testezi auto-deploy-ul:</b><br>
+      1. Schimba numarul de mai sus (ex. din <code>Versiune test: 1</code> in <code>2</code>) in fisierul
+      <code>dashboard/templates/test.html</code>.<br>
+      2. Da commit + push (sau Sync).<br>
+      3. Asteapta ~30 secunde, apoi reincarca pagina cu <b>Ctrl+Shift+R</b>.<br>
+      Daca numarul s-a schimbat aici, inseamna ca auto-deploy-ul functioneaza. 🎉
+    </div>
+  </div>
+{% endblock %}
