@@ -731,6 +731,13 @@ def invitelog(guild_id):
 def servers():
     if "user" not in session:
         return redirect(url_for("index"))
+
+    # DOAR owner-ul botului poate vedea/folosi aceasta pagina
+    owner_id = storage.get(0, "bot_owner_id", None)
+    if owner_id and str(session["user"]["id"]) != str(owner_id):
+        return render_template("servers.html", servers=[], leave_status=None,
+                               section="servers", denied=True)
+
     if request.method == "POST":
         gid = request.form.get("guild_id", "")
         if request.form.get("action") == "leave" and gid.isdigit():
@@ -739,13 +746,12 @@ def servers():
         return redirect(url_for("servers"))
 
     bot_servers = storage.get(0, "bot_servers", []) or []
-    # doar serverele unde userul are acces (le gestioneaza) - din sesiune
     my_ids = {str(g["id"]) for g in session.get("guilds", [])}
     for s in bot_servers:
         s["i_manage"] = str(s["id"]) in my_ids
     leave_status = storage.get(0, "leave_request", None)
     return render_template("servers.html", servers=bot_servers,
-                           leave_status=leave_status, section="servers")
+                           leave_status=leave_status, section="servers", denied=False)
 
 
 if __name__ == "__main__":

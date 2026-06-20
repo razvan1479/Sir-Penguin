@@ -33,6 +33,9 @@
     <h1>🤖 Serverele botului</h1>
     <p class="sub">Toate serverele pe care e Sir-Penguin. Poti scoate botul de pe oricare.</p>
 
+    {% if denied %}
+      <div class="status st-error">🔒 Doar owner-ul botului poate folosi aceasta sectiune.</div>
+    {% else %}
     <div class="note">
       Aici vezi <b>toate</b> serverele pe care e botul, inclusiv cele pe care poate nu mai esti tu.
       Daca ai iesit de pe un server dar botul a ramas, il poti scoate de aici.
@@ -67,6 +70,7 @@
         </form>
       </div>
       {% endfor %}
+    {% endif %}
     {% endif %}
   </div>
   <script>

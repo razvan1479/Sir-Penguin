@@ -25,6 +25,14 @@ class Admin(commands.Cog):
     # scrie lista serverelor pentru dashboard
     @tasks.loop(seconds=20)
     async def sync_loop(self):
+        # salvam o singura data ID-ul owner-ului botului (pt. verificari in dashboard)
+        if not getattr(self, "_owner_saved", False):
+            try:
+                app = await self.bot.application_info()
+                storage.set(0, "bot_owner_id", str(app.owner.id))
+                self._owner_saved = True
+            except discord.HTTPException:
+                pass
         servers = []
         for g in sorted(self.bot.guilds, key=lambda x: x.member_count or 0, reverse=True):
             servers.append({"id": str(g.id), "name": g.name,
