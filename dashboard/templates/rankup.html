@@ -36,6 +36,8 @@
 
     {% if not roles %}
       <div class="empty-roles">⚠️ Botul nu a sincronizat încă rolurile — vei putea alege rolul după ce repornește. Poți seta totuși zilele și emoji-urile acum.</div>
+    {% else %}
+      <div class="empty-roles">💡 Rolurile marcate cu 🔒 sunt mai sus decât rolul botului în ierarhie, așa că botul nu le poate da. Mută rolul botului mai sus (Setări server → Roluri) ca să le poți folosi.</div>
     {% endif %}
 
     <div class="tier-head">
@@ -48,7 +50,7 @@
         <input type="text" name="tier_emoji" value="{{ t.emoji }}" placeholder="⭐">
         <select name="tier_role">
           <option value="">— fără rol —</option>
-          {% for r in roles %}{% if r.assignable %}<option value="{{ r.id }}" {% if t.role_id|string==r.id %}selected{% endif %}>{{ r.name }}</option>{% endif %}{% endfor %}
+          {% for r in roles %}{% if not r.managed and not r.default %}{% if r.assignable %}<option value="{{ r.id }}" {% if t.role_id|string==r.id %}selected{% endif %}>{{ r.name }}</option>{% else %}<option value="" disabled>🔒 {{ r.name }} (mai sus decât botul)</option>{% endif %}{% endif %}{% endfor %}
         </select>
         <button type="button" class="del" onclick="this.parentElement.remove()">✕</button>
       </div>
@@ -65,7 +67,7 @@
       <input type="text" name="tier_emoji" placeholder="⭐">
       <select name="tier_role">
         <option value="">— fără rol —</option>
-        {% for r in roles %}{% if r.assignable %}<option value="{{ r.id }}">{{ r.name }}</option>{% endif %}{% endfor %}
+        {% for r in roles %}{% if not r.managed and not r.default %}{% if r.assignable %}<option value="{{ r.id }}">{{ r.name }}</option>{% else %}<option value="" disabled>🔒 {{ r.name }} (mai sus decât botul)</option>{% endif %}{% endif %}{% endfor %}
       </select>
       <button type="button" class="del" onclick="this.parentElement.remove()">✕</button>
     </div>
