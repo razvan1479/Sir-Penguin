@@ -103,6 +103,21 @@ class RankUp(commands.Cog):
                 cur = current_tier(nick, tiers)
                 cor = correct_tier(days, tiers)
 
+                # --- SKIP: are deja emoji-ul si rolul corect ---
+                target_role_id = str(tiers[cor]["role_id"]) if (cor != -1 and tiers[cor].get("role_id")) else None
+                has_correct_nick = (cur == cor)
+                has_correct_role = (
+                    not target_role_id or
+                    any(str(r.id) == target_role_id for r in member.roles)
+                )
+                has_no_wrong_roles = not any(
+                    rid != target_role_id and
+                    any(str(r.id) == rid for r in member.roles)
+                    for rid in tier_role_ids
+                )
+                if has_correct_nick and has_correct_role and has_no_wrong_roles:
+                    continue  # totul e deja corect, ignoram membrul
+
                 # --- nickname (emoji treptei) ---
                 if cur != cor:
                     emoji = tiers[cor]["emoji"] if cor != -1 else ""
