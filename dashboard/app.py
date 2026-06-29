@@ -695,14 +695,23 @@ def backups(guild_id):
                            meta=storage.get(gid, "meta", {}), section="backups")
 
 
-@app.route("/invitelog/<guild_id>")
+@app.route("/invitelog/<guild_id>", methods=["GET", "POST"])
 @guild_required
 def invitelog(guild_id):
     gid = int(guild_id)
+
+    if request.method == "POST":
+        ch_id = _to_int(request.form.get("channel_id", ""))
+        storage.set(gid, "invites_log", {"channel_id": ch_id})
+        return redirect(url_for("invitelog", guild_id=guild_id, saved=1))
+
     data = storage.get(gid, "invites", {}) or {}
     history = data.get("history", [])
     joined_by = data.get("joined_by", {})
     members = data.get("members", {})
+    cfg = storage.get(gid, "invites_log", {}) or {}
+    meta = storage.get(gid, "meta", {})
+    channels = storage.get(gid, "channels", {}) or {}
 
     def _total(key):
         st = members.get(str(key))
@@ -727,7 +736,9 @@ def invitelog(guild_id):
             "left": str(mid) not in joined_by,
         })
     return render_template("invitelog.html", guild_id=guild_id, rows=rows,
-                           total=len(history), meta=storage.get(gid, "meta", {}),
+                           total=len(history), meta=meta, cfg=cfg,
+                           channels=channels.get("texts", []),
+                           saved=request.args.get("saved"),
                            section="invitelog")
 
 

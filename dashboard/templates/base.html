@@ -66,7 +66,7 @@
     </div>
   </div>
 
-  {% set CMD_SECTIONS = ['welcome','embeds','notifications','leaderboard','contest','tickets','massrole','massdm','giveaway','rankup','backups','game','rps'] %}
+  {% set CMD_SECTIONS = ['welcome','embeds','notifications','leaderboard','invitelog','contest','tickets','massrole','massdm','giveaway','rankup','backups','game','rps'] %}
   <div class="layout {% if section not in CMD_SECTIONS %}no-help{% endif %}">
     <aside class="sidebar">
       <p class="side-title">⚙️ General</p>
@@ -136,6 +136,10 @@
         <div class="cmd"><code>/addinvites</code><div class="d">Adaugă invitații bonus unui membru (admin)</div></div>
         <div class="cmd"><code>/removeinvites</code><div class="d">Scade invitații bonus unui membru (admin)</div></div>
         <div class="cmd"><code>/resetinvites</code><div class="d">Resetează invitațiile, pe perioadă (admin)</div></div>
+
+      {% elif section=='invitelog' %}
+        <div class="hgroup">📜 Jurnal invitații</div>
+        <div class="cmd"><code>/invitelog</code><div class="d">Jurnalul complet de invitații în Discord, navigabil pagină cu pagină</div></div>
 
       {% elif section=='contest' %}
         <div class="hgroup">🏁 Concurs invitații</div>
