@@ -232,7 +232,7 @@ class Invites(commands.Cog):
                     if e.get("member") == str(member.id):
                         inv_name = e.get("inviter_name")
                         break
-                await self._post_leave(ch, str(member), inv_name, inv_key)
+                await self._post_leave(ch, member, inv_name, inv_key)
 
     # ------------------------------------------------------------- helper
     def _stats_for(self, guild_id, user_id) -> dict:
@@ -634,13 +634,15 @@ class Invites(commands.Cog):
         tag_str = f" · {' · '.join(tags)}" if tags else ""
         code_str = f" · cod `{code}`" if code else ""
 
-        text = f"**{member}** a fost invitat de {inv_str}{code_str}{tag_str}"
+        # mentiune clickabila (deschide profilul, chiar daca a plecat)
+        who = f"{member.mention} ({member})"
+        text = f"{who} a fost invitat de {inv_str}{code_str}{tag_str}"
         try:
-            await channel.send(text)
+            await channel.send(text, allowed_mentions=discord.AllowedMentions.none())
         except discord.Forbidden:
             pass
 
-    async def _post_leave(self, channel, member_name, inviter_name, inviter_key):
+    async def _post_leave(self, channel, member, inviter_name, inviter_key):
         """Posteaza pe canalul de jurnal cand cineva iese — identic cu eticheta 'a plecat'."""
         if inviter_key == "vanity":
             inv_str = "🔗 link vanity"
@@ -648,8 +650,10 @@ class Invites(commands.Cog):
             inv_str = "❓ necunoscut"
         else:
             inv_str = f"**{inviter_name}**"
+        who = f"{member.mention} ({member})"
         try:
-            await channel.send(f"🚪 **{member_name}** a plecat · invitat de {inv_str}")
+            await channel.send(f"🚪 {who} a plecat · invitat de {inv_str}",
+                               allowed_mentions=discord.AllowedMentions.none())
         except discord.Forbidden:
             pass
 

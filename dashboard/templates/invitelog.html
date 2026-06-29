@@ -12,9 +12,11 @@
     .empty { background:var(--input); border-radius:10px; padding:20px; color:var(--muted); text-align:center; }
     .log { display:flex; flex-direction:column; gap:8px; }
     .row { display:flex; align-items:center; gap:12px; background:var(--input); border-radius:10px; padding:12px 14px; flex-wrap:wrap; }
-    .who { font-weight:600; }
+    .who { font-weight:600; color:var(--text); text-decoration:none; }
+    .who:hover { color:#9bb7ff; text-decoration:underline; }
     .arrow { color:var(--muted); }
-    .inv { font-weight:600; color:#9bb7ff; }
+    .inv { font-weight:600; color:#9bb7ff; text-decoration:none; }
+    .inv:hover { text-decoration:underline; }
     .count { background:#1e3a23; color:#3ba55d; font-size:11px; font-weight:700; padding:2px 9px; border-radius:10px; }
     .vanity { color:#f0b232; font-weight:600; }
     .unknown { color:var(--muted); font-style:italic; }
@@ -54,14 +56,14 @@
       <div class="log" id="log">
         {% for r in rows %}
         <div class="row" data-s="{{ (r.member_name ~ ' ' ~ (r.inviter_name or '') ~ ' ' ~ (r.code or ''))|lower }}">
-          <span class="who">{{ r.member_name }}</span>
+          <a class="who" href="https://discord.com/users/{{ r.member_id }}" target="_blank" rel="noopener">{{ r.member_name }}</a>
           <span class="arrow">a fost invitat de</span>
           {% if r.inviter == 'vanity' %}
             <span class="vanity">🔗 link vanity</span>
           {% elif r.inviter == 'unknown' or not r.inviter_name %}
             <span class="unknown">necunoscut</span>
           {% else %}
-            <span class="inv">{{ r.inviter_name }}</span>
+            <a class="inv" href="https://discord.com/users/{{ r.inviter }}" target="_blank" rel="noopener">{{ r.inviter_name }}</a>
             {% if r.inviter_total is not none %}<span class="count">{{ r.inviter_total }} inv</span>{% endif %}
           {% endif %}
           {% if r.code %}<span class="code">{{ r.code }}</span>{% endif %}
