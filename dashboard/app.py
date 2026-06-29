@@ -266,7 +266,7 @@ def goodbye_settings(guild_id):
 
 
 def _invite_total(s):
-    return s.get("regular", 0) + s.get("bonus", 0) - s.get("left", 0) - s.get("fake", 0)
+    return max(0, s.get("regular", 0) + s.get("bonus", 0) - s.get("left", 0) - s.get("fake", 0))
 
 
 def _period_counts(invdata, days):
@@ -735,8 +735,8 @@ def invitelog(guild_id):
         st = members.get(str(key))
         if not st:
             return None
-        return (st.get("regular", 0) + st.get("bonus", 0)
-                - st.get("left", 0) - st.get("fake", 0))
+        return max(0, st.get("regular", 0) + st.get("bonus", 0)
+                   - st.get("left", 0) - st.get("fake", 0))
 
     rows = []
     for h in reversed(history):  # cele mai noi primele

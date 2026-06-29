@@ -45,9 +45,10 @@ FAKE_DAYS = 7
 
 
 def invite_total(stats: dict) -> int:
-    """Formula de total a invitatiilor (ca la Invite Tracker)."""
-    return (stats.get("regular", 0) + stats.get("bonus", 0)
-            - stats.get("left", 0) - stats.get("fake", 0))
+    """Formula de total a invitatiilor (ca la Invite Tracker). Niciodata sub 0."""
+    total = (stats.get("regular", 0) + stats.get("bonus", 0)
+             - stats.get("left", 0) - stats.get("fake", 0))
+    return max(0, total)
 
 
 def _empty_stats() -> dict:
@@ -159,7 +160,11 @@ class Invites(commands.Cog):
             else:
                 # prima data cand e invitata aceasta persoana -> credit normal
                 stats = members.setdefault(inviter_key, _empty_stats())
-                stats["fake" if is_fake else "regular"] += 1
+                # contul nou (fake) creste si regular, si fake -> se anuleaza (net 0),
+                # nu penalizeaza invitatorul sub zero
+                stats["regular"] += 1
+                if is_fake:
+                    stats["fake"] += 1
                 credited[str(member.id)] = inviter_key
                 data["credited"] = credited
         elif info["type"] == "vanity":
