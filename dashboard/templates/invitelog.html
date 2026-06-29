@@ -29,22 +29,6 @@
 {% endblock %}
 
 {% block content %}
-  <div class="cfg">
-    <h3>⚙️ Canal de jurnal Discord</h3>
-    <p class="sub">Alege un canal unde botul va posta automat cine pe cine a invitat, de fiecare dată când cineva intră pe server.</p>
-    {% if saved %}<div class="saved">✅ Salvat! Botul va posta pe canalul ales de acum înainte.</div>{% endif %}
-    <form method="POST">
-      <label>Canal Discord pentru jurnal</label>
-      <select name="channel_id">
-        <option value="">— dezactivat (nu posta nicaieri) —</option>
-        {% for ch in channels %}
-        <option value="{{ ch.id }}" {% if cfg.get('channel_id')|string == ch.id|string %}selected{% endif %}>#{{ ch.name }}</option>
-        {% endfor %}
-      </select>
-      <button type="submit">💾 Salvează</button>
-    </form>
-  </div>
-
   <div class="panel">
     <h3>📜 Jurnal invitatii</h3>
     <p class="sub">Cine pe cine a invitat, cu ce cod si cand. Total inregistrari: {{ total }}.</p>

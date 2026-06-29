@@ -129,16 +129,6 @@ class Invites(commands.Cog):
             inviter_key, is_fake, rejoin = self._record_join(guild, member, info)
             self.bot.dispatch("invite_join", member, info)
 
-        # postam pe canalul de jurnal (daca e configurat)
-        cfg = storage.get(guild.id, "invites_log", {}) or {}
-        log_ch_id = cfg.get("channel_id")
-        if log_ch_id:
-            ch = guild.get_channel(int(log_ch_id))
-            if ch:
-                await self._post_log(ch, member, inviter_key,
-                                     info.get("inviter_name"), info.get("code"),
-                                     is_fake, rejoin)
-
     def _record_join(self, guild, member, info):
         import time
         data = storage.get(guild.id, "invites", {})
@@ -218,21 +208,6 @@ class Invites(commands.Cog):
 
         data["joined_by"] = joined_by
         storage.set(member.guild.id, "invites", data)
-
-        # postam pe canalul de jurnal ca a plecat
-        cfg = storage.get(member.guild.id, "invites_log", {}) or {}
-        log_ch_id = cfg.get("channel_id")
-        if log_ch_id and rec:
-            ch = member.guild.get_channel(int(log_ch_id))
-            if ch:
-                inv_key = rec.get("inviter")
-                # cautam numele invitatorului din istoric
-                inv_name = None
-                for e in reversed(data.get("history", [])):
-                    if e.get("member") == str(member.id):
-                        inv_name = e.get("inviter_name")
-                        break
-                await self._post_leave(ch, member, inv_name, inv_key)
 
     # ------------------------------------------------------------- helper
     def _stats_for(self, guild_id, user_id) -> dict:
@@ -609,53 +584,6 @@ class Invites(commands.Cog):
         else:
             return await interaction.response.send_message("Niciun concurs activ.", ephemeral=True)
         await interaction.response.send_message(msg, ephemeral=True)
-
-    # ─── JURNAL AUTOMAT PE CANAL ──────────────────────────────────────────────
-
-    async def _post_log(self, channel, member, inviter_key, inviter_name, code,
-                        is_fake, rejoin):
-        """Posteaza pe canalul de jurnal la intrare — identic cu randul din dashboard."""
-        if inviter_key == "vanity":
-            inv_str = "🔗 link vanity"
-        elif not inviter_name:
-            inv_str = "❓ necunoscut"
-        else:
-            # calculeaza totalul invitatorului (ca pe dashboard)
-            inv_data = storage.get(channel.guild.id, "invites", {})
-            st = inv_data.get("members", {}).get(str(inviter_key), {})
-            total = (st.get("regular", 0) + st.get("bonus", 0)
-                     - st.get("left", 0) - st.get("fake", 0)) if st else None
-            total_str = f" · **{total} inv**" if total is not None else ""
-            inv_str = f"**{inviter_name}**{total_str}"
-
-        tags = []
-        if is_fake:  tags.append("🆕 cont nou")
-        if rejoin:   tags.append("🔄 rejoin")
-        tag_str = f" · {' · '.join(tags)}" if tags else ""
-        code_str = f" · cod `{code}`" if code else ""
-
-        # mentiune clickabila (deschide profilul, chiar daca a plecat)
-        who = f"{member.mention} ({member})"
-        text = f"{who} a fost invitat de {inv_str}{code_str}{tag_str}"
-        try:
-            await channel.send(text, allowed_mentions=discord.AllowedMentions.none())
-        except discord.Forbidden:
-            pass
-
-    async def _post_leave(self, channel, member, inviter_name, inviter_key):
-        """Posteaza pe canalul de jurnal cand cineva iese — identic cu eticheta 'a plecat'."""
-        if inviter_key == "vanity":
-            inv_str = "🔗 link vanity"
-        elif not inviter_name:
-            inv_str = "❓ necunoscut"
-        else:
-            inv_str = f"**{inviter_name}**"
-        who = f"{member.mention} ({member})"
-        try:
-            await channel.send(f"🚪 {who} a plecat · invitat de {inv_str}",
-                               allowed_mentions=discord.AllowedMentions.none())
-        except discord.Forbidden:
-            pass
 
 
 async def setup(bot: commands.Bot):
