@@ -55,9 +55,10 @@ class Goodbye(commands.Cog):
         return inviter_name
 
     def _fill(self, text, member):
+        user_str = f"{member.mention} ({member})" if hasattr(member, "mention") else str(member)
         return (str(text or "")
-                .replace("{user}", str(member))
-                .replace("{username}", member.display_name if hasattr(member, "display_name") else str(member))
+                .replace("{user}", user_str)
+                .replace("{username}", str(member))
                 .replace("{server}", member.guild.name)
                 .replace("{count}", str(member.guild.member_count))
                 .replace("{inviter}", self._inviter_str(member)))
@@ -71,7 +72,7 @@ class Goodbye(commands.Cog):
         if channel is None:
             return
 
-        message = self._fill(cfg.get("message") or "🚪 **{user}** a plecat · invitat de {inviter}", member)
+        message = self._fill(cfg.get("message") or "{user} a plecat · invitat de {inviter}", member)
 
         try:
             if cfg.get("use_embed", True):
@@ -87,7 +88,7 @@ class Goodbye(commands.Cog):
                 embed.timestamp = discord.utils.utcnow()
                 await channel.send(embed=embed)
             else:
-                await channel.send(message)
+                await channel.send(message, allowed_mentions=discord.AllowedMentions.none())
         except discord.Forbidden:
             pass
 
