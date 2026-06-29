@@ -240,6 +240,31 @@ def guild_settings(guild_id):
                            section="welcome", saved=request.args.get("saved"))
 
 
+@app.route("/goodbye/<guild_id>", methods=["GET", "POST"])
+@guild_required
+def goodbye_settings(guild_id):
+    gid = int(guild_id)
+    if request.method == "POST":
+        cfg = {
+            "enabled": request.form.get("enabled") == "on",
+            "channel_id": _to_int(request.form.get("channel_id", "")),
+            "message": request.form.get("message", "").strip(),
+            "title": request.form.get("title", "").strip(),
+            "show_avatar": request.form.get("show_avatar") == "on",
+            "use_embed": request.form.get("use_embed") == "on",
+            "color": request.form.get("color", "#ed4245"),
+        }
+        storage.set(gid, "goodbye", cfg)
+        return redirect(url_for("goodbye_settings", guild_id=guild_id, saved=1))
+
+    cfg = storage.get(gid, "goodbye", {})
+    meta = storage.get(gid, "meta", {})
+    channels = storage.get(gid, "channels", {}) or {}
+    return render_template("goodbye.html", guild_id=guild_id, cfg=cfg, meta=meta,
+                           channels=channels.get("texts", []),
+                           section="goodbye", saved=request.args.get("saved"))
+
+
 def _invite_total(s):
     return s.get("regular", 0) + s.get("bonus", 0) - s.get("left", 0) - s.get("fake", 0)
 
@@ -701,8 +726,8 @@ def invitelog(guild_id):
     gid = int(guild_id)
 
     if request.method == "POST":
-        ch_id = _to_int(request.form.get("channel_id", ""))
-        storage.set(gid, "invites_log", {"channel_id": ch_id})
+        ch_id = _to_int(request.form.get("leave_channel_id", ""))
+        storage.set(gid, "invites_log", {"leave_channel_id": ch_id})
         return redirect(url_for("invitelog", guild_id=guild_id, saved=1))
 
     data = storage.get(gid, "invites", {}) or {}

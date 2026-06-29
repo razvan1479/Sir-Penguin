@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Rămas bun · {{ meta.get('name','Server') }}{% endblock %}
+
+{% block extra_style %}
+    .panel { background:var(--card); border-radius:14px; padding:24px; }
+    h3 { margin:0 0 4px; font-size:17px; }
+    .sub { color:var(--muted); font-size:13px; margin:0 0 20px; line-height:1.6; }
+    .saved { background:#1e3a23; color:#3ba55d; border-radius:8px; padding:11px 14px; font-size:14px; margin-bottom:16px; }
+    label { display:block; font-size:13px; color:var(--muted); margin:16px 0 6px; font-weight:600; }
+    input[type=text], textarea, select { width:100%; padding:11px; border-radius:8px; border:none; background:var(--input); color:var(--text); font-size:14px; box-sizing:border-box; font-family:inherit; }
+    textarea { min-height:80px; resize:vertical; }
+    .row2 { display:flex; gap:14px; flex-wrap:wrap; }
+    .row2 > div { flex:1; min-width:160px; }
+    .toggle { display:flex; align-items:center; gap:10px; margin:14px 0; cursor:pointer; }
+    .toggle input { width:18px; height:18px; cursor:pointer; }
+    .toggle span { font-size:14px; }
+    .ph { background:var(--input); border-radius:8px; padding:12px 14px; font-size:12px; color:var(--muted); margin-top:8px; line-height:1.8; }
+    .ph code { background:var(--card); padding:2px 7px; border-radius:5px; color:#9bb7ff; }
+    input[type=color] { width:54px; height:40px; border:none; border-radius:8px; background:var(--input); cursor:pointer; padding:3px; }
+    .save { margin-top:22px; background:var(--accent); color:#fff; border:none; padding:13px 28px; border-radius:9px; font-weight:600; font-size:15px; cursor:pointer; }
+    .colorbox { display:flex; align-items:center; gap:10px; }
+{% endblock %}
+
+{% block content %}
+  <div class="panel">
+    <h3>👋 Mesaj de rămas bun</h3>
+    <p class="sub">Configurează un mesaj care apare pe un canal ales, de fiecare dată când cineva iese de pe server. Personalizează-l cum vrei.</p>
+
+    {% if saved %}<div class="saved">✅ Salvat! Modificările sunt active.</div>{% endif %}
+
+    <form method="POST">
+      <label class="toggle">
+        <input type="checkbox" name="enabled" {% if cfg.get('enabled') %}checked{% endif %}>
+        <span>Activează mesajul de rămas bun</span>
+      </label>
+
+      <label>Canal unde apare mesajul</label>
+      <select name="channel_id">
+        <option value="">— alege un canal —</option>
+        {% for ch in channels %}
+        <option value="{{ ch.id }}" {% if cfg.get('channel_id')|string == ch.id|string %}selected{% endif %}>#{{ ch.name }}</option>
+        {% endfor %}
+      </select>
+
+      <label>Mesaj</label>
+      <textarea name="message" placeholder="🚪 **{user}** a plecat · invitat de {inviter}">{{ cfg.get('message','') }}</textarea>
+      <div class="ph">
+        Poți folosi: <code>{user}</code> numele celui plecat · <code>{username}</code> porecla · <code>{inviter}</code> cine l-a invitat · <code>{server}</code> numele serverului · <code>{count}</code> câți membri au rămas
+      </div>
+
+      <div class="row2">
+        <div>
+          <label>Titlu (sus în mesaj)</label>
+          <input type="text" name="title" value="{{ cfg.get('title','') }}" placeholder="👋 La revedere">
+        </div>
+        <div>
+          <label>Culoare</label>
+          <div class="colorbox">
+            <input type="color" name="color" value="{{ cfg.get('color','#ed4245') }}">
+            <span class="sub" style="margin:0">(doar pentru modul embed)</span>
+          </div>
+        </div>
+      </div>
+
+      <label class="toggle">
+        <input type="checkbox" name="use_embed" {% if cfg.get('use_embed', True) %}checked{% endif %}>
+        <span>Folosește embed (casetă colorată). Dezactivat = text simplu.</span>
+      </label>
+
+      <label class="toggle">
+        <input type="checkbox" name="show_avatar" {% if cfg.get('show_avatar', True) %}checked{% endif %}>
+        <span>Arată poza de profil a celui plecat</span>
+      </label>
+
+      <button class="save" type="submit">💾 Salvează</button>
+    </form>
+  </div>
+{% endblock %}
