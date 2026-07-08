@@ -9,10 +9,10 @@
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg:#07070c; --card:rgba(255,255,255,0.045); --card-solid:#14141c;
-      --input:rgba(255,255,255,0.06); --accent:#8b5cf6; --accent2:#22d3ee;
-      --gold:#fbbf24; --text:#ecedff; --muted:#9296b5;
-      --glass-border:rgba(255,255,255,0.09);
+      --bg:#07070c; --card:rgba(22,23,34,0.78); --card-solid:#14141c;
+      --input:rgba(255,255,255,0.08); --accent:#8b5cf6; --accent2:#22d3ee;
+      --gold:#fbbf24; --text:#f4f5ff; --muted:#a9adc9;
+      --glass-border:rgba(255,255,255,0.1);
     }
     * { box-sizing:border-box; margin:0; padding:0; }
 
@@ -21,16 +21,18 @@
       font-family:'Outfit',system-ui,sans-serif;
       background:var(--bg); color:var(--text); padding:36px 24px;
       min-height:100vh; position:relative; overflow-x:hidden;
+      -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+      letter-spacing:.1px;
     }
     /* fundal animat cu blob-uri neon */
     body::before {
       content:""; position:fixed; inset:-30%; z-index:-2;
       background:
-        radial-gradient(40% 40% at 20% 20%, rgba(139,92,246,0.28), transparent 60%),
-        radial-gradient(35% 35% at 80% 15%, rgba(34,211,238,0.20), transparent 60%),
-        radial-gradient(45% 45% at 75% 80%, rgba(236,72,153,0.18), transparent 60%),
-        radial-gradient(40% 40% at 15% 85%, rgba(59,130,246,0.18), transparent 60%);
-      filter:blur(40px);
+        radial-gradient(40% 40% at 20% 20%, rgba(139,92,246,0.16), transparent 60%),
+        radial-gradient(35% 35% at 80% 15%, rgba(34,211,238,0.12), transparent 60%),
+        radial-gradient(45% 45% at 75% 80%, rgba(236,72,153,0.10), transparent 60%),
+        radial-gradient(40% 40% at 15% 85%, rgba(59,130,246,0.10), transparent 60%);
+      filter:blur(50px);
       animation:drift 22s ease-in-out infinite alternate;
     }
     body::after {
@@ -85,8 +87,8 @@
     .sidebar, .help,
     main > div, main > form, main > section {
       background:var(--card); border:1px solid var(--glass-border);
-      backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
-      box-shadow:0 8px 32px rgba(0,0,0,0.28);
+      backdrop-filter:blur(8px) saturate(1.1); -webkit-backdrop-filter:blur(8px) saturate(1.1);
+      box-shadow:0 8px 32px rgba(0,0,0,0.4);
     }
     main > div, main > form, main > section { border-radius:18px; animation:fadeUp .55s ease both; }
 
