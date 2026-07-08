@@ -54,8 +54,12 @@ class Goodbye(commands.Cog):
             return "❓ necunoscut"
         return inviter_name
 
-    def _fill(self, text, member):
-        user_str = f"{member.mention} ({member})" if hasattr(member, "mention") else str(member)
+    def _fill(self, text, member, as_link=False):
+        if as_link and hasattr(member, "id"):
+            # link clickabil spre profil (merge in embed, pe orice dispozitiv, chiar daca a plecat)
+            user_str = f"[{member}](https://discord.com/users/{member.id})"
+        else:
+            user_str = str(member)
         return (str(text or "")
                 .replace("{user}", user_str)
                 .replace("{username}", str(member))
@@ -72,7 +76,9 @@ class Goodbye(commands.Cog):
         if channel is None:
             return
 
-        message = self._fill(cfg.get("message") or "{user} a plecat · invitat de {inviter}", member)
+        use_embed = cfg.get("use_embed", True)
+        message = self._fill(cfg.get("message") or "{user} a plecat · invitat de {inviter}",
+                             member, as_link=use_embed)
 
         try:
             if cfg.get("use_embed", True):
