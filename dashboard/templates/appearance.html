@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block title %}Aspect · {{ meta.get('name','Server') }}{% endblock %}
+
+{% block extra_style %}
+    .panel { padding:26px; }
+    h3 { margin:0 0 4px; font-size:18px; font-weight:800; }
+    .sub { color:var(--muted); font-size:13px; margin:0 0 22px; line-height:1.6; }
+    .saved { }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:16px; margin-bottom:24px; }
+    .field { background:var(--input); border:1px solid var(--glass-border); border-radius:14px; padding:16px; }
+    .field label { display:block; font-size:13px; font-weight:600; margin-bottom:10px; }
+    .field .row { display:flex; align-items:center; gap:12px; }
+    input[type=color] { width:56px; height:44px; border:none; border-radius:10px; background:transparent; cursor:pointer; padding:0; }
+    input[type=text].hex { flex:1; padding:10px; border-radius:8px; border:1px solid var(--glass-border); background:var(--bg); color:var(--text); font-size:13px; font-family:ui-monospace,monospace; }
+
+    .presets { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:26px; }
+    .preset { cursor:pointer; border:2px solid transparent; border-radius:14px; padding:12px 14px; background:var(--input); transition:transform .2s, border-color .2s; display:flex; flex-direction:column; gap:8px; align-items:center; min-width:96px; }
+    .preset:hover { transform:translateY(-3px); }
+    .preset .dots { display:flex; gap:5px; }
+    .preset .dots span { width:16px; height:16px; border-radius:50%; }
+    .preset .pname { font-size:12px; font-weight:600; color:var(--muted); }
+
+    .toggle { display:flex; align-items:center; gap:12px; margin:12px 0; cursor:pointer; background:var(--input); border:1px solid var(--glass-border); border-radius:12px; padding:14px 16px; }
+    .toggle input { width:20px; height:20px; cursor:pointer; accent-color:var(--accent); }
+    .toggle span { font-size:14px; font-weight:500; }
+
+    .slider-wrap { background:var(--input); border:1px solid var(--glass-border); border-radius:12px; padding:16px; margin-bottom:20px; }
+    .slider-wrap label { font-size:14px; font-weight:600; display:block; margin-bottom:10px; }
+    input[type=range] { width:100%; accent-color:var(--accent); }
+
+    .actions { display:flex; gap:12px; margin-top:8px; }
+    .save { background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; border:none; padding:14px 30px; border-radius:12px; font-weight:700; font-size:15px; cursor:pointer; box-shadow:0 8px 24px rgba(139,92,246,0.4); }
+    .reset { background:var(--input); color:var(--text); border:1px solid var(--glass-border); padding:14px 24px; border-radius:12px; font-weight:600; font-size:15px; cursor:pointer; }
+    .hint { background:rgba(34,211,238,0.08); border:1px solid rgba(34,211,238,0.2); color:#7dd3fc; border-radius:12px; padding:14px 16px; font-size:13px; margin-bottom:22px; line-height:1.6; }
+{% endblock %}
+
+{% block content %}
+  <div class="panel">
+    <h3>🎨 Personalizează aspectul</h3>
+    <p class="sub">Alege-ți culorile, intensitatea sticlei și animațiile. Vezi schimbarea în timp real, apoi salvează.</p>
+
+    {% if saved %}<div class="saved">✅ Salvat! Tema ta e activă pe tot dashboardul.</div>{% endif %}
+
+    <div class="hint">💡 Modifică orice mai jos și privește meniul din stânga și pagina — se schimbă instant. Când îți place, apasă „Salvează".</div>
+
+    <form method="POST" id="themeForm">
+      <p class="sub" style="font-weight:700;color:var(--text);margin-bottom:12px">🎨 Presetări rapide</p>
+      <div class="presets">
+        <div class="preset" onclick="applyPreset('#8b5cf6','#22d3ee','#07070c','#ecedff')">
+          <div class="dots"><span style="background:#8b5cf6"></span><span style="background:#22d3ee"></span></div>
+          <div class="pname">Neon mov</div>
+        </div>
+        <div class="preset" onclick="applyPreset('#f43f5e','#fb923c','#0a0708','#ffecef')">
+          <div class="dots"><span style="background:#f43f5e"></span><span style="background:#fb923c"></span></div>
+          <div class="pname">Foc</div>
+        </div>
+        <div class="preset" onclick="applyPreset('#10b981','#a3e635','#050a08','#e6ffef')">
+          <div class="dots"><span style="background:#10b981"></span><span style="background:#a3e635"></span></div>
+          <div class="pname">Matrix</div>
+        </div>
+        <div class="preset" onclick="applyPreset('#3b82f6','#06b6d4','#060912','#e6f0ff')">
+          <div class="dots"><span style="background:#3b82f6"></span><span style="background:#06b6d4"></span></div>
+          <div class="pname">Ocean</div>
+        </div>
+        <div class="preset" onclick="applyPreset('#eab308','#f97316','#0c0a06','#fff8e6')">
+          <div class="dots"><span style="background:#eab308"></span><span style="background:#f97316"></span></div>
+          <div class="pname">Auriu</div>
+        </div>
+        <div class="preset" onclick="applyPreset('#ec4899','#a855f7','#0c0710','#ffe6f5')">
+          <div class="dots"><span style="background:#ec4899"></span><span style="background:#a855f7"></span></div>
+          <div class="pname">Bombon</div>
+        </div>
+      </div>
+
+      <p class="sub" style="font-weight:700;color:var(--text);margin-bottom:12px">🖌️ Culori individuale</p>
+      <div class="grid">
+        <div class="field">
+          <label>Neon principal</label>
+          <div class="row">
+            <input type="color" name="accent" id="accent" value="{{ theme.get('accent','#8b5cf6') }}" oninput="live()">
+            <input type="text" class="hex" id="accent_hex" value="{{ theme.get('accent','#8b5cf6') }}" oninput="syncHex('accent')">
+          </div>
+        </div>
+        <div class="field">
+          <label>Neon secundar</label>
+          <div class="row">
+            <input type="color" name="accent2" id="accent2" value="{{ theme.get('accent2','#22d3ee') }}" oninput="live()">
+            <input type="text" class="hex" id="accent2_hex" value="{{ theme.get('accent2','#22d3ee') }}" oninput="syncHex('accent2')">
+          </div>
+        </div>
+        <div class="field">
+          <label>Fundal</label>
+          <div class="row">
+            <input type="color" name="bg" id="bg" value="{{ theme.get('bg','#07070c') }}" oninput="live()">
+            <input type="text" class="hex" id="bg_hex" value="{{ theme.get('bg','#07070c') }}" oninput="syncHex('bg')">
+          </div>
+        </div>
+        <div class="field">
+          <label>Text</label>
+          <div class="row">
+            <input type="color" name="text" id="text" value="{{ theme.get('text','#ecedff') }}" oninput="live()">
+            <input type="text" class="hex" id="text_hex" value="{{ theme.get('text','#ecedff') }}" oninput="syncHex('text')">
+          </div>
+        </div>
+      </div>
+
+      <div class="slider-wrap">
+        <label>Intensitate sticlă (blur): <span id="glassval">{{ theme.get('glass','16') }}</span>px</label>
+        <input type="range" name="glass" id="glass" min="0" max="30" value="{{ theme.get('glass','16') }}" oninput="live()">
+      </div>
+
+      <label class="toggle">
+        <input type="checkbox" name="no_anim" id="no_anim" {% if theme.get('no_anim') %}checked{% endif %} onchange="live()">
+        <span>🚫 Oprește animațiile (dashboard mai rapid, static)</span>
+      </label>
+
+      <div class="actions">
+        <button class="save" type="submit">💾 Salvează tema</button>
+        <button class="reset" type="button" onclick="applyPreset('#8b5cf6','#22d3ee','#07070c','#ecedff'); document.getElementById('glass').value=16; document.getElementById('no_anim').checked=false; live();">↺ Revino la implicit</button>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    const root = document.documentElement;
+    function live(){
+      root.style.setProperty('--accent', document.getElementById('accent').value);
+      root.style.setProperty('--accent2', document.getElementById('accent2').value);
+      root.style.setProperty('--bg', document.getElementById('bg').value);
+      root.style.setProperty('--text', document.getElementById('text').value);
+      document.getElementById('glassval').textContent = document.getElementById('glass').value;
+      ['accent','accent2','bg','text'].forEach(id=>{
+        document.getElementById(id+'_hex').value = document.getElementById(id).value;
+      });
+    }
+    function syncHex(id){
+      const v = document.getElementById(id+'_hex').value;
+      if(/^#[0-9a-fA-F]{6}$/.test(v)){ document.getElementById(id).value = v; live(); }
+    }
+    function applyPreset(a,a2,bg,tx){
+      document.getElementById('accent').value=a;
+      document.getElementById('accent2').value=a2;
+      document.getElementById('bg').value=bg;
+      document.getElementById('text').value=tx;
+      live();
+    }
+    live();
+  </script>
+{% endblock %}

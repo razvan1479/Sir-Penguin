@@ -140,6 +140,25 @@
     }
     {% block extra_style %}{% endblock %}
   </style>
+  {% if theme %}
+  <style id="theme-overrides">
+    :root {
+      {% if theme.get('accent') %}--accent:{{ theme.get('accent') }};{% endif %}
+      {% if theme.get('accent2') %}--accent2:{{ theme.get('accent2') }};{% endif %}
+      {% if theme.get('bg') %}--bg:{{ theme.get('bg') }};{% endif %}
+      {% if theme.get('text') %}--text:{{ theme.get('text') }};{% endif %}
+    }
+    {% if theme.get('glass') %}
+    .sidebar, .help, .server-header, main > div, main > form, main > section {
+      backdrop-filter:blur({{ theme.get('glass') }}px); -webkit-backdrop-filter:blur({{ theme.get('glass') }}px);
+    }
+    {% endif %}
+    {% if theme.get('no_anim') %}
+    *, *::before, *::after { animation:none !important; transition:none !important; }
+    body::before { animation:none !important; }
+    {% endif %}
+  </style>
+  {% endif %}
 </head>
 <body>
 <div class="wrap">
@@ -183,6 +202,7 @@
       <a class="nav {% if section=='rps' %}active{% endif %}" href="/rps/{{ guild_id }}"><span class="ic">✊</span> Piatra-foarfeca</a>
 
       <p class="side-title">🧪 Unelte</p>
+      <a class="nav {% if section=='appearance' %}active{% endif %}" href="/appearance/{{ guild_id }}"><span class="ic">🎨</span> Aspect</a>
       <a class="nav {% if section=='test' %}active{% endif %}" href="/test/{{ guild_id }}"><span class="ic">🧪</span> Test deploy</a>
     </aside>
 

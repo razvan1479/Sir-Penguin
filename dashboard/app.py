@@ -778,6 +778,41 @@ def test_page(guild_id):
                            version=version, commit=commit, section="test")
 
 
+@app.route("/appearance/<guild_id>", methods=["GET", "POST"])
+@guild_required
+def appearance(guild_id):
+    gid = int(guild_id)
+    if request.method == "POST":
+        theme = {
+            "accent": request.form.get("accent", "#8b5cf6"),
+            "accent2": request.form.get("accent2", "#22d3ee"),
+            "bg": request.form.get("bg", "#07070c"),
+            "text": request.form.get("text", "#ecedff"),
+            "no_anim": request.form.get("no_anim") == "on",
+            "glass": request.form.get("glass", "16"),
+        }
+        storage.set(gid, "theme", theme)
+        return redirect(url_for("appearance", guild_id=guild_id, saved=1))
+
+    theme = storage.get(gid, "theme", {})
+    meta = storage.get(gid, "meta", {})
+    return render_template("appearance.html", guild_id=guild_id, theme=theme,
+                           meta=meta, section="appearance",
+                           saved=request.args.get("saved"))
+
+
+@app.context_processor
+def inject_theme():
+    """Face tema disponibila automat in toate paginile (pentru base.html)."""
+    gid = None
+    if request.view_args:
+        gid = request.view_args.get("guild_id")
+    theme = {}
+    if gid and str(gid).isdigit():
+        theme = storage.get(int(gid), "theme", {}) or {}
+    return {"theme": theme}
+
+
 @app.route("/servers", methods=["GET", "POST"])
 def servers():
     if "user" not in session:
