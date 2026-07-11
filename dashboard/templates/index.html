@@ -3,35 +3,90 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bot Dashboard</title>
+  <title>Sir Penguin · Panou</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
-    :root { --bg:#1a1b1e; --card:#2b2d31; --accent:#5865f2; --text:#dbdee1; --muted:#949ba4; }
+    :root {
+      --bg:#07070c; --card:rgba(22,23,34,0.78); --input:rgba(255,255,255,0.06);
+      --accent:#8b5cf6; --accent2:#22d3ee; --text:#f4f5ff; --muted:#a9adc9;
+      --glass-border:rgba(255,255,255,0.1);
+    }
     * { box-sizing:border-box; margin:0; padding:0; }
-    body { font-family:system-ui,sans-serif; background:var(--bg); color:var(--text); padding:32px 24px; }
-    .wrap { max-width:780px; margin:0 auto; }
+    body {
+      font-family:'Outfit',system-ui,sans-serif; background:var(--bg); color:var(--text);
+      padding:34px 24px; min-height:100vh; position:relative; overflow-x:hidden;
+      -webkit-font-smoothing:antialiased; letter-spacing:.1px;
+    }
+    body::before {
+      content:""; position:fixed; inset:-30%; z-index:-2;
+      background:
+        radial-gradient(38% 38% at 18% 20%, rgba(139,92,246,0.20), transparent 60%),
+        radial-gradient(34% 34% at 82% 12%, rgba(34,211,238,0.15), transparent 60%),
+        radial-gradient(42% 42% at 78% 82%, rgba(236,72,153,0.12), transparent 60%),
+        radial-gradient(38% 38% at 12% 88%, rgba(59,130,246,0.12), transparent 60%);
+      filter:blur(48px); animation:drift 24s ease-in-out infinite alternate;
+    }
+    @keyframes drift { 0%{transform:translate(0,0) scale(1);} 50%{transform:translate(3%,2%) scale(1.08);} 100%{transform:translate(-2%,-3%) scale(1.03);} }
+    @keyframes fadeUp { from{opacity:0;transform:translateY(18px);} to{opacity:1;transform:translateY(0);} }
+    @keyframes wave { 0%{transform:translateX(-12%) skewY(-3deg) scaleY(.9);} 50%{transform:translateX(6%) skewY(2deg) scaleY(1.15);} 100%{transform:translateX(-4%) skewY(-1deg) scaleY(1);} }
 
-    .topbar { display:flex; align-items:center; justify-content:space-between; margin-bottom:32px; }
-    .me { display:flex; align-items:center; gap:10px; }
-    .me img { width:38px; height:38px; border-radius:50%; }
-    .me .av { width:38px; height:38px; border-radius:50%; background:var(--accent); display:flex; align-items:center; justify-content:center; font-weight:700; color:#fff; }
-    .me b { font-size:15px; }
-    .logout { color:var(--muted); text-decoration:none; font-size:14px; border:1px solid #3a3c41; padding:7px 14px; border-radius:8px; }
-    .logout:hover { color:var(--text); border-color:var(--muted); }
+    .wrap { max-width:1080px; margin:0 auto; }
 
-    h2 { font-size:14px; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); margin:26px 0 14px; }
-    .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(230px,1fr)); gap:14px; }
-    .server { background:var(--card); border-radius:14px; padding:18px; display:flex; align-items:center; gap:14px;
-              text-decoration:none; color:var(--text); border:2px solid transparent; transition:.15s; }
-    .server:hover { border-color:var(--accent); transform:translateY(-2px); }
-    .ava { width:52px; height:52px; border-radius:50%; flex-shrink:0; object-fit:cover; background:var(--accent);
-           display:flex; align-items:center; justify-content:center; font-size:20px; font-weight:700; color:#fff; }
-    .server .name { font-weight:600; font-size:15px; line-height:1.2; word-break:break-word; }
-    .server .meta { color:var(--muted); font-size:13px; margin-top:3px; display:flex; align-items:center; gap:5px; }
-    .dot { width:8px; height:8px; border-radius:50%; background:#3ba55d; display:inline-block; }
-    .server.add { opacity:.75; }
-    .server.add .ava { background:#404249; }
-    .server.add .meta { color:var(--accent); }
-    .empty { color:var(--muted); }
+    .topbar {
+      display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+      padding:14px 18px; border-radius:16px; margin-bottom:30px;
+      background:var(--card); border:1px solid var(--glass-border);
+      backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+      box-shadow:0 8px 30px rgba(0,0,0,0.3); animation:fadeUp .5s ease both;
+    }
+    .me { display:flex; align-items:center; gap:11px; }
+    .me img { width:40px; height:40px; border-radius:12px; box-shadow:0 0 0 2px var(--glass-border); }
+    .me .av { width:40px; height:40px; border-radius:12px; background:linear-gradient(135deg,var(--accent),var(--accent2)); display:flex; align-items:center; justify-content:center; font-weight:800; color:#fff; box-shadow:0 0 22px rgba(139,92,246,.5); }
+    .me b { font-size:16px; font-weight:700; }
+    .actions { display:flex; gap:10px; }
+    .btn { color:var(--muted); text-decoration:none; font-size:14px; font-weight:600; border:1px solid var(--glass-border); padding:9px 16px; border-radius:11px; transition:transform .2s, color .2s, border-color .2s, box-shadow .25s; }
+    .btn:hover { color:#fff; transform:translateY(-2px); border-color:var(--accent); box-shadow:0 6px 18px rgba(139,92,246,.25); }
+
+    .hero { position:relative; overflow:hidden; border-radius:24px; padding:40px 36px; margin-bottom:34px; isolation:isolate; background:var(--card); border:1px solid var(--glass-border); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); animation:fadeUp .55s ease both; }
+    .aurora { position:absolute; inset:-60% -20% auto -20%; height:180%; z-index:-1; pointer-events:none; }
+    .aurora span { position:absolute; left:0; right:0; height:120px; border-radius:50%; filter:blur(44px); mix-blend-mode:screen; opacity:.5; animation:wave 9s ease-in-out infinite alternate; }
+    .aurora span:nth-child(1){ top:14%; background:linear-gradient(90deg,transparent,var(--accent),transparent); }
+    .aurora span:nth-child(2){ top:38%; background:linear-gradient(90deg,transparent,var(--accent2),transparent); animation-delay:-3s; }
+    .aurora span:nth-child(3){ top:26%; background:linear-gradient(90deg,transparent,#ec4899,transparent); animation-delay:-5s; opacity:.35; }
+    .eyebrow { font-size:12px; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:var(--accent2); margin-bottom:8px; }
+    .hero h1 { font-size:34px; font-weight:800; letter-spacing:-1px; line-height:1.08; background:linear-gradient(90deg,#fff 30%,#c9c4ff); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+    .hero p { color:var(--muted); font-size:15px; margin-top:10px; max-width:560px; line-height:1.6; }
+    .hero .count { display:inline-flex; align-items:center; gap:8px; margin-top:18px; background:var(--input); border:1px solid var(--glass-border); padding:8px 14px; border-radius:12px; font-size:14px; font-weight:600; }
+    .hero .count b { background:linear-gradient(135deg,var(--accent),var(--accent2)); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+
+    .section-title { font-size:13px; text-transform:uppercase; letter-spacing:1px; color:var(--muted); margin:30px 4px 16px; font-weight:700; display:flex; align-items:center; gap:10px; }
+    .section-title::after { content:""; flex:1; height:1px; background:var(--glass-border); }
+
+    .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(250px,1fr)); gap:14px; }
+    .server {
+      position:relative; background:var(--card); border:1px solid var(--glass-border); border-radius:18px; padding:18px;
+      display:flex; align-items:center; gap:15px; text-decoration:none; color:var(--text);
+      backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); overflow:hidden;
+      transition:transform .25s, box-shadow .3s, border-color .25s; animation:fadeUp .5s ease both;
+    }
+    .server::after { content:""; position:absolute; inset:0; border-radius:18px; padding:1px; background:linear-gradient(135deg,var(--accent),transparent 45%); -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0); -webkit-mask-composite:xor; mask-composite:exclude; opacity:0; transition:opacity .3s; }
+    .server:hover { transform:translateY(-5px); box-shadow:0 16px 40px rgba(0,0,0,.4); }
+    .server:hover::after { opacity:1; }
+    .ava { width:54px; height:54px; border-radius:15px; flex-shrink:0; object-fit:cover; background:linear-gradient(135deg,var(--accent),var(--accent2)); display:flex; align-items:center; justify-content:center; font-size:22px; font-weight:800; color:#fff; box-shadow:0 0 22px rgba(139,92,246,.35); }
+    .server .name { font-weight:700; font-size:16px; line-height:1.2; word-break:break-word; }
+    .server .meta { color:var(--muted); font-size:13px; margin-top:5px; display:flex; align-items:center; gap:6px; }
+    .dot { width:8px; height:8px; border-radius:50%; background:#22c55e; box-shadow:0 0 8px #22c55e; display:inline-block; }
+    .go { position:absolute; top:20px; right:20px; color:var(--muted); opacity:0; transform:translateX(-4px); transition:.25s; font-size:16px; }
+    .server:hover .go { opacity:1; transform:translateX(0); color:var(--accent2); }
+    .server.add .ava { background:var(--input); color:var(--muted); box-shadow:none; border:1px dashed var(--glass-border); }
+    .server.add::after { background:linear-gradient(135deg,var(--accent2),transparent 45%); }
+    .server.add .meta { color:var(--accent2); }
+
+    .empty { color:var(--muted); background:var(--card); border:1px solid var(--glass-border); border-radius:16px; padding:24px; text-align:center; }
+
+    @media (max-width:600px){ .hero h1{ font-size:26px; } .topbar{ justify-content:center; } }
   </style>
 </head>
 <body>
@@ -42,38 +97,50 @@
       {% else %}<div class="av">{{ user.name[0]|upper }}</div>{% endif %}
       <b>{{ user.name }}</b>
     </div>
-    <a class="logout" href="/servers" style="margin-right:8px">🤖 Servere bot</a>
-    <a class="logout" href="/logout">Deconectare</a>
+    <div class="actions">
+      <a class="btn" href="/servers">🤖 Servere bot</a>
+      <a class="btn" href="/logout">Deconectare</a>
+    </div>
+  </div>
+
+  <div class="hero">
+    <div class="aurora"><span></span><span></span><span></span></div>
+    <div class="eyebrow">Sir Penguin · Panou de control</div>
+    <h1>Bine ai venit, {{ user.name }}</h1>
+    <p>Alege un server pentru a-i gestiona bun venit, invitații, giveaway-uri, tickete și tot restul — dintr-un singur loc.</p>
+    {% if guilds %}<div class="count">🛡️ <b>{{ guilds|length }}</b> {% if guilds|length == 1 %}server gestionat{% else %}servere gestionate{% endif %}</div>{% endif %}
   </div>
 
   {% if guilds %}
-  <h2>Serverele tale (cu botul)</h2>
+  <div class="section-title">Serverele tale (cu botul)</div>
   <div class="grid">
     {% for g in guilds %}
-    <a class="server" href="/home/{{ g.id }}">
+    <a class="server" href="/home/{{ g.id }}" style="animation-delay:{{ loop.index0 * 0.05 }}s">
+      <span class="go">→</span>
       {% if g.icon %}<img class="ava" src="{{ g.icon }}" alt="">
       {% else %}<div class="ava">{{ g.name[0]|upper }}</div>{% endif %}
       <div>
         <div class="name">{{ g.name }}</div>
-        <div class="meta"><span class="dot"></span>{% if g.members is not none %}{{ g.members }} membri{% else %}configureaza{% endif %}</div>
+        <div class="meta"><span class="dot"></span>{% if g.members is not none %}{{ g.members }} membri{% else %}configurează{% endif %}</div>
       </div>
     </a>
     {% endfor %}
   </div>
   {% else %}
-  <p class="empty">Botul nu e inca pe niciunul dintre serverele tale. Adauga-l mai jos.</p>
+  <div class="empty">Botul nu e încă pe niciunul dintre serverele tale. Adaugă-l mai jos. 👇</div>
   {% endif %}
 
   {% if not_added %}
-  <h2>Servere unde poti adauga botul</h2>
+  <div class="section-title">Servere unde poți adăuga botul</div>
   <div class="grid">
     {% for g in not_added %}
-    <a class="server add" href="{{ invite_url }}{% if invite_url %}&guild_id={{ g.id }}{% endif %}" target="_blank">
+    <a class="server add" href="{{ invite_url }}{% if invite_url %}&guild_id={{ g.id }}{% endif %}" target="_blank" style="animation-delay:{{ loop.index0 * 0.05 }}s">
+      <span class="go">↗</span>
       {% if g.icon %}<img class="ava" src="{{ g.icon }}" alt="">
       {% else %}<div class="ava">{{ g.name[0]|upper }}</div>{% endif %}
       <div>
         <div class="name">{{ g.name }}</div>
-        <div class="meta">+ Adauga botul</div>
+        <div class="meta">+ Adaugă botul</div>
       </div>
     </a>
     {% endfor %}
