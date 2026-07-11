@@ -50,7 +50,7 @@
   <h2>Serverele tale (cu botul)</h2>
   <div class="grid">
     {% for g in guilds %}
-    <a class="server" href="/guild/{{ g.id }}">
+    <a class="server" href="/home/{{ g.id }}">
       {% if g.icon %}<img class="ava" src="{{ g.icon }}" alt="">
       {% else %}<div class="ava">{{ g.name[0]|upper }}</div>{% endif %}
       <div>

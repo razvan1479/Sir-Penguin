@@ -213,6 +213,40 @@ def api_guild(guild_id):
     return jsonify(meta or {})
 
 
+@app.route("/home/<guild_id>")
+@guild_required
+def home(guild_id):
+    gid = int(guild_id)
+    meta = storage.get(gid, "meta", {})
+    invites = storage.get(gid, "invites", {}) or {}
+    history = invites.get("history", [])
+    inv_members = invites.get("members", {})
+
+    # top invitator (real, fara conturi false/plecate)
+    top = None
+    ranked = sorted(
+        [(uid, _invite_total(s)) for uid, s in inv_members.items()],
+        key=lambda kv: kv[1], reverse=True)
+    if ranked and ranked[0][1] > 0:
+        top = {"name": resolve_name(gid, ranked[0][0]), "total": ranked[0][1]}
+
+    # module active (cate au ceva configurat / pornit)
+    active = 0
+    for key in ["welcome", "goodbye", "giveaways", "tickets", "notifications", "rankup", "embeds"]:
+        cfg = storage.get(gid, key, {})
+        if cfg:
+            active += 1
+
+    stats = {
+        "members": meta.get("members", 0),
+        "invites_tracked": len(history),
+        "inviters": sum(1 for s in inv_members.values() if _invite_total(s) > 0),
+        "modules": active,
+    }
+    return render_template("home.html", guild_id=guild_id, meta=meta,
+                           stats=stats, top=top, section="home")
+
+
 @app.route("/guild/<guild_id>", methods=["GET", "POST"])
 @guild_required
 def guild_settings(guild_id):

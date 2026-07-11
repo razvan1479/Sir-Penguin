@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}{{ meta.get('name','Server') }} · Premium{% endblock %}
+
+{% block extra_style %}
+    /* ---- HERO cu AURORA (semnatura paginii) ---- */
+    .hero {
+      position:relative; overflow:hidden; border-radius:24px; padding:44px 40px 40px;
+      margin-bottom:26px; isolation:isolate;
+    }
+    .aurora { position:absolute; inset:-60% -20% auto -20%; height:180%; z-index:-1; pointer-events:none; opacity:.9; }
+    .aurora span {
+      position:absolute; left:0; right:0; height:130px; border-radius:50%;
+      filter:blur(46px); mix-blend-mode:screen; opacity:.55;
+      animation:wave 9s ease-in-out infinite alternate;
+    }
+    .aurora span:nth-child(1){ top:12%; background:linear-gradient(90deg,transparent,var(--accent),transparent); animation-delay:0s; }
+    .aurora span:nth-child(2){ top:34%; background:linear-gradient(90deg,transparent,var(--accent2),transparent); animation-delay:-2s; }
+    .aurora span:nth-child(3){ top:22%; background:linear-gradient(90deg,transparent,#ec4899,transparent); animation-delay:-4s; opacity:.4; }
+    @keyframes wave {
+      0%   { transform:translateX(-12%) skewY(-3deg) scaleY(.9); }
+      50%  { transform:translateX(6%)  skewY(2deg)  scaleY(1.15); }
+      100% { transform:translateX(-4%) skewY(-1deg) scaleY(1); }
+    }
+    .hero-top { display:flex; align-items:center; gap:18px; margin-bottom:26px; }
+    .hero-ic { width:72px; height:72px; border-radius:20px; object-fit:cover; box-shadow:0 0 0 2px var(--glass-border), 0 0 40px rgba(139,92,246,.5); }
+    .hero-ic-fb { width:72px; height:72px; border-radius:20px; display:flex; align-items:center; justify-content:center; font-size:32px; font-weight:800; color:#fff; background:linear-gradient(135deg,var(--accent),var(--accent2)); box-shadow:0 0 40px rgba(139,92,246,.5); }
+    .eyebrow { font-size:12px; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:var(--accent2); margin-bottom:6px; }
+    .hero h1 { font-size:38px; font-weight:800; letter-spacing:-1px; line-height:1.05; margin:0;
+      background:linear-gradient(90deg,#fff 20%,#c9c4ff); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+    .hero .tag { color:var(--muted); font-size:15px; margin-top:8px; }
+
+    /* ---- STATISTICI ---- */
+    .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
+    .stat { background:rgba(255,255,255,.04); border:1px solid var(--glass-border); border-radius:16px; padding:20px; transition:transform .25s, box-shadow .25s; }
+    .stat:hover { transform:translateY(-4px); box-shadow:0 12px 30px rgba(0,0,0,.35); }
+    .stat .num { font-size:34px; font-weight:800; line-height:1; letter-spacing:-1px;
+      background:linear-gradient(135deg,var(--accent),var(--accent2)); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+    .stat .lbl { color:var(--muted); font-size:13px; margin-top:8px; font-weight:500; }
+
+    /* ---- SECTIUNI ---- */
+    .sect-title { font-size:13px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--muted); margin:30px 4px 14px; }
+
+    /* ---- GRID MODULE ---- */
+    .mods { display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:14px; }
+    .mod { position:relative; display:block; text-decoration:none; color:var(--text);
+      background:rgba(255,255,255,.04); border:1px solid var(--glass-border); border-radius:18px; padding:20px;
+      overflow:hidden; transition:transform .25s, border-color .25s, box-shadow .3s;
+      animation:fadeUp .5s ease both; }
+    .mod::after { content:""; position:absolute; inset:0; border-radius:18px; padding:1px;
+      background:linear-gradient(135deg,var(--accent),transparent 40%); -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+      -webkit-mask-composite:xor; mask-composite:exclude; opacity:0; transition:opacity .3s; }
+    .mod:hover { transform:translateY(-5px); box-shadow:0 16px 40px rgba(0,0,0,.4); }
+    .mod:hover::after { opacity:1; }
+    .mod .ic { font-size:28px; display:block; margin-bottom:14px; transition:transform .3s; }
+    .mod:hover .ic { transform:scale(1.15) translateY(-2px); }
+    .mod .name { font-weight:700; font-size:16px; }
+    .mod .desc { color:var(--muted); font-size:12.5px; margin-top:4px; line-height:1.5; }
+    .mod .go { position:absolute; top:18px; right:18px; color:var(--muted); font-size:16px; opacity:0; transform:translateX(-4px); transition:.25s; }
+    .mod:hover .go { opacity:1; transform:translateX(0); color:var(--accent2); }
+
+    /* highlight card (top invitator) */
+    .spot { background:linear-gradient(135deg,rgba(139,92,246,.18),rgba(34,211,238,.1)); border:1px solid var(--glass-border);
+      border-radius:18px; padding:22px 24px; display:flex; align-items:center; gap:18px; margin-bottom:6px; }
+    .spot .crown { font-size:34px; }
+    .spot .who { font-weight:800; font-size:20px; }
+    .spot .meta2 { color:var(--muted); font-size:13px; margin-top:2px; }
+    .spot .big { margin-left:auto; text-align:right; }
+    .spot .big b { font-size:30px; background:linear-gradient(135deg,var(--accent),var(--accent2)); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+
+    @media (max-width:720px){ .stats{ grid-template-columns:repeat(2,1fr); } .hero h1{ font-size:28px; } }
+{% endblock %}
+
+{% block content %}
+  <div class="hero">
+    <div class="aurora"><span></span><span></span><span></span></div>
+    <div class="hero-top">
+      {% if meta.get('icon') %}<img class="hero-ic" src="{{ meta.get('icon') }}" alt="">
+      {% else %}<div class="hero-ic-fb">{{ (meta.get('name','S'))[0]|upper }}</div>{% endif %}
+      <div>
+        <div class="eyebrow">Panou de control · Sir Penguin</div>
+        <h1>{{ meta.get('name','Serverul tău') }}</h1>
+        <div class="tag">Tot ce se întâmplă pe server, într-un singur loc.</div>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><div class="num" data-count="{{ stats.members }}">0</div><div class="lbl">Membri</div></div>
+      <div class="stat"><div class="num" data-count="{{ stats.invites_tracked }}">0</div><div class="lbl">Intrări urmărite</div></div>
+      <div class="stat"><div class="num" data-count="{{ stats.inviters }}">0</div><div class="lbl">Invitatori activi</div></div>
+      <div class="stat"><div class="num" data-count="{{ stats.modules }}">0</div><div class="lbl">Module active</div></div>
+    </div>
+  </div>
+
+  {% if top %}
+  <div class="spot">
+    <div class="crown">👑</div>
+    <div>
+      <div class="who">{{ top.name }}</div>
+      <div class="meta2">Cel mai activ invitator de pe server</div>
+    </div>
+    <div class="big"><b>{{ top.total }}</b><div class="meta2">invitații</div></div>
+  </div>
+  {% endif %}
+
+  <div class="sect-title">Gestionează serverul</div>
+  <div class="mods">
+    <a class="mod" href="/guild/{{ guild_id }}"><span class="go">→</span><span class="ic">👋</span><div class="name">Bun venit</div><div class="desc">Mesaj de întâmpinare pentru noii membri</div></a>
+    <a class="mod" href="/goodbye/{{ guild_id }}"><span class="go">→</span><span class="ic">🚪</span><div class="name">Rămas bun</div><div class="desc">Anunță când cineva pleacă de pe server</div></a>
+    <a class="mod" href="/leaderboard/{{ guild_id }}"><span class="go">→</span><span class="ic">🏆</span><div class="name">Leaderboard</div><div class="desc">Clasamentul celor care aduc membri</div></a>
+    <a class="mod" href="/invitelog/{{ guild_id }}"><span class="go">→</span><span class="ic">📜</span><div class="name">Jurnal invitații</div><div class="desc">Cine pe cine a invitat, cu istoric</div></a>
+    <a class="mod" href="/contest/{{ guild_id }}"><span class="go">→</span><span class="ic">🏁</span><div class="name">Concurs invite</div><div class="desc">Competiție pe invitații, cu premii</div></a>
+    <a class="mod" href="/giveaway/{{ guild_id }}"><span class="go">→</span><span class="ic">🎁</span><div class="name">Giveaway</div><div class="desc">Trageri la sorți cu buton de participare</div></a>
+    <a class="mod" href="/tickets/{{ guild_id }}"><span class="go">→</span><span class="ic">🎫</span><div class="name">Tickete</div><div class="desc">Sistem de suport cu canale private</div></a>
+    <a class="mod" href="/rankup/{{ guild_id }}"><span class="go">→</span><span class="ic">⭐</span><div class="name">Rank-uri auto</div><div class="desc">Roluri după vechimea pe server</div></a>
+    <a class="mod" href="/notifications/{{ guild_id }}"><span class="go">→</span><span class="ic">🔔</span><div class="name">Notificări</div><div class="desc">Anunță live/video de pe TikTok, YouTube</div></a>
+    <a class="mod" href="/embeds/{{ guild_id }}"><span class="go">→</span><span class="ic">📋</span><div class="name">Embed-uri</div><div class="desc">Mesaje frumoase, colorate, personalizate</div></a>
+    <a class="mod" href="/massrole/{{ guild_id }}"><span class="go">→</span><span class="ic">👥</span><div class="name">Roluri în masă</div><div class="desc">Adaugă sau scoate roluri tuturor</div></a>
+    <a class="mod" href="/massdm/{{ guild_id }}"><span class="go">→</span><span class="ic">✉️</span><div class="name">Mesaje DM</div><div class="desc">Trimite un mesaj către mai mulți membri</div></a>
+    <a class="mod" href="/backups/{{ guild_id }}"><span class="go">→</span><span class="ic">💾</span><div class="name">Backup server</div><div class="desc">Salvează și restaurează structura serverului</div></a>
+  </div>
+
+  <div class="sect-title">Personalizare</div>
+  <div class="mods">
+    <a class="mod" href="/appearance/{{ guild_id }}"><span class="go">→</span><span class="ic">🎨</span><div class="name">Aspect</div><div class="desc">Culori, animații și stilul dashboardului</div></a>
+    <a class="mod" href="/permissions/{{ guild_id }}"><span class="go">→</span><span class="ic">🔐</span><div class="name">Permisiuni</div><div class="desc">Cine poate folosi comenzile botului</div></a>
+    <a class="mod" href="/game/{{ guild_id }}"><span class="go">→</span><span class="ic">🎲</span><div class="name">Joc numere</div><div class="desc">Mini-joc pentru distracție pe server</div></a>
+  </div>
+
+  <script>
+    // numaratoare animata care creste pana la valoarea reala
+    document.querySelectorAll('.num[data-count]').forEach(function(el){
+      const target = parseInt(el.dataset.count) || 0;
+      if (target === 0) { el.textContent = '0'; return; }
+      const dur = 1100, t0 = performance.now();
+      function step(now){
+        const p = Math.min((now - t0) / dur, 1);
+        const eased = 1 - Math.pow(1 - p, 3);
+        el.textContent = Math.round(target * eased).toLocaleString('ro-RO');
+        if (p < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    });
+  </script>
+{% endblock %}
