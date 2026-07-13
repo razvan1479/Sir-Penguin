@@ -3,42 +3,97 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Login · Bot Dashboard</title>
+  <title>Sir Penguin · Conectare</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
-    :root { --bg:#1a1b1e; --card:#2b2d31; --accent:#5865f2; --text:#dbdee1; --muted:#949ba4; }
+    :root {
+      --bg:#07070c; --card:rgba(22,23,34,0.78); --input:rgba(255,255,255,0.06);
+      --accent:#8b5cf6; --accent2:#22d3ee; --text:#f4f5ff; --muted:#a9adc9;
+      --glass-border:rgba(255,255,255,0.1);
+    }
     * { box-sizing:border-box; margin:0; padding:0; }
-    body { font-family:system-ui,sans-serif; background:var(--bg); color:var(--text);
-           min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
-    .card { background:var(--card); border-radius:16px; padding:48px 40px; max-width:420px; width:100%; text-align:center; }
-    .logo { font-size:48px; margin-bottom:16px; }
-    h1 { font-size:24px; margin-bottom:8px; }
-    p { color:var(--muted); margin-bottom:28px; line-height:1.5; }
-    a.btn { background:var(--accent); color:#fff; text-decoration:none; font-weight:600; font-size:16px;
-            padding:14px 28px; border-radius:10px; display:inline-flex; align-items:center; gap:10px; }
-    a.btn:hover { filter:brightness(1.1); }
-    .warn { background:#3a2c1a; color:#f0b232; border-radius:10px; padding:16px; font-size:13px; text-align:left; line-height:1.6; }
-    .warn code { background:#1e1f22; padding:2px 6px; border-radius:4px; }
+    body {
+      font-family:'Outfit',system-ui,sans-serif; background:var(--bg); color:var(--text);
+      min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;
+      position:relative; overflow:hidden; -webkit-font-smoothing:antialiased;
+    }
+    /* aurora fullscreen in fundal */
+    .bg-aurora { position:fixed; inset:-40%; z-index:-1; pointer-events:none; }
+    .bg-aurora span {
+      position:absolute; left:0; right:0; height:280px; border-radius:50%;
+      filter:blur(70px); mix-blend-mode:screen; opacity:.5;
+      animation:wave 11s ease-in-out infinite alternate;
+    }
+    .bg-aurora span:nth-child(1){ top:20%; background:linear-gradient(90deg,transparent,var(--accent),transparent); }
+    .bg-aurora span:nth-child(2){ top:45%; background:linear-gradient(90deg,transparent,var(--accent2),transparent); animation-delay:-3s; }
+    .bg-aurora span:nth-child(3){ top:32%; background:linear-gradient(90deg,transparent,#ec4899,transparent); animation-delay:-6s; opacity:.35; }
+    @keyframes wave { 0%{transform:translateX(-14%) skewY(-4deg) scaleY(.85);} 50%{transform:translateX(8%) skewY(3deg) scaleY(1.2);} 100%{transform:translateX(-6%) skewY(-1deg) scaleY(1);} }
+    @keyframes pop { from{opacity:0;transform:translateY(24px) scale(.96);} to{opacity:1;transform:translateY(0) scale(1);} }
+    @keyframes float { 0%,100%{transform:translateY(0) rotate(-2deg);} 50%{transform:translateY(-10px) rotate(2deg);} }
+    @keyframes glow { 0%,100%{box-shadow:0 0 40px rgba(139,92,246,.5);} 50%{box-shadow:0 0 65px rgba(34,211,238,.6);} }
+
+    .card {
+      position:relative; background:var(--card); border:1px solid var(--glass-border);
+      border-radius:26px; padding:52px 44px; max-width:440px; width:100%; text-align:center;
+      backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);
+      box-shadow:0 24px 70px rgba(0,0,0,0.5); animation:pop .6s cubic-bezier(.2,.8,.2,1) both;
+      overflow:hidden;
+    }
+    .card::before { content:""; position:absolute; inset:0; border-radius:26px; padding:1px;
+      background:linear-gradient(135deg,var(--accent),transparent 40%,var(--accent2)); -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0); -webkit-mask-composite:xor; mask-composite:exclude; opacity:.6; }
+
+    .logo { width:88px; height:88px; margin:0 auto 22px; border-radius:26px; font-size:46px;
+      display:flex; align-items:center; justify-content:center;
+      background:linear-gradient(135deg,var(--accent),var(--accent2));
+      animation:float 5s ease-in-out infinite, glow 4s ease-in-out infinite; }
+    .brand { font-size:12px; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:var(--accent2); margin-bottom:8px; }
+    h1 { font-size:29px; font-weight:800; letter-spacing:-.5px; margin-bottom:12px;
+      background:linear-gradient(90deg,#fff 30%,#c9c4ff); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+    p.desc { color:var(--muted); margin-bottom:30px; line-height:1.6; font-size:15px; }
+
+    a.btn { background:linear-gradient(135deg,#5865f2,#8b5cf6); color:#fff; text-decoration:none; font-weight:700; font-size:16px;
+      padding:15px 30px; border-radius:14px; display:inline-flex; align-items:center; gap:11px;
+      box-shadow:0 12px 30px rgba(88,101,242,.45); transition:transform .2s, box-shadow .3s; }
+    a.btn:hover { transform:translateY(-3px); box-shadow:0 18px 40px rgba(139,92,246,.55); }
+    a.btn:active { transform:translateY(-1px); }
+
+    .feats { display:flex; justify-content:center; gap:20px; margin-top:32px; flex-wrap:wrap; }
+    .feat { color:var(--muted); font-size:12.5px; display:flex; align-items:center; gap:6px; }
+    .feat .fic { font-size:15px; }
+
+    .warn { background:rgba(251,191,36,0.08); border:1px solid rgba(251,191,36,0.25); color:#fbbf24; border-radius:12px; padding:16px; font-size:13px; text-align:left; line-height:1.7; }
+    .warn code { background:rgba(0,0,0,0.35); padding:2px 6px; border-radius:5px; color:#fde68a; }
   </style>
 </head>
 <body>
+  <div class="bg-aurora"><span></span><span></span><span></span></div>
   <div class="card">
-    <div class="logo">🤖</div>
-    <h1>Bot Dashboard</h1>
+    <div class="logo">🐧</div>
+    <div class="brand">Sir Penguin</div>
+    <h1>Panou de control</h1>
     {% if configured %}
-      <p>Conecteaza-te cu Discord ca sa configurezi botul pe serverele tale.</p>
+      <p class="desc">Conectează-te cu Discord ca să gestionezi botul pe serverele tale — bun venit, invitații, giveaway-uri și tot restul.</p>
       <a class="btn" href="/login">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff"><path d="M20.3 4.4A19.8 19.8 0 0 0 15.4 3l-.3.5a18 18 0 0 1 4.3 1.4 17 17 0 0 0-14.8 0A18 18 0 0 1 8.9 3.5L8.6 3a19.8 19.8 0 0 0-4.9 1.4C.6 9 0 13.4.3 17.8a19.9 19.9 0 0 0 6 3l.8-1.2c-.7-.3-1.4-.6-2-1l.5-.4a14.2 14.2 0 0 0 12.2 0l.5.4c-.6.4-1.3.7-2 1l.8 1.2a19.9 19.9 0 0 0 6-3c.4-5.1-.6-9.5-2.8-13.4ZM8.3 15.2c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2Zm7.4 0c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2Z"/></svg>
-        Conecteaza-te cu Discord
+        Conectează-te cu Discord
       </a>
+      <div class="feats">
+        <div class="feat"><span class="fic">🎁</span> Giveaway-uri</div>
+        <div class="feat"><span class="fic">📨</span> Invitații</div>
+        <div class="feat"><span class="fic">🎫</span> Tickete</div>
+        <div class="feat"><span class="fic">⭐</span> Rank-uri</div>
+      </div>
     {% else %}
-      <p>OAuth nu e configurat inca.</p>
+      <p class="desc">OAuth nu e configurat încă.</p>
       <div class="warn">
-        Adauga in fisierul <code>.env</code>:<br><br>
-        <code>DISCORD_CLIENT_ID</code> (ID-ul aplicatiei)<br>
+        Adaugă în fișierul <code>.env</code>:<br><br>
+        <code>DISCORD_CLIENT_ID</code> (ID-ul aplicației)<br>
         <code>DISCORD_CLIENT_SECRET</code> (din OAuth2)<br>
         <code>DISCORD_REDIRECT_URI=http://localhost:5000/callback</code><br>
         <code>FLASK_SECRET</code> (orice text random)<br><br>
-        Si in Developer Portal → OAuth2 → Redirects adauga
+        Și în Developer Portal → OAuth2 → Redirects adaugă
         <code>http://localhost:5000/callback</code>.
       </div>
     {% endif %}
