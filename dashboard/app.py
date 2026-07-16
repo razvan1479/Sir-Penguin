@@ -407,9 +407,17 @@ def giveaway(guild_id):
         storage.set(int(guild_id), "giveaways", data)
         return redirect(url_for("giveaway", guild_id=guild_id, saved=1))
 
+    # modul preferat: dashboard sau discord (salvat, schimbabil din query)
+    mode = request.args.get("mode")
+    if mode in ("dashboard", "discord"):
+        data["mode"] = mode
+        storage.set(int(guild_id), "giveaways", data)
+    mode = data.get("mode", "dashboard")
+
     return render_template("giveaway.html", guild_id=guild_id,
                            cfg=data.get("config", {}),
                            active_count=len(data.get("active", {})),
+                           mode=mode,
                            meta=storage.get(int(guild_id), "meta", {}),
                            section="giveaway", saved=request.args.get("saved"))
 
@@ -796,20 +804,36 @@ def invitelog(guild_id):
 @guild_required
 def test_page(guild_id):
     import subprocess
-    version, commit = None, None
-    try:
-        root = os.path.join(os.path.dirname(__file__), "..")
-        version = subprocess.check_output(
-            ["git", "-C", root, "log", "-1", "--pretty=%s"],
-            stderr=subprocess.DEVNULL, timeout=3).decode().strip()
-        commit = subprocess.check_output(
-            ["git", "-C", root, "rev-parse", "--short", "HEAD"],
-            stderr=subprocess.DEVNULL, timeout=3).decode().strip()
-    except Exception:
-        pass
+    root = os.path.join(os.path.dirname(__file__), "..")
+
+    def _git(args, timeout=8):
+        try:
+            return subprocess.check_output(
+                ["git", "-C", root] + args,
+                stderr=subprocess.DEVNULL, timeout=timeout).decode().strip()
+        except Exception:
+            return None
+
+    version = _git(["log", "-1", "--pretty=%s"])
+    commit = _git(["rev-parse", "--short", "HEAD"])
+    commit_date = _git(["log", "-1", "--pretty=%cd", "--date=format:%d.%m.%Y %H:%M"])
+    local_full = _git(["rev-parse", "HEAD"])
+
+    # verifica pe GitHub daca e ceva nou (fara sa traga nimic)
+    update_available = None
+    remote_msg = None
+    if request.args.get("check"):
+        remote_line = _git(["ls-remote", "origin", "refs/heads/main"], timeout=12)
+        if remote_line and local_full:
+            remote_hash = remote_line.split()[0]
+            update_available = (remote_hash != local_full)
+
     return render_template("test.html", guild_id=guild_id,
                            meta=storage.get(int(guild_id), "meta", {}),
-                           version=version, commit=commit, section="test")
+                           version=version, commit=commit, commit_date=commit_date,
+                           update_available=update_available,
+                           checked=bool(request.args.get("check")),
+                           section="test")
 
 
 @app.route("/appearance/<guild_id>", methods=["GET", "POST"])

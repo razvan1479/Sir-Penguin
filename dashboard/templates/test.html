@@ -1,46 +1,99 @@
 {% extends "base.html" %}
-{% block title %}Test · {{ meta.get('name','Server') }}{% endblock %}
+{% block title %}Versiune & Update · {{ meta.get('name','Server') }}{% endblock %}
 
 {% block extra_style %}
-    .panel { background:var(--card); border-radius:14px; padding:26px; text-align:center; }
-    h3 { margin:0 0 6px; font-size:18px; }
-    .sub { color:var(--muted); font-size:14px; margin:0 0 22px; line-height:1.6; }
-    .ver { display:inline-block; background:#1e3a23; color:#3ba55d; font-weight:700;
-           font-size:22px; padding:10px 22px; border-radius:12px; margin-bottom:22px; }
-    .btn { background:var(--accent); color:#fff; border:none; padding:13px 26px;
-           border-radius:10px; font-size:15px; font-weight:600; cursor:pointer; }
-    .btn:hover { filter:brightness(1.1); }
-    .out { margin-top:20px; font-size:16px; min-height:24px; color:var(--text); }
-    .hint { margin-top:24px; background:var(--input); border-radius:10px; padding:14px 16px;
-            font-size:13px; color:var(--muted); text-align:left; line-height:1.7; }
-    code { background:var(--bg); padding:2px 7px; border-radius:5px; font-size:12px; }
+    .panel { padding:30px; }
+    .head { display:flex; align-items:center; gap:16px; margin-bottom:8px; }
+    .head .badge { width:56px; height:56px; border-radius:16px; display:flex; align-items:center; justify-content:center; font-size:28px; background:linear-gradient(135deg,var(--accent),var(--accent2)); box-shadow:0 0 26px rgba(139,92,246,.4); }
+    h3 { margin:0; font-size:20px; font-weight:800; }
+    .sub { color:var(--muted); font-size:14px; margin:2px 0 0; line-height:1.6; }
+
+    .notif { border-radius:16px; padding:18px 20px; margin:24px 0; display:flex; align-items:center; gap:14px; font-size:15px; font-weight:600; animation:fadeUp .4s ease both; }
+    .notif .ni { font-size:26px; }
+    .notif.up { background:linear-gradient(135deg,rgba(251,191,36,.15),rgba(251,146,60,.1)); border:1px solid rgba(251,191,36,.3); color:#fbbf24; }
+    .notif.ok { background:linear-gradient(135deg,rgba(34,197,94,.14),rgba(16,185,129,.1)); border:1px solid rgba(34,197,94,.3); color:#4ade80; }
+    .notif .sub2 { color:var(--muted); font-weight:400; font-size:13px; margin-top:3px; }
+
+    .verbox { background:var(--input); border:1px solid var(--glass-border); border-radius:16px; padding:22px; margin-bottom:20px; }
+    .verrow { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:10px 0; border-bottom:1px solid var(--glass-border); }
+    .verrow:last-child { border-bottom:none; }
+    .verrow .k { color:var(--muted); font-size:13px; font-weight:600; }
+    .verrow .v { font-weight:700; font-size:15px; text-align:right; }
+    .verrow .v code { background:var(--bg); padding:3px 9px; border-radius:6px; font-size:13px; color:#c4b5fd; }
+
+    .btn { background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; text-decoration:none; border:none; padding:13px 26px; border-radius:12px; font-size:15px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:9px; box-shadow:0 8px 22px rgba(139,92,246,.35); }
+    .btn.ghost { background:var(--input); border:1px solid var(--glass-border); box-shadow:none; color:var(--text); }
+    .actions { display:flex; gap:12px; flex-wrap:wrap; }
+
+    .hint { margin-top:24px; background:rgba(34,211,238,0.06); border:1px solid rgba(34,211,238,0.18); border-radius:14px; padding:16px 18px; font-size:13px; color:#9fd8e8; text-align:left; line-height:1.75; }
+    .hint code { background:var(--bg); padding:2px 7px; border-radius:5px; font-size:12px; color:#7dd3fc; }
+    .hint b { color:var(--text); }
 {% endblock %}
 
 {% block content %}
   <div class="panel">
-    <h3>🧪 Pagina de test</h3>
-    <p class="sub">Foloseste pagina asta ca sa verifici ca modificarile ajung pe server prin auto-deploy.</p>
-
-    <div class="ver">
-      {% if version %}Versiune pe server: {{ version }}{% else %}Versiune: necunoscuta{% endif %}
+    <div class="head">
+      <div class="badge">🚀</div>
+      <div>
+        <h3>Versiune & Update</h3>
+        <p class="sub">Vezi ce versiune rulează pe server și verifică dacă e ceva nou pe GitHub.</p>
+      </div>
     </div>
-    {% if commit %}<div class="sub" style="margin-top:-14px">commit <code>{{ commit }}</code></div>{% endif %}
 
-    <div>
-      <button class="btn" onclick="document.getElementById('out').textContent = '✅ Merge! Ora: ' + new Date().toLocaleTimeString()">
-        Apasa-ma
-      </button>
+    {% if checked %}
+      {% if update_available %}
+        <div class="notif up">
+          <span class="ni">🔔</span>
+          <div>Update disponibil pe GitHub!
+            <div class="sub2">Există modificări noi pe GitHub care încă nu sunt pe server. Dacă ai auto-deploy pornit, se aplică singur în ~30s după push. Altfel, trage-le manual pe server.</div>
+          </div>
+        </div>
+      {% elif update_available == False %}
+        <div class="notif ok">
+          <span class="ni">✅</span>
+          <div>Ești la zi!
+            <div class="sub2">Versiunea de pe server e identică cu ultima de pe GitHub. Nu ai nimic de actualizat.</div>
+          </div>
+        </div>
+      {% else %}
+        <div class="notif up">
+          <span class="ni">⚠️</span>
+          <div>N-am putut verifica GitHub
+            <div class="sub2">Serverul nu a putut ajunge la GitHub în acest moment. Încearcă din nou peste puțin.</div>
+          </div>
+        </div>
+      {% endif %}
+    {% endif %}
+
+    <div class="verbox">
+      <div class="verrow">
+        <span class="k">Versiune activă pe server</span>
+        <span class="v">{% if version %}{{ version }}{% else %}necunoscută{% endif %}</span>
+      </div>
+      {% if commit %}
+      <div class="verrow">
+        <span class="k">Commit</span>
+        <span class="v"><code>{{ commit }}</code></span>
+      </div>
+      {% endif %}
+      {% if commit_date %}
+      <div class="verrow">
+        <span class="k">Data</span>
+        <span class="v">{{ commit_date }}</span>
+      </div>
+      {% endif %}
     </div>
-    <div class="out" id="out"></div>
+
+    <div class="actions">
+      <a class="btn" href="/test/{{ guild_id }}?check=1">🔍 Verifică update pe GitHub</a>
+      <a class="btn ghost" href="/test/{{ guild_id }}">↺ Reîmprospătează</a>
+    </div>
 
     <div class="hint">
-      <b>Cum testezi auto-deploy-ul:</b><br>
-      Versiunea de mai sus e luata direct din Git, de pe server — adica e exact mesajul ultimului
-      commit care ruleaza acum.<br>
-      1. Pe calculator, fa o modificare si da commit cu un mesaj nou (ex. <code>v21 test</code>).<br>
-      2. Push (sau Sync).<br>
-      3. Asteapta ~30 secunde, apoi reincarca pagina cu <b>Ctrl+Shift+R</b>.<br>
-      Daca versiunea de aici s-a schimbat in mesajul tau nou, auto-deploy-ul functioneaza. 🎉
+      <b>Cum funcționează:</b><br>
+      Versiunea de mai sus e luată direct din Git, de pe server — e exact ultimul commit care rulează acum.<br>
+      Apeși <b>„Verifică update"</b> și dashboardul compară ce ai pe server cu ultima versiune de pe GitHub, fără să tragă nimic.<br>
+      Dacă ai <b>auto-deploy</b> pornit (GitHub Actions), după fiecare push modificările ajung singure pe server în ~30 secunde.
     </div>
   </div>
 {% endblock %}

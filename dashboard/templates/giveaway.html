@@ -23,11 +23,64 @@
     .cmd { color:var(--muted); font-size:13px; margin-top:14px; }
     .cmd code { background:var(--input); padding:2px 6px; border-radius:4px; color:#dbdee1; }
     #interval-wrap { display:none; }
+
+    .modewrap { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    @media (max-width:700px){ .modewrap{ grid-template-columns:1fr; } }
+    .modebtn { display:flex; align-items:center; gap:13px; padding:16px; border-radius:14px; text-decoration:none; color:var(--text); background:var(--input); border:1px solid var(--glass-border); transition:transform .2s, border-color .2s, box-shadow .25s; }
+    .modebtn:hover { transform:translateY(-3px); }
+    .modebtn.on { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent), 0 8px 22px rgba(139,92,246,.25); background:linear-gradient(135deg,rgba(139,92,246,.14),transparent); }
+    .modebtn .mi { font-size:26px; }
+    .modebtn b { font-size:15px; display:block; }
+    .modebtn small { color:var(--muted); font-size:12px; display:block; margin-top:3px; line-height:1.45; }
+    .modebtn code { background:var(--bg); padding:1px 5px; border-radius:4px; font-size:11px; color:#c4b5fd; }
+
+    .cmdbox { background:var(--input); border:1px solid var(--glass-border); border-radius:14px; padding:18px 20px; margin-top:8px; }
+    .cmdbox > code { font-size:17px; font-weight:700; color:#c4b5fd; background:var(--bg); padding:6px 12px; border-radius:8px; display:inline-block; margin-bottom:14px; }
+    .cmdbox .params > div { padding:7px 0; border-bottom:1px solid var(--glass-border); font-size:13.5px; }
+    .cmdbox .params > div:last-child { border-bottom:none; }
+    .cmdbox .params b { color:var(--accent2); }
+    .cmdbox .opt { color:var(--muted); font-size:11.5px; font-style:italic; }
 {% endblock %}
 
 {% block content %}
   {% if saved %}<div class="saved">✓ Salvat! Botul foloseste deja noua configurare.</div>{% endif %}
   {% if active_count %}<p class="cmd" style="margin-bottom:14px">🎁 Giveaway-uri active acum: <strong>{{ active_count }}</strong></p>{% endif %}
+
+  <!-- SELECTOR MOD -->
+  <div class="panel" style="margin-bottom:20px">
+    <div class="preview-title">Cum vrei să configurezi giveaway-urile?</div>
+    <div class="modewrap">
+      <a href="/giveaway/{{ guild_id }}?mode=dashboard" class="modebtn {% if mode != 'discord' %}on{% endif %}">
+        <span class="mi">🖥️</span>
+        <div><b>Din Dashboard</b><small>Completezi aici canalul, premiul, durata — apoi <code>/giveaway start</code></small></div>
+      </a>
+      <a href="/giveaway/{{ guild_id }}?mode=discord" class="modebtn {% if mode == 'discord' %}on{% endif %}">
+        <span class="mi">💬</span>
+        <div><b>Direct din Discord</b><small>Faci totul cu o comandă, fără dashboard</small></div>
+      </a>
+    </div>
+  </div>
+
+  {% if mode == 'discord' %}
+  <!-- MOD DISCORD: instructiuni comanda -->
+  <div class="panel">
+    <div class="preview-title">💬 Creează un giveaway direct din Discord</div>
+    <p class="hint" style="font-size:14px;line-height:1.7">Scrie pe orice canal comanda de mai jos — botul postează giveaway-ul pe loc, cu buton de participare. Nu trebuie să configurezi nimic aici.</p>
+    <div class="cmdbox">
+      <code>/giveaway creaza</code>
+      <div class="params">
+        <div><b>premiu</b> — ce se câștigă (ex. <i>Discord Nitro</i>)</div>
+        <div><b>minute</b> — cât durează (ex. <i>60</i> = o oră)</div>
+        <div><b>castigatori</b> — câți câștigători <span class="opt">opțional, implicit 1</span></div>
+        <div><b>canal</b> — pe ce canal se postează <span class="opt">opțional, implicit canalul curent</span></div>
+        <div><b>rol_necesar</b> — doar cine are rolul poate participa <span class="opt">opțional</span></div>
+        <div><b>ping</b> — dă @everyone la postare <span class="opt">opțional</span></div>
+      </div>
+    </div>
+    <p class="hint" style="margin-top:16px">Exemplu: <code>/giveaway creaza premiu:Nitro minute:60 castigatori:2</code></p>
+    <p class="hint">Ca să-l închizi mai devreme sau să tragi din nou: <code>/giveaway end</code> și <code>/giveaway reroll</code>.</p>
+  </div>
+  {% else %}
 
   <div class="grid">
     <!-- FORMULAR -->
@@ -94,9 +147,11 @@
       <p class="cmd">Posteaza manual oricand cu <code>/giveaway start</code>. La final, botul alege singur castigatorii. Reroll: <code>/giveaway reroll &lt;message_id&gt;</code></p>
     </div>
   </div>
+  {% endif %}
 {% endblock %}
 
 {% block scripts %}
+{% if mode != 'discord' %}
 <script>
   const $ = id => document.getElementById(id);
   function render(){
@@ -122,4 +177,5 @@
   });
   render();
 </script>
+{% endif %}
 {% endblock %}

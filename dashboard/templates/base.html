@@ -49,6 +49,8 @@
       .layout { grid-template-columns:1fr; }
       .sidebar { position:static !important; top:auto !important; margin-bottom:18px; }
     }
+    /* checkbox-uri mai mici, uniform pe tot dashboardul */
+    input[type=checkbox] { width:15px !important; height:15px !important; accent-color:var(--accent); cursor:pointer; }
     {% block extra_style %}{% endblock %}
   </style>
   {% if theme %}

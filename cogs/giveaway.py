@@ -289,7 +289,8 @@ class Giveaway(commands.Cog):
         cfg = data.get("config", {})
         if not cfg.get("channel_id"):
             return await interaction.response.send_message(
-                "Configureaza intai giveaway-ul in dashboard (canal, premiu, durata).", ephemeral=True)
+                "Configureaza intai giveaway-ul in dashboard (canal, premiu, durata), "
+                "sau foloseste `/giveaway creaza` ca sa-l faci direct de aici.", ephemeral=True)
         # retinem cine a dat start (apare ca "Organizat de" si la postarile recurente)
         cfg["host_id"] = interaction.user.id
         data["config"] = cfg
@@ -300,6 +301,50 @@ class Giveaway(commands.Cog):
         else:
             await interaction.response.send_message(
                 "Nu am putut posta (verifica canalul si permisiunile).", ephemeral=True)
+
+    @group.command(name="creaza",
+                   description="Creeaza si posteaza un giveaway direct de aici (fara dashboard)")
+    @app_commands.describe(
+        premiu="Ce se castiga (ex. Nitro, 100 RON, un rol)",
+        minute="Cat dureaza, in minute (ex. 60 = o ora)",
+        castigatori="Cati castigatori (implicit 1)",
+        canal="Pe ce canal se posteaza (implicit canalul curent)",
+        rol_necesar="Doar cine are acest rol poate participa (optional)",
+        ping="Da ping (@everyone sau pe rol) cand se posteaza")
+    @bot_access()
+    async def creaza(self, interaction: discord.Interaction,
+                     premiu: str, minute: int,
+                     castigatori: int = 1,
+                     canal: discord.TextChannel = None,
+                     rol_necesar: discord.Role = None,
+                     ping: bool = False):
+        if minute < 1:
+            return await interaction.response.send_message(
+                "Durata trebuie sa fie cel putin 1 minut.", ephemeral=True)
+        if castigatori < 1:
+            castigatori = 1
+        channel = canal or interaction.channel
+
+        cfg = {
+            "channel_id": channel.id,
+            "prize": premiu,
+            "duration_minutes": minute,
+            "winners": castigatori,
+            "button_label": "🎉 Particip",
+            "title": "🎉 GIVEAWAY 🎉",
+            "color": "#8b5cf6",
+            "ping_everyone": ping,
+            "required_role_id": rol_necesar.id if rol_necesar else None,
+            "host_id": interaction.user.id,
+        }
+        msg = await self._post_giveaway(interaction.guild, cfg, host_id=interaction.user.id)
+        if msg:
+            await interaction.response.send_message(
+                f"✅ Giveaway creat: {msg.jump_url}", ephemeral=True)
+        else:
+            await interaction.response.send_message(
+                "Nu am putut posta (verifica permisiunile botului pe canalul ales).",
+                ephemeral=True)
 
     @group.command(name="end", description="Incheie acum un giveaway")
     @bot_access()
