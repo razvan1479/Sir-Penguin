@@ -535,6 +535,20 @@ def rps(guild_id):
                            section="rps", saved=request.args.get("saved"))
 
 
+@app.route("/culori/<guild_id>", methods=["GET", "POST"])
+@guild_required
+def colors_settings(guild_id):
+    if request.method == "POST":
+        cfg = {"enabled": request.form.get("enabled") == "on"}
+        storage.set(int(guild_id), "colors", cfg)
+        return redirect(url_for("colors_settings", guild_id=guild_id, saved=1))
+
+    cfg = storage.get(int(guild_id), "colors", {})
+    return render_template("colors.html", guild_id=guild_id, cfg=cfg,
+                           meta=storage.get(int(guild_id), "meta", {}),
+                           section="colors", saved=request.args.get("saved"))
+
+
 import time as _time
 
 

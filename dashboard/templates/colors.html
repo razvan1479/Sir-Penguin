@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Culori la nume · {{ meta.get('name','Server') }}{% endblock %}
+
+{% block extra_style %}
+    .panel { padding:26px; }
+    h3 { margin:0 0 4px; font-size:18px; font-weight:800; }
+    .sub { color:var(--muted); font-size:13px; margin:0 0 22px; line-height:1.6; }
+    .toggle { display:flex; align-items:center; gap:12px; margin:14px 0; cursor:pointer; background:var(--input); border:1px solid var(--glass-border); border-radius:12px; padding:15px 17px; }
+    .toggle input { cursor:pointer; }
+    .toggle span { font-size:15px; font-weight:600; }
+    .save { margin-top:22px; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; border:none; padding:13px 28px; border-radius:11px; font-weight:700; font-size:15px; cursor:pointer; }
+    .cmdbox { background:var(--input); border:1px solid var(--glass-border); border-radius:12px; padding:14px 16px; font-size:13.5px; color:var(--muted); margin-top:8px; line-height:1.8; }
+    .cmdbox code { background:var(--bg); padding:2px 8px; border-radius:5px; color:#c4b5fd; }
+    .swatches { display:flex; gap:8px; flex-wrap:wrap; margin:14px 0 6px; }
+    .sw { width:26px; height:26px; border-radius:8px; box-shadow:0 0 0 1px var(--glass-border); }
+    .off { background:rgba(244,63,94,.1); border:1px solid rgba(244,63,94,.3); color:#fb7185; border-radius:10px; padding:11px 14px; font-size:13.5px; margin-bottom:16px; }
+{% endblock %}
+
+{% block content %}
+  <div class="panel">
+    <h3>🎨 Culori la nume</h3>
+    <p class="sub">Membrii își pot alege singuri o culoare de nume, apăsând pe butoane. Botul creează rolurile automat și le refolosește (fără dubluri).</p>
+
+    {% if saved %}<div class="saved">✅ Salvat!</div>{% endif %}
+
+    {% if not cfg.get('enabled', True) %}
+      <div class="off">⚠️ Funcția e momentan <b>dezactivată</b>. Comanda <code>/culori panou</code> nu merge și butoanele nu atribuie culori până o activezi.</div>
+    {% endif %}
+
+    <form method="POST">
+      <label class="toggle">
+        <input type="checkbox" name="enabled" {% if cfg.get('enabled', True) %}checked{% endif %}>
+        <span>Activează culorile la nume</span>
+      </label>
+
+      <div class="swatches">
+        <div class="sw" style="background:#E74C3C"></div>
+        <div class="sw" style="background:#E67E22"></div>
+        <div class="sw" style="background:#F1C40F"></div>
+        <div class="sw" style="background:#2ECC71"></div>
+        <div class="sw" style="background:#1ABC9C"></div>
+        <div class="sw" style="background:#3498DB"></div>
+        <div class="sw" style="background:#9B59B6"></div>
+        <div class="sw" style="background:#E84393"></div>
+        <div class="sw" style="background:#A04000"></div>
+        <div class="sw" style="background:#FFFFFF"></div>
+        <div class="sw" style="background:#95A5A6"></div>
+      </div>
+      <div class="cmdbox">
+        Când e activat, folosește comanda <code>/culori panou</code> pe canalul dorit — botul postează panoul cu butoane.<br>
+        Fiecare membru poate avea o singură culoare. Apasă din nou pe aceeași culoare sau pe „🚫 Scoate culoarea" ca s-o elimini.
+      </div>
+
+      <button class="save" type="submit">💾 Salvează</button>
+    </form>
+  </div>
+{% endblock %}
