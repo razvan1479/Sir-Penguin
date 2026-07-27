@@ -26,27 +26,27 @@ ROLE_PREFIX = "🎨 "
 
 # paleta de culori (nume, emoji-cerc, cod). Emoji-ul arata culoarea pe buton.
 COLORS = [
-    ("Roșu",          "❤️", 0xE74C3C),
-    ("Coral",         "🧡", 0xFF7043),
+    ("Roșu",          "🔴", 0xE74C3C),
+    ("Coral",         "🟠", 0xFF7043),
     ("Portocaliu",    "🟠", 0xE67E22),
     ("Auriu",         "🟡", 0xF39C12),
-    ("Galben",        "💛", 0xF1C40F),
+    ("Galben",        "🟡", 0xF1C40F),
     ("Verde-lămâie",  "🟢", 0xA3E635),
-    ("Verde",         "💚", 0x2ECC71),
-    ("Verde-închis",  "🌲", 0x1E8449),
-    ("Turcoaz",       "🩵", 0x1ABC9C),
+    ("Verde",         "🟢", 0x2ECC71),
+    ("Verde-închis",  "🟢", 0x1E8449),
+    ("Turcoaz",       "🟢", 0x1ABC9C),
     ("Cyan",          "🔵", 0x00CEC9),
-    ("Albastru",      "💙", 0x3498DB),
-    ("Albastru-cer",  "🌊", 0x74B9FF),
-    ("Indigo",        "🟦", 0x5C6BC0),
-    ("Mov",           "💜", 0x9B59B6),
+    ("Albastru",      "🔵", 0x3498DB),
+    ("Albastru-cer",  "🔵", 0x74B9FF),
+    ("Indigo",        "🟣", 0x5C6BC0),
+    ("Mov",           "🟣", 0x9B59B6),
     ("Violet",        "🟣", 0xBB6BD9),
-    ("Roz",           "🩷", 0xE84393),
-    ("Roz-pal",       "🌸", 0xFDA7DF),
-    ("Maro",          "🤎", 0xA04000),
-    ("Alb",           "🤍", 0xFFFFFF),
-    ("Gri",           "🩶", 0x95A5A6),
-    ("Negru",         "🖤", 0x010101),
+    ("Roz",           "🟣", 0xE84393),
+    ("Roz-pal",       "🟣", 0xFDA7DF),
+    ("Maro",          "🟤", 0xA04000),
+    ("Alb",           "⚪", 0xFFFFFF),
+    ("Gri",           "⚪", 0x95A5A6),
+    ("Negru",         "⚫", 0x010101),
 ]
 
 
@@ -73,15 +73,21 @@ async def _assign_color(interaction: discord.Interaction, name: str, color_val: 
             return await interaction.response.send_message(
                 "Nu am putut crea rolul de culoare acum. Încearcă din nou.", ephemeral=True)
 
-        # mutam rolul cat mai sus (imediat sub rolul botului) ca sa se vada culoarea.
+        # mutam rolul imediat sub rolul cel mai de sus al botului, ca sa se vada culoarea.
         # in Discord, culoarea numelui vine de la cel mai de sus rol COLORAT.
+        # folosim edit_role_positions (metoda dedicata, sigura cu mai multe roluri)
         try:
-            bot_top = guild.me.top_role.position
-            target = max(1, bot_top - 1)
-            if role.position != target:
-                await role.edit(position=target, reason="Rol de culoare sus, ca sa se vada")
+            target = guild.me.top_role.position - 1
+            if target >= 1:
+                await guild.edit_role_positions(
+                    positions={role: target},
+                    reason="Rol de culoare sus, ca sa se vada")
         except (discord.Forbidden, discord.HTTPException):
-            pass  # daca nu putem muta, ramane unde e (macar rolul exista)
+            # fallback pe metoda simpla daca cea dedicata esueaza
+            try:
+                await role.edit(position=max(1, guild.me.top_role.position - 1))
+            except (discord.Forbidden, discord.HTTPException):
+                pass
 
     # scoatem orice ALTA culoare din sistemul asta (o singura culoare de nume)
     others = [r for r in member.roles if r.name.startswith(ROLE_PREFIX) and r.id != role.id]
