@@ -26,17 +26,27 @@ ROLE_PREFIX = "🎨 "
 
 # paleta de culori (nume, emoji-cerc, cod). Emoji-ul arata culoarea pe buton.
 COLORS = [
-    ("Roșu",       "🔴", 0xE74C3C),
-    ("Portocaliu", "🟠", 0xE67E22),
-    ("Galben",     "🟡", 0xF1C40F),
-    ("Verde",      "🟢", 0x2ECC71),
-    ("Turcoaz",    "🩵", 0x1ABC9C),
-    ("Albastru",   "🔵", 0x3498DB),
-    ("Mov",        "🟣", 0x9B59B6),
-    ("Roz",        "🩷", 0xE84393),
-    ("Maro",       "🟤", 0xA04000),
-    ("Alb",        "⚪", 0xFFFFFF),
-    ("Gri",        "🩶", 0x95A5A6),
+    ("Roșu",          "❤️", 0xE74C3C),
+    ("Coral",         "🧡", 0xFF7043),
+    ("Portocaliu",    "🟠", 0xE67E22),
+    ("Auriu",         "🟡", 0xF39C12),
+    ("Galben",        "💛", 0xF1C40F),
+    ("Verde-lămâie",  "🟢", 0xA3E635),
+    ("Verde",         "💚", 0x2ECC71),
+    ("Verde-închis",  "🌲", 0x1E8449),
+    ("Turcoaz",       "🩵", 0x1ABC9C),
+    ("Cyan",          "🔵", 0x00CEC9),
+    ("Albastru",      "💙", 0x3498DB),
+    ("Albastru-cer",  "🌊", 0x74B9FF),
+    ("Indigo",        "🟦", 0x5C6BC0),
+    ("Mov",           "💜", 0x9B59B6),
+    ("Violet",        "🟣", 0xBB6BD9),
+    ("Roz",           "🩷", 0xE84393),
+    ("Roz-pal",       "🌸", 0xFDA7DF),
+    ("Maro",          "🤎", 0xA04000),
+    ("Alb",           "🤍", 0xFFFFFF),
+    ("Gri",           "🩶", 0x95A5A6),
+    ("Negru",         "🖤", 0x010101),
 ]
 
 
@@ -62,6 +72,16 @@ async def _assign_color(interaction: discord.Interaction, name: str, color_val: 
         except discord.HTTPException:
             return await interaction.response.send_message(
                 "Nu am putut crea rolul de culoare acum. Încearcă din nou.", ephemeral=True)
+
+        # mutam rolul cat mai sus (imediat sub rolul botului) ca sa se vada culoarea.
+        # in Discord, culoarea numelui vine de la cel mai de sus rol COLORAT.
+        try:
+            bot_top = guild.me.top_role.position
+            target = max(1, bot_top - 1)
+            if role.position != target:
+                await role.edit(position=target, reason="Rol de culoare sus, ca sa se vada")
+        except (discord.Forbidden, discord.HTTPException):
+            pass  # daca nu putem muta, ramane unde e (macar rolul exista)
 
     # scoatem orice ALTA culoare din sistemul asta (o singura culoare de nume)
     others = [r for r in member.roles if r.name.startswith(ROLE_PREFIX) and r.id != role.id]
@@ -143,13 +163,11 @@ class Colors(commands.Cog):
             return await interaction.response.send_message(
                 "Activează întâi funcția din dashboard (Distracție → Culori la nume).",
                 ephemeral=True)
-        lines = "\n".join(f"{emoji} **{name}**" for name, emoji, _ in COLORS)
         embed = discord.Embed(
             title="🎨 Alege-ți o culoare la nume",
             description=("Apasă pe un buton mai jos ca să-ți pui culoarea aleasă.\n"
                          "Poți schimba oricând — apeși altă culoare și se schimbă.\n"
-                         "Ca s-o scoți, apasă **🚫 Scoate culoarea**.\n\n"
-                         f"{lines}"),
+                         "Ca s-o scoți, apasă **🚫 Scoate culoarea**."),
             color=discord.Color(0x8B5CF6))
         embed.set_footer(text="Fiecare membru poate avea o singură culoare.")
         await interaction.response.send_message(embed=embed, view=ColorView())
