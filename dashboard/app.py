@@ -617,6 +617,23 @@ def contest(guild_id):
             c["live_message_id"] = None  # forteaza un mesaj nou cu noile setari
             c["live_last_post"] = 0
             storage.set(gid, "contest", c)
+        elif action == "exclude":
+            # adauga o persoana la lista de exclusi (nu apare in clasament)
+            uid = _to_int(request.form.get("exclude_id", ""))
+            if uid:
+                excluded = c.get("excluded", [])
+                if uid not in excluded:
+                    excluded.append(uid)
+                c["excluded"] = excluded
+                c["live_message_id"] = None  # actualizeaza clasamentul live
+                storage.set(gid, "contest", c)
+        elif action == "include":
+            # scoate o persoana din lista de exclusi (revine in clasament)
+            uid = _to_int(request.form.get("include_id", ""))
+            excluded = [x for x in c.get("excluded", []) if x != uid]
+            c["excluded"] = excluded
+            c["live_message_id"] = None
+            storage.set(gid, "contest", c)
         elif action == "stop" and c.get("status") in ("scheduled", "running"):
             c["status"] = "ended"
             c["end_ts"] = _time.time()
@@ -647,8 +664,10 @@ def contest(guild_id):
     elif c.get("status") == "scheduled":
         remaining = max(0, c.get("start_ts", 0) - _time.time())
 
+    excluded_named = [{"id": x, "name": resolve_name(gid, x)} for x in c.get("excluded", [])]
     return render_template("contest.html", guild_id=guild_id, contest=c,
                            standings=standings, remaining=remaining,
+                           excluded=excluded_named,
                            channels=(storage.get(gid, "channels", {}) or {}).get("texts", []),
                            meta=storage.get(gid, "meta", {}), section="contest")
 

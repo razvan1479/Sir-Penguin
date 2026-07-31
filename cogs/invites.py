@@ -477,8 +477,12 @@ class Invites(commands.Cog):
             return []
         if limit is None:
             limit = max(1, min(25, int(c.get("board_count", 10))))
+        # persoane excluse din concurs (ex. owner) - nu apar in clasament, dar
+        # invitatiile lor reale raman neatinse in restul botului
+        excluded = {str(x) for x in c.get("excluded", [])}
         counts = self._count_since(gid, c.get("start_ts", 0))
-        return sorted([(u, n) for u, n in counts.items() if n > 0],
+        return sorted([(u, n) for u, n in counts.items()
+                       if n > 0 and str(u) not in excluded],
                       key=lambda x: x[1], reverse=True)[:limit]
 
     def _board_lines(self, ranked):
