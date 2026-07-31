@@ -602,7 +602,21 @@ def contest(guild_id):
                 "end_ts": end_ts,
                 "announce_channel_id": _to_int(request.form.get("announce_channel_id", "")),
                 "winners_count": _to_int(request.form.get("winners_count", "1")) or 1,
+                "live_enabled": request.form.get("live_enabled") == "on",
+                "live_channel_id": _to_int(request.form.get("live_channel_id", "")),
+                "live_interval_minutes": _to_int(request.form.get("live_interval_minutes", "30")) or 30,
+                "board_count": _to_int(request.form.get("board_count", "10")) or 10,
+                "live_message_id": None, "live_last_post": 0,
             })
+        elif action == "live":
+            # actualizeaza doar setarile de clasament live (merge si in timpul concursului)
+            c["live_enabled"] = request.form.get("live_enabled") == "on"
+            c["live_channel_id"] = _to_int(request.form.get("live_channel_id", ""))
+            c["live_interval_minutes"] = _to_int(request.form.get("live_interval_minutes", "30")) or 30
+            c["board_count"] = _to_int(request.form.get("board_count", "10")) or 10
+            c["live_message_id"] = None  # forteaza un mesaj nou cu noile setari
+            c["live_last_post"] = 0
+            storage.set(gid, "contest", c)
         elif action == "stop" and c.get("status") in ("scheduled", "running"):
             c["status"] = "ended"
             c["end_ts"] = _time.time()
@@ -635,6 +649,7 @@ def contest(guild_id):
 
     return render_template("contest.html", guild_id=guild_id, contest=c,
                            standings=standings, remaining=remaining,
+                           channels=(storage.get(gid, "channels", {}) or {}).get("texts", []),
                            meta=storage.get(gid, "meta", {}), section="contest")
 
 

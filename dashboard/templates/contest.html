@@ -20,6 +20,10 @@
     .badge { display:inline-block; padding:5px 14px; border-radius:20px; font-size:13px; font-weight:600; }
     .on { background:#1e3a23; color:#3ba55d; } .sched { background:#3a2c1a; color:#f0b232; } .off { background:var(--input); color:var(--muted); }
     .timer { font-size:22px; font-weight:700; margin:14px 0 4px; }
+    .livebox { background:var(--input); border:1px solid var(--glass-border); border-radius:12px; padding:16px; margin-top:18px; }
+    .livebox .row2 label { margin-top:8px; }
+    .ck { display:flex; align-items:center; gap:10px; text-transform:none; letter-spacing:0; font-size:14px; color:var(--text); cursor:pointer; margin:0; }
+    .ck input { width:auto; }
 {% endblock %}
 
 {% block content %}
@@ -38,6 +42,21 @@
         <button class="stop" type="submit">⏹️ Oprește acum</button>
       </form>
       <p class="hint">La final, botul anunță automat câștigătorii și clasamentul în canalul setat. Clasamentul se actualizează automat.</p>
+
+      <div class="livebox" style="margin-top:16px">
+        <form method="POST">
+          <input type="hidden" name="action" value="live">
+          <label class="ck"><input type="checkbox" name="live_enabled" {% if contest.get('live_enabled') %}checked{% endif %}> 📊 Postează clasamentul live pe un canal</label>
+          <div class="row2">
+            <div><label>ID canal clasament live</label><input type="text" name="live_channel_id" value="{{ contest.get('live_channel_id','') or '' }}" placeholder="unde apare clasamentul"></div>
+            <div><label>La câte minute se actualizează</label><input type="number" name="live_interval_minutes" value="{{ contest.get('live_interval_minutes',30) }}" min="1"></div>
+          </div>
+          <label>Câți apar în clasament (max 25)</label>
+          <input type="number" name="board_count" value="{{ contest.get('board_count',10) }}" min="1" max="25">
+          <p class="hint">Se actualizează singur (editează același mesaj). Poți schimba asta chiar și în timpul concursului.</p>
+          <button class="start" type="submit" style="background:var(--input)">💾 Salvează clasamentul live</button>
+        </form>
+      </div>
     {% else %}
       <span class="badge off">Niciun concurs activ</span>
       <form method="POST" style="margin-top:8px">
@@ -59,6 +78,17 @@
 
         <label>Câți câștigători se anunță</label>
         <input type="number" name="winners_count" value="1" min="1">
+
+        <div class="livebox">
+          <label class="ck"><input type="checkbox" name="live_enabled"> 📊 Postează clasamentul live pe un canal</label>
+          <div class="row2">
+            <div><label>ID canal clasament live</label><input type="text" name="live_channel_id" placeholder="unde apare clasamentul"></div>
+            <div><label>La câte minute se actualizează</label><input type="number" name="live_interval_minutes" value="30" min="1"></div>
+          </div>
+          <label>Câți apar în clasament (max 25)</label>
+          <input type="number" name="board_count" value="10" min="1" max="25">
+          <p class="hint">Botul postează un clasament care se actualizează singur (editează același mesaj, nu spamează). Ex: 30 = din jumătate în jumătate de oră.</p>
+        </div>
 
         <button class="start" type="submit">🏁 Pornește concursul</button>
       </form>

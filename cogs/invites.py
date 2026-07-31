@@ -470,14 +470,16 @@ class Invites(commands.Cog):
     def _contest(self, gid):
         return storage.get(gid, "contest", {}) or {}
 
-    def _contest_board(self, gid):
-        """Clasamentul concursului (de la start incoace), top 10."""
+    def _contest_board(self, gid, limit=None):
+        """Clasamentul concursului (de la start incoace). Cati apar = setabil din dashboard."""
         c = self._contest(gid)
         if c.get("status") not in ("running", "ended"):
             return []
+        if limit is None:
+            limit = max(1, min(25, int(c.get("board_count", 10))))
         counts = self._count_since(gid, c.get("start_ts", 0))
         return sorted([(u, n) for u, n in counts.items() if n > 0],
-                      key=lambda x: x[1], reverse=True)[:10]
+                      key=lambda x: x[1], reverse=True)[:limit]
 
     def _board_lines(self, ranked):
         out = []
@@ -523,6 +525,44 @@ class Invites(commands.Cog):
                     except discord.HTTPException:
                         pass
 
+            # ---- clasament LIVE pe canal (daca e activat) ----
+            if status == "running" and c.get("live_enabled") and c.get("live_channel_id"):
+                interval = max(1, int(c.get("live_interval_minutes", 30))) * 60
+                last = c.get("live_last_post", 0)
+                if now - last >= interval:
+                    await self._post_live_board(guild, c)
+
+    async def _post_live_board(self, guild, c):
+        import time
+        ch = guild.get_channel(int(c["live_channel_id"]))
+        if ch is None:
+            return
+        ranked = self._contest_board(guild.id)
+        embed = discord.Embed(
+            title=f"🏁 {c.get('name','Concurs')} · Clasament live",
+            description=self._board_lines(ranked) or "Încă nicio invitație. Fii primul!",
+            color=discord.Color(0x8B5CF6))
+        embed.set_footer(text="Se actualizează automat")
+        embed.timestamp = discord.utils.utcnow()
+        # editam acelasi mesaj daca exista, altfel postam unul nou
+        msg_id = c.get("live_message_id")
+        posted = False
+        if msg_id:
+            try:
+                msg = await ch.fetch_message(int(msg_id))
+                await msg.edit(embed=embed)
+                posted = True
+            except (discord.NotFound, discord.HTTPException):
+                posted = False
+        if not posted:
+            try:
+                msg = await ch.send(embed=embed)
+                c["live_message_id"] = msg.id
+            except discord.HTTPException:
+                return
+        c["live_last_post"] = time.time()
+        storage.set(guild.id, "contest", c)
+
     @contest_loop.before_loop
     async def _before_contest(self):
         await self.bot.wait_until_ready()
@@ -534,9 +574,16 @@ class Invites(commands.Cog):
         if self._contest(interaction.guild_id).get("status") in ("scheduled", "running"):
             return await interaction.response.send_message(
                 "Exista deja un concurs activ/programat. Opreste-l cu `/concurs stop`.", ephemeral=True)
+        prev = self._contest(interaction.guild_id)
         storage.set(interaction.guild_id, "contest", {
             "status": "running", "name": nume, "start_ts": time.time(),
             "end_ts": None, "announce_channel_id": None, "winners_count": 1,
+            # pastram setarile de clasament live (din dashboard), resetam mesajul
+            "live_enabled": prev.get("live_enabled", False),
+            "live_channel_id": prev.get("live_channel_id"),
+            "live_interval_minutes": prev.get("live_interval_minutes", 30),
+            "board_count": prev.get("board_count", 10),
+            "live_message_id": None, "live_last_post": 0,
         })
         await interaction.response.send_message(
             f"🏁 **{nume}** a inceput! Vezi clasamentul cu `/concurs clasament`.\n"
