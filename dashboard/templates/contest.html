@@ -27,8 +27,9 @@
     .excl-list { display:flex; flex-direction:column; gap:8px; margin-bottom:12px; }
     .excl-item { display:flex; align-items:center; justify-content:space-between; gap:10px; background:var(--card); border:1px solid var(--glass-border); border-radius:10px; padding:9px 13px; font-size:14px; }
     .excl-item .x { background:rgba(244,63,94,.15); color:#fb7185; border:none; padding:5px 11px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; }
-    .excl-add { display:flex; gap:8px; }
-    .excl-add input { flex:1; }
+    .excl-add { display:flex; flex-wrap:wrap; gap:8px; margin-top:6px; }
+    .excl-add input[type=text] { padding:11px; border-radius:8px; color:var(--text); font-size:14px; font-family:inherit; }
+    .excl-add input::placeholder { color:var(--muted); }
 {% endblock %}
 
 {% block content %}
@@ -84,8 +85,11 @@
         {% endif %}
         <form method="POST" class="excl-add">
           <input type="hidden" name="action" value="exclude">
-          <input type="text" name="exclude_id" placeholder="ID-ul persoanei de exclus">
-          <button type="submit">➕ Exclude</button>
+          <label style="width:100%;display:block;margin-bottom:6px;font-size:13px;color:var(--muted);font-weight:600">ID-ul persoanei de exclus</label>
+          <div style="display:flex;gap:8px;width:100%">
+            <input type="text" name="exclude_id" placeholder="ex: 1216202118135021581" style="flex:1;border:1px solid var(--glass-border);background:var(--bg)">
+            <button type="submit">➕ Exclude</button>
+          </div>
         </form>
         <p class="hint">Click dreapta pe persoană în Discord → Copiază ID utilizator. (Ai nevoie de „Mod dezvoltator" pornit în Discord.)</p>
       </div>
