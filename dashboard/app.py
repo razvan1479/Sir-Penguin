@@ -549,6 +549,31 @@ def colors_settings(guild_id):
                            section="colors", saved=request.args.get("saved"))
 
 
+@app.route("/conturinoi/<guild_id>", methods=["GET", "POST"])
+@guild_required
+def newacc_settings(guild_id):
+    gid = int(guild_id)
+    if request.method == "POST":
+        cfg = {
+            "enabled": request.form.get("enabled") == "on",
+            "days": _to_int(request.form.get("days", "30")) or 30,
+            "role_id": _to_int(request.form.get("role_id", "")),
+            "announce_enabled": request.form.get("announce_enabled") == "on",
+            "announce_channel_id": _to_int(request.form.get("announce_channel_id", "")),
+        }
+        storage.set(gid, "newacc", cfg)
+        return redirect(url_for("newacc_settings", guild_id=guild_id, saved=1))
+
+    cfg = storage.get(gid, "newacc", {})
+    roles = storage.get(gid, "roles", {}) or {}
+    channels = storage.get(gid, "channels", {}) or {}
+    return render_template("newacc.html", guild_id=guild_id, cfg=cfg,
+                           roles=[r for r in roles.get("list", []) if r.get("assignable")],
+                           channels=channels.get("texts", []),
+                           meta=storage.get(gid, "meta", {}),
+                           section="newacc", saved=request.args.get("saved"))
+
+
 import time as _time
 
 

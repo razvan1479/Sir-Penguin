@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Conturi noi · {{ meta.get('name','Server') }}{% endblock %}
+
+{% block extra_style %}
+    .panel { padding:26px; }
+    h3 { margin:0 0 4px; font-size:18px; font-weight:800; }
+    .sub { color:var(--muted); font-size:13px; margin:0 0 22px; line-height:1.6; }
+    label { display:block; font-size:13px; color:var(--muted); margin:16px 0 6px; font-weight:600; }
+    input[type=text], input[type=number], select { width:100%; padding:11px; border-radius:8px; border:1px solid var(--glass-border); background:var(--bg); color:var(--text); font-size:14px; box-sizing:border-box; font-family:inherit; }
+    .toggle { display:flex; align-items:center; gap:12px; margin:16px 0; cursor:pointer; background:var(--input); border:1px solid var(--glass-border); border-radius:12px; padding:14px 16px; }
+    .toggle input { width:auto; }
+    .toggle span { font-size:14px; font-weight:600; }
+    .save { margin-top:22px; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; border:none; padding:13px 28px; border-radius:11px; font-weight:700; font-size:15px; cursor:pointer; }
+    .hint { background:var(--input); border-radius:8px; padding:12px 14px; font-size:12.5px; color:var(--muted); margin-top:8px; line-height:1.7; }
+    .hint code { background:var(--bg); padding:2px 7px; border-radius:5px; color:#9bb7ff; }
+    .cmd { font-size:13px; color:var(--muted); margin-top:6px; }
+    .cmd code { background:var(--input); padding:2px 7px; border-radius:5px; color:#c4b5fd; }
+    .warn { background:rgba(251,191,36,.1); border:1px solid rgba(251,191,36,.25); color:#fbbf24; border-radius:10px; padding:11px 14px; font-size:13px; margin:10px 0; }
+{% endblock %}
+
+{% block content %}
+  <div class="panel">
+    <h3>🆕 Conturi noi</h3>
+    <p class="sub">Depistează membrii cu cont de Discord creat recent (util contra fake-urilor). Vârsta contului se calculează exact, din ID-ul de Discord.</p>
+
+    {% if saved %}<div class="saved">✅ Salvat!</div>{% endif %}
+
+    <form method="POST">
+      <label class="toggle">
+        <input type="checkbox" name="enabled" {% if cfg.get('enabled') %}checked{% endif %}>
+        <span>Activează depistarea conturilor noi</span>
+      </label>
+
+      <label>Sub câte zile un cont e considerat „nou"</label>
+      <input type="number" name="days" value="{{ cfg.get('days', 30) }}" min="1" max="365">
+      <p class="hint">Ex: 30 = conturile create în ultima lună. 7 = ultima săptămână.</p>
+
+      <label>Rol pus automat la conturile noi (când intră)</label>
+      <select name="role_id">
+        <option value="">— niciun rol (doar anunț/comandă) —</option>
+        {% for r in roles %}
+        <option value="{{ r.id }}" {% if cfg.get('role_id')|string == r.id|string %}selected{% endif %}>{{ r.name }}</option>
+        {% endfor %}
+      </select>
+      <p class="hint">Alege un rol creat de tine (ex. „🆕 Cont nou"). Botul îl pune automat celor cu cont sub prag. {% if not roles %}<br>⚠️ Nu am găsit roluri pe care botul le poate atribui — creează un rol pe server și pune rolul botului mai sus decât el.{% endif %}</p>
+
+      <label class="toggle">
+        <input type="checkbox" name="announce_enabled" {% if cfg.get('announce_enabled') %}checked{% endif %}>
+        <span>Anunță pe un canal când intră un cont nou</span>
+      </label>
+
+      <label>Canal pentru anunț</label>
+      <select name="announce_channel_id">
+        <option value="">— alege un canal —</option>
+        {% for ch in channels %}
+        <option value="{{ ch.id }}" {% if cfg.get('announce_channel_id')|string == ch.id|string %}selected{% endif %}>#{{ ch.name }}</option>
+        {% endfor %}
+      </select>
+
+      <button class="save" type="submit">💾 Salvează</button>
+    </form>
+
+    <p class="cmd" style="margin-top:20px">În Discord poți folosi și comenzile: <code>/conturinoi lista</code> (listează toți), <code>/conturinoi verifica</code> (un anumit membru).</p>
+  </div>
+{% endblock %}
