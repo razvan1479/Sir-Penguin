@@ -22,7 +22,7 @@ import datetime
 
 import discord
 from discord import app_commands
-from discord.ext import commands
+from discord.ext import commands, tasks
 
 from utils import storage
 from utils.perms import bot_access
@@ -40,6 +40,58 @@ def _account_age_days(member: discord.abc.Snowflake) -> float:
 class NewAccounts(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        self.scan_loop.start()
+
+    def cog_unload(self):
+        self.scan_loop.cancel()
+
+    # ---- scanare tot serverul, ceruta din dashboard ----
+    @tasks.loop(seconds=10)
+    async def scan_loop(self):
+        for guild in self.bot.guilds:
+            job = storage.get(guild.id, "newacc_scan", None)
+            if not job or job.get("status") != "pending":
+                continue
+            job["status"] = "running"
+            storage.set(guild.id, "newacc_scan", job)
+
+            cfg = _cfg(guild.id)
+            days = int(cfg.get("days", 30))
+            role = guild.get_role(int(cfg["role_id"])) if cfg.get("role_id") else None
+            if not role:
+                job.update(status="error", result="Alege întâi un rol în setări, apoi scanează.")
+                storage.set(guild.id, "newacc_scan", job)
+                continue
+            # botul poate atribui rolul?
+            if not guild.me.guild_permissions.manage_roles:
+                job.update(status="error", result="Botul nu are permisiunea „Gestionează rolurile”.")
+                storage.set(guild.id, "newacc_scan", job)
+                continue
+            if role.position >= guild.me.top_role.position:
+                job.update(status="error", result="Rolul botului trebuie să fie mai sus decât rolul ales.")
+                storage.set(guild.id, "newacc_scan", job)
+                continue
+
+            changed = 0
+            errors = 0
+            checked = 0
+            for m in guild.members:
+                if m.bot:
+                    continue
+                checked += 1
+                if _account_age_days(m) < days and role not in m.roles:
+                    try:
+                        await m.add_roles(role, reason="Scanare conturi noi (dashboard)")
+                        changed += 1
+                    except discord.HTTPException:
+                        errors += 1
+            job.update(status="done",
+                       result=f"Gata! Am pus rolul la {changed} conturi noi (din {checked} membri verificați){', ' + str(errors) + ' erori' if errors else ''}.")
+            storage.set(guild.id, "newacc_scan", job)
+
+    @scan_loop.before_loop
+    async def _before_scan(self):
+        await self.bot.wait_until_ready()
 
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member):

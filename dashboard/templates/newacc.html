@@ -62,4 +62,26 @@
 
     <p class="cmd" style="margin-top:20px">În Discord poți folosi și comenzile: <code>/conturinoi lista</code> (listează toți), <code>/conturinoi verifica</code> (un anumit membru).</p>
   </div>
+
+  <div class="panel" style="margin-top:18px">
+    <h3>🔎 Scanează tot serverul acum</h3>
+    <p class="sub">Pune rolul ales la <b>toate</b> conturile noi care sunt deja pe server (nu doar la cele care intră de-acum). Folosește pragul și rolul din setările de sus.</p>
+
+    {% if scan and scan.status == 'running' %}
+      <div class="warn st-running" data-refresh="1">⏳ Se scanează serverul... (se actualizează singur)</div>
+    {% elif scan and scan.status == 'done' %}
+      <div class="saved">✅ {{ scan.result }}</div>
+    {% elif scan and scan.status == 'error' %}
+      <div class="warn">⚠️ {{ scan.result }}</div>
+    {% endif %}
+
+    {% if not cfg.get('role_id') %}
+      <div class="warn">Alege întâi un rol în setările de sus și salvează, apoi poți scana.</div>
+    {% else %}
+      <form method="POST" onsubmit="return confirm('Sigur pui rolul la toate conturile noi de pe server?')">
+        <input type="hidden" name="action" value="scan">
+        <button class="save" type="submit">🔎 Scanează și pune rolul acum</button>
+      </form>
+    {% endif %}
+  </div>
 {% endblock %}

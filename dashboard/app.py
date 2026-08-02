@@ -554,6 +554,10 @@ def colors_settings(guild_id):
 def newacc_settings(guild_id):
     gid = int(guild_id)
     if request.method == "POST":
+        if request.form.get("action") == "scan":
+            # porneste scanarea intregului server (botul o executa in ~10s)
+            storage.set(gid, "newacc_scan", {"status": "pending"})
+            return redirect(url_for("newacc_settings", guild_id=guild_id))
         cfg = {
             "enabled": request.form.get("enabled") == "on",
             "days": _to_int(request.form.get("days", "30")) or 30,
@@ -567,9 +571,11 @@ def newacc_settings(guild_id):
     cfg = storage.get(gid, "newacc", {})
     roles = storage.get(gid, "roles", {}) or {}
     channels = storage.get(gid, "channels", {}) or {}
+    scan = storage.get(gid, "newacc_scan", None)
     return render_template("newacc.html", guild_id=guild_id, cfg=cfg,
                            roles=[r for r in roles.get("list", []) if r.get("assignable")],
                            channels=channels.get("texts", []),
+                           scan=scan,
                            meta=storage.get(gid, "meta", {}),
                            section="newacc", saved=request.args.get("saved"))
 
