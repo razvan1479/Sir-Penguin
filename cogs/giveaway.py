@@ -305,7 +305,7 @@ class Giveaway(commands.Cog):
         parts = gw.get("participants", [])
         if not parts:
             await channel.send(
-                f"🎉 Giveaway pentru **{gw['prize']}** s-a incheiat — niciun participant. 😢")
+                f"🎉 Giveaway pentru **{gw['prize']}** s-a incheiat — niciun participant. 😢 @everyone")
         else:
             n = min(gw.get("winners", 1), len(parts))
             winners = random.sample(parts, n)
