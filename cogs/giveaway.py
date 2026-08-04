@@ -111,141 +111,82 @@ def _fmt_duration(minutes):
     return f"{minutes} minute"
 
 
-class TitluPremiuModal(discord.ui.Modal, title="Titlu & Premiu"):
-    def __init__(self, panel):
+class GiveawayModal(discord.ui.Modal, title="🎉 Creează un giveaway"):
+    """Un singur formular cu tot ce trebuie: titlu, premiu, castigatori, durata, canal."""
+
+    def __init__(self, cog, default_channel_id):
         super().__init__()
-        self.panel = panel
+        self.cog = cog
+        self.default_channel_id = default_channel_id
         self.titlu = discord.ui.TextInput(
-            label="Titlu", default=panel.cfg.get("title", "🎉 GIVEAWAY 🎉"),
+            label="Titlu", default="🎉 GIVEAWAY 🎉",
             max_length=100, required=True)
         self.premiu = discord.ui.TextInput(
-            label="Premiu (ce se câștigă)", default=panel.cfg.get("prize") or "",
+            label="Premiu (ce se câștigă)",
             placeholder="ex: Discord Nitro", max_length=200, required=True)
-        self.add_item(self.titlu)
-        self.add_item(self.premiu)
-
-    async def on_submit(self, interaction: discord.Interaction):
-        self.panel.cfg["title"] = str(self.titlu.value).strip() or "🎉 GIVEAWAY 🎉"
-        self.panel.cfg["prize"] = str(self.premiu.value).strip()
-        await interaction.response.edit_message(embed=self.panel.embed(), view=self.panel)
-
-
-class NrDurataModal(discord.ui.Modal, title="Câștigători & Durată"):
-    def __init__(self, panel):
-        super().__init__()
-        self.panel = panel
         self.castigatori = discord.ui.TextInput(
-            label="Câți câștigători", default=str(panel.cfg.get("winners", 1)),
+            label="Câți câștigători", default="1",
             max_length=3, required=True)
         self.durata = discord.ui.TextInput(
-            label="Durată în minute (60 = o oră)",
-            default=str(panel.cfg.get("duration_minutes", 60)),
+            label="Durată în minute (60 = o oră)", default="60",
             placeholder="ex: 60", max_length=6, required=True)
-        self.add_item(self.castigatori)
-        self.add_item(self.durata)
+        self.canal = discord.ui.TextInput(
+            label="Canal (ID sau nume) — gol = canalul curent",
+            placeholder="lasă gol ca să posteze aici", required=False, max_length=100)
+        for it in (self.titlu, self.premiu, self.castigatori, self.durata, self.canal):
+            self.add_item(it)
+
+    def _resolve_channel(self, guild):
+        raw = str(self.canal.value).strip()
+        if not raw:
+            return guild.get_channel(self.default_channel_id)
+        raw = raw.strip("<#>")
+        if raw.isdigit():
+            ch = guild.get_channel(int(raw))
+            if ch:
+                return ch
+        name = raw.lstrip("#").lower()
+        for ch in guild.text_channels:
+            if ch.name.lower() == name:
+                return ch
+        return None
 
     async def on_submit(self, interaction: discord.Interaction):
         try:
-            w = max(1, int(str(self.castigatori.value).strip()))
+            winners = max(1, int(str(self.castigatori.value).strip()))
         except ValueError:
-            w = 1
+            winners = 1
         try:
-            d = max(1, int(str(self.durata.value).strip()))
+            minutes = max(1, int(str(self.durata.value).strip()))
         except ValueError:
-            d = 60
-        self.panel.cfg["winners"] = w
-        self.panel.cfg["duration_minutes"] = d
-        await interaction.response.edit_message(embed=self.panel.embed(), view=self.panel)
+            minutes = 60
 
+        channel = self._resolve_channel(interaction.guild)
+        if channel is None:
+            return await interaction.response.send_message(
+                "Nu am găsit canalul scris. Verifică ID-ul/numele, sau lasă câmpul gol "
+                "ca să postez pe canalul curent.", ephemeral=True)
 
-class GiveawaySetupView(discord.ui.View):
-    """Mini-dashboard in Discord: /giveaway panou -> setezi tot cu butoane, apoi Pornesti."""
-
-    def __init__(self, cog, author_id, channel_id):
-        super().__init__(timeout=600)
-        self.cog = cog
-        self.author_id = author_id
-        self.cfg = {
-            "channel_id": channel_id,
-            "title": "🎉 GIVEAWAY 🎉",
-            "prize": None,
-            "winners": 1,
-            "duration_minutes": 60,
+        cfg = {
+            "channel_id": channel.id,
+            "title": str(self.titlu.value).strip() or "🎉 GIVEAWAY 🎉",
+            "prize": str(self.premiu.value).strip(),
+            "winners": winners,
+            "duration_minutes": minutes,
             "button_label": "🎉 Particip",
             "color": "#8b5cf6",
-            "ping_everyone": False,
+            "ping_everyone": True,   # ping pornit implicit
             "required_role_id": None,
+            "host_id": interaction.user.id,
         }
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user.id != self.author_id:
-            await interaction.response.send_message(
-                "Doar cine a deschis panoul îl poate folosi.", ephemeral=True)
-            return False
-        return True
-
-    def embed(self):
-        c = self.cfg
-        prize = c.get("prize") or "— nesetat —"
-        ch = f"<#{c['channel_id']}>" if c.get("channel_id") else "— nesetat —"
-        ping = "Da (@everyone / rol)" if c.get("ping_everyone") else "Nu"
-        e = discord.Embed(
-            title="🎛️ Configurează giveaway-ul",
-            description=("Setează cu butoanele de jos, apoi apasă **🚀 Pornește**.\n"
-                         "Giveaway-ul va arăta exact ca de obicei."),
-            color=_color_from_hex(c.get("color", "#8b5cf6")))
-        e.add_field(name="Titlu", value=c.get("title", "🎉 GIVEAWAY 🎉"), inline=False)
-        e.add_field(name="🎁 Premiu", value=prize, inline=True)
-        e.add_field(name="🏆 Câștigători", value=str(c.get("winners", 1)), inline=True)
-        e.add_field(name="⏱️ Durată", value=_fmt_duration(c.get("duration_minutes", 60)), inline=True)
-        e.add_field(name="📢 Canal", value=ch, inline=True)
-        e.add_field(name="🔔 Ping", value=ping, inline=True)
-        e.set_footer(text="Panoul e valabil 10 minute.")
-        return e
-
-    @discord.ui.select(cls=discord.ui.ChannelSelect,
-                       channel_types=[discord.ChannelType.text],
-                       placeholder="📢 Alege canalul unde se postează", row=0)
-    async def pick_channel(self, interaction: discord.Interaction, select: discord.ui.ChannelSelect):
-        self.cfg["channel_id"] = select.values[0].id
-        await interaction.response.edit_message(embed=self.embed(), view=self)
-
-    @discord.ui.button(label="Titlu & Premiu", emoji="✏️", style=discord.ButtonStyle.secondary, row=1)
-    async def edit_titlu(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_modal(TitluPremiuModal(self))
-
-    @discord.ui.button(label="Câștigători & Durată", emoji="🔢", style=discord.ButtonStyle.secondary, row=1)
-    async def edit_nr(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_modal(NrDurataModal(self))
-
-    @discord.ui.button(label="Ping: Nu", emoji="🔔", style=discord.ButtonStyle.secondary, row=1)
-    async def toggle_ping(self, interaction: discord.Interaction, button: discord.ui.Button):
-        self.cfg["ping_everyone"] = not self.cfg.get("ping_everyone")
-        button.label = "Ping: Da" if self.cfg["ping_everyone"] else "Ping: Nu"
-        await interaction.response.edit_message(embed=self.embed(), view=self)
-
-    @discord.ui.button(label="Pornește", emoji="🚀", style=discord.ButtonStyle.success, row=2)
-    async def start(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not self.cfg.get("prize"):
-            return await interaction.response.send_message(
-                "Setează întâi **premiul** (butonul ✏️ Titlu & Premiu).", ephemeral=True)
-        if not self.cfg.get("channel_id"):
-            return await interaction.response.send_message(
-                "Alege întâi **canalul** din meniul de sus.", ephemeral=True)
-        msg = await self.cog._post_giveaway(interaction.guild, self.cfg, host_id=self.author_id)
+        msg = await self.cog._post_giveaway(interaction.guild, cfg, host_id=interaction.user.id)
         if msg:
-            for item in self.children:
-                item.disabled = True
-            await interaction.response.edit_message(
-                content=f"✅ Giveaway pornit: {msg.jump_url}", embed=None, view=None)
+            await interaction.response.send_message(
+                f"✅ Giveaway pornit în {channel.mention}: {msg.jump_url}", ephemeral=True)
         else:
             await interaction.response.send_message(
                 "Nu am putut posta (verifică permisiunile botului pe canalul ales).",
                 ephemeral=True)
-
-    @discord.ui.button(label="Anulează", emoji="✖️", style=discord.ButtonStyle.danger, row=2)
-    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(content="Anulat.", embed=None, view=None)
 
 
 class Giveaway(commands.Cog):
@@ -430,8 +371,8 @@ class Giveaway(commands.Cog):
                           description="Deschide panoul ca sa configurezi si sa pornesti un giveaway")
     @bot_access()
     async def giveaway(self, interaction: discord.Interaction):
-        view = GiveawaySetupView(self, interaction.user.id, interaction.channel_id)
-        await interaction.response.send_message(embed=view.embed(), view=view, ephemeral=True)
+        await interaction.response.send_modal(
+            GiveawayModal(self, interaction.channel_id))
 
     @app_commands.command(name="giveaway_start",
                           description="Posteaza acum un giveaway configurat in dashboard")
