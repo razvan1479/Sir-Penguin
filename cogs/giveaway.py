@@ -317,8 +317,13 @@ class Giveaway(commands.Cog):
             msg = await channel.fetch_message(int(mid))
             if msg.embeds:
                 e = msg.embeds[0]
-                e.description = (e.description or "").replace(
+                desc = e.description or ""
+                # inlocuim ceasul care numara (<t:...:R>) cu un text fix, ca sa nu mai para activ
+                end_ts = gw.get("end_ts", 0)
+                desc = desc.replace(f"⏰ **Se termina:** <t:{end_ts}:R>", "🔒 **Giveaway încheiat**")
+                desc = desc.replace(
                     "Apasa butonul de mai jos ca sa participi!", "**🔒 Giveaway-ul s-a terminat!**")
+                e.description = desc
                 e.set_footer(text=f"👥 {len(parts)} participanti · Incheiat")
                 await msg.edit(embed=e, view=None)
         except discord.HTTPException:
