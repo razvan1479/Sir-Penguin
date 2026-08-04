@@ -52,7 +52,7 @@
     <div class="modewrap">
       <a href="/giveaway/{{ guild_id }}?mode=dashboard" class="modebtn {% if mode != 'discord' %}on{% endif %}">
         <span class="mi">🖥️</span>
-        <div><b>Din Dashboard</b><small>Completezi aici canalul, premiul, durata — apoi <code>/giveaway start</code></small></div>
+        <div><b>Din Dashboard</b><small>Completezi aici canalul, premiul, durata — apoi <code>/giveaway_start</code></small></div>
       </a>
       <a href="/giveaway/{{ guild_id }}?mode=discord" class="modebtn {% if mode == 'discord' %}on{% endif %}">
         <span class="mi">💬</span>
@@ -62,23 +62,23 @@
   </div>
 
   {% if mode == 'discord' %}
-  <!-- MOD DISCORD: instructiuni comanda -->
+  <!-- MOD DISCORD: mini-dashboard cu o comanda -->
   <div class="panel">
     <div class="preview-title">💬 Creează un giveaway direct din Discord</div>
-    <p class="hint" style="font-size:14px;line-height:1.7">Scrie pe orice canal comanda de mai jos — botul postează giveaway-ul pe loc, cu buton de participare. Nu trebuie să configurezi nimic aici.</p>
+    <p class="hint" style="font-size:14px;line-height:1.7">Scrie pe orice canal comanda de mai jos — îți apare un mini-panou chiar în Discord unde setezi titlul, premiul, câștigătorii, durata și canalul cu butoane, apoi apeși <b>🚀 Pornește</b>. Nu trebuie să configurezi nimic aici.</p>
     <div class="cmdbox">
-      <code>/giveaway creaza</code>
+      <code>/giveaway</code>
       <div class="params">
-        <div><b>premiu</b> — ce se câștigă (ex. <i>Discord Nitro</i>)</div>
-        <div><b>minute</b> — cât durează (ex. <i>60</i> = o oră)</div>
-        <div><b>castigatori</b> — câți câștigători <span class="opt">opțional, implicit 1</span></div>
-        <div><b>canal</b> — pe ce canal se postează <span class="opt">opțional, implicit canalul curent</span></div>
-        <div><b>rol_necesar</b> — doar cine are rolul poate participa <span class="opt">opțional</span></div>
-        <div><b>ping</b> — dă @everyone la postare <span class="opt">opțional</span></div>
+        <div>Se deschide un panou (doar tu îl vezi) cu:</div>
+        <div><b>✏️ Titlu & Premiu</b> — scrii ce se câștigă</div>
+        <div><b>🔢 Câștigători & Durată</b> — câți câștigă și cât ține</div>
+        <div><b>📢 Canal</b> — unde se postează</div>
+        <div><b>🔔 Ping</b> — dă @everyone la postare (pornit/oprit)</div>
+        <div><b>🚀 Pornește</b> — postează giveaway-ul</div>
       </div>
     </div>
-    <p class="hint" style="margin-top:16px">Exemplu: <code>/giveaway creaza premiu:Nitro minute:60 castigatori:2</code></p>
-    <p class="hint">Ca să-l închizi mai devreme sau să tragi din nou: <code>/giveaway end</code> și <code>/giveaway reroll</code>.</p>
+    <p class="hint" style="margin-top:16px">Practic: dai <code>/giveaway</code>, completezi cu butoane, apeși Pornește. Giveaway-ul arată exact ca de obicei.</p>
+    <p class="hint">Ca să-l închizi mai devreme sau să tragi din nou: <code>/giveaway_end</code> și <code>/giveaway_reroll</code>.</p>
   </div>
   {% else %}
 
@@ -144,7 +144,7 @@
         <span class="e-btn" id="pv-btn"></span>
         <div style="color:#949ba4;font-size:12px;margin-top:12px;">👥 0 participanti</div>
       </div>
-      <p class="cmd">Posteaza manual oricand cu <code>/giveaway start</code>. La final, botul alege singur castigatorii. Reroll: <code>/giveaway reroll &lt;message_id&gt;</code></p>
+      <p class="cmd">Posteaza manual oricand cu <code>/giveaway_start</code>. La final, botul alege singur castigatorii. Reroll: <code>/giveaway_reroll &lt;message_id&gt;</code></p>
     </div>
   </div>
   {% endif %}
