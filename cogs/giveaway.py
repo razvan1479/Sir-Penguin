@@ -305,12 +305,12 @@ class Giveaway(commands.Cog):
         parts = gw.get("participants", [])
         if not parts:
             await channel.send(
-                f"🎉 Giveaway pentru **{gw['prize']}** s-a incheiat — niciun participant. 😢 @everyone")
+                f"🎉 Giveaway pentru **{gw['prize']}** s-a incheiat — niciun participant. 😢")
         else:
             n = min(gw.get("winners", 1), len(parts))
             winners = random.sample(parts, n)
             mentions = ", ".join(f"<@{u}>" for u in winners)
-            await channel.send(f"🎉 Felicitari {mentions}! Ai castigat **{gw['prize']}**! @everyone")
+            await channel.send(f"🎉 Felicitari {mentions}! Ai castigat **{gw['prize']}**!")
 
         # edit mesajul original: scrie ca s-a terminat si scoate butonul
         try:
