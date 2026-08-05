@@ -46,7 +46,7 @@
       background:rgba(255,255,255,.04); border:1px solid var(--glass-border); border-radius:18px; padding:20px;
       overflow:hidden; transition:transform .25s, border-color .25s, box-shadow .3s;
       animation:fadeUp .5s ease both; }
-    .mod::after { content:""; position:absolute; inset:0; border-radius:18px; padding:1px;
+    .mod::after { content:""; position:absolute; inset:0; border-radius:18px; padding:1px; pointer-events:none;
       background:linear-gradient(135deg,var(--accent),transparent 40%); -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
       -webkit-mask-composite:xor; mask-composite:exclude; opacity:0; transition:opacity .3s; }
     .mod:hover { transform:translateY(-5px); box-shadow:0 16px 40px rgba(0,0,0,.4); }
