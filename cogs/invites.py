@@ -31,6 +31,7 @@ Comenzi admin:
   /resetinvites [membru]           - reseteaza tot (sau un singur membru)
 """
 
+import asyncio
 import datetime
 
 import discord
@@ -60,7 +61,15 @@ class Invites(commands.Cog):
         self.bot = bot
         self.invite_cache: dict[int, dict[str, int]] = {}
         self.vanity_cache: dict[int, int] = {}
+        self._join_locks: dict[int, asyncio.Lock] = {}
         self.contest_loop.start()
+
+    def _lock_for(self, gid: int) -> "asyncio.Lock":
+        lock = self._join_locks.get(gid)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._join_locks[gid] = lock
+        return lock
 
     def cog_unload(self):
         self.contest_loop.cancel()
@@ -101,34 +110,36 @@ class Invites(commands.Cog):
     async def on_member_join(self, member: discord.Member):
         guild = member.guild
         info = {"type": "unknown", "inviter_id": None, "inviter_name": None, "code": None}
-        try:
-            before = self.invite_cache.get(guild.id, {})
-            after_list = await guild.invites()
-            after = {inv.code: inv for inv in after_list}
-            used = None
-            for code, inv in after.items():
-                if (inv.uses or 0) > before.get(code, 0):
-                    used = inv
-                    break
-            self.invite_cache[guild.id] = {inv.code: inv.uses or 0 for inv in after_list}
+        # procesam intrarile pe RAND (per server) ca sa nu se incurce comparatia
+        # numarului de folosiri cand intra multi oameni deodata (ex. la concurs)
+        async with self._lock_for(guild.id):
+            try:
+                before = self.invite_cache.get(guild.id, {})
+                after_list = await guild.invites()
+                after = {inv.code: inv for inv in after_list}
+                used = None
+                for code, inv in after.items():
+                    if (inv.uses or 0) > before.get(code, 0):
+                        used = inv
+                        break
+                self.invite_cache[guild.id] = {inv.code: inv.uses or 0 for inv in after_list}
 
-            if used and used.inviter:
-                info = {"type": "personal", "inviter_id": used.inviter.id,
-                        "inviter_name": str(used.inviter), "code": used.code}
-            elif "VANITY_URL" in guild.features:
-                try:
-                    v = await guild.vanity_invite()
-                    if v and (v.uses or 0) > self.vanity_cache.get(guild.id, 0):
-                        self.vanity_cache[guild.id] = v.uses or 0
-                        info = {"type": "vanity", "inviter_id": None,
-                                "inviter_name": None, "code": guild.vanity_url_code}
-                except discord.HTTPException:
-                    pass
-        except (discord.Forbidden, discord.HTTPException):
-            pass
-        finally:
-            inviter_key, is_fake, rejoin = self._record_join(guild, member, info)
-            self.bot.dispatch("invite_join", member, info)
+                if used and used.inviter:
+                    info = {"type": "personal", "inviter_id": used.inviter.id,
+                            "inviter_name": str(used.inviter), "code": used.code}
+                elif "VANITY_URL" in guild.features:
+                    try:
+                        v = await guild.vanity_invite()
+                        if v and (v.uses or 0) > self.vanity_cache.get(guild.id, 0):
+                            self.vanity_cache[guild.id] = v.uses or 0
+                            info = {"type": "vanity", "inviter_id": None,
+                                    "inviter_name": None, "code": guild.vanity_url_code}
+                    except discord.HTTPException:
+                        pass
+            except (discord.Forbidden, discord.HTTPException):
+                pass
+        inviter_key, is_fake, rejoin = self._record_join(guild, member, info)
+        self.bot.dispatch("invite_join", member, info)
 
     def _record_join(self, guild, member, info):
         import time
