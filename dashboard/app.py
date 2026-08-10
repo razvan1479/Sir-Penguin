@@ -792,12 +792,35 @@ def tickets(guild_id):
             tid = request.form.get("type_id")
             data["types"] = [t for t in data.get("types", []) if t.get("id") != tid]
             storage.set(gid, "tickets", data)
+        elif action == "edit_type":
+            tid = request.form.get("type_id")
+            for t in data.get("types", []):
+                if t.get("id") == tid:
+                    t["label"] = request.form.get("label", "").strip() or t.get("label", "Ticket")
+                    t["emoji"] = request.form.get("emoji", "").strip()
+                    t["button_color"] = request.form.get("button_color", "blurple")
+                    t["support_roles"] = request.form.getlist("support_roles")
+                    t["category_id"] = _to_int(request.form.get("category_id", ""))
+                    t["open_message"] = request.form.get("open_message", "")
+                    t["ping_support"] = request.form.get("ping_support") == "on"
+                    t["one_per_user"] = request.form.get("one_per_user") == "on"
+                    t["btn_close"] = request.form.get("btn_close") == "on"
+                    t["btn_close_reason"] = request.form.get("btn_close_reason") == "on"
+                    t["btn_claim"] = request.form.get("btn_claim") == "on"
+                    break
+            # cerem botului sa reaplice permisiunile pe ticketele DESCHISE de acest tip,
+            # ca rolurile de suport nou adaugate sa vada si ticketele existente
+            data["perm_sync"] = {"status": "pending"}
+            storage.set(gid, "tickets", data)
         return redirect(url_for("tickets", guild_id=guild_id, saved=1))
 
+    edit_id = request.args.get("edit", "")
+    editing = next((t for t in data.get("types", []) if t.get("id") == edit_id), None)
     roles = storage.get(gid, "roles", {}) or {}
     channels = storage.get(gid, "channels", {}) or {}
     return render_template("tickets.html", guild_id=guild_id, data=data,
                            panel=data.get("panel", {}), types=data.get("types", []),
+                           editing=editing,
                            roles=roles.get("list", []),
                            categories=channels.get("categories", []),
                            text_channels=channels.get("texts", []),

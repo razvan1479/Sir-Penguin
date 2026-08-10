@@ -75,35 +75,47 @@
             {% if t.ping_support %}<span>ping suport</span>{% endif %}
           </div>
         </div>
-        <form method="POST" onsubmit="return confirm('Ștergi acest tip?')">
-          <input type="hidden" name="action" value="del_type">
-          <input type="hidden" name="type_id" value="{{ t.id }}">
-          <button class="del" type="submit">Șterge</button>
-        </form>
+        <div style="display:flex; gap:8px; align-items:flex-start">
+          <a class="del" style="background:var(--input); text-decoration:none; display:inline-flex; align-items:center" href="/tickets/{{ guild_id }}?edit={{ t.id }}#form">✏️ Editează</a>
+          <form method="POST" onsubmit="return confirm('Ștergi acest tip?')">
+            <input type="hidden" name="action" value="del_type">
+            <input type="hidden" name="type_id" value="{{ t.id }}">
+            <button class="del" type="submit">Șterge</button>
+          </form>
+        </div>
       </div>
       {% endfor %}
     {% endif %}
   </div>
 
-  <!-- ADAUGA TIP NOU -->
-  <form class="panel" method="POST">
+  <!-- ADAUGA / EDITEAZA TIP -->
+  <form class="panel" method="POST" id="form">
+    {% if editing %}
+    <input type="hidden" name="action" value="edit_type">
+    <input type="hidden" name="type_id" value="{{ editing.id }}">
+    <h3>✏️ Editează tipul: {{ editing.emoji }} {{ editing.label }}</h3>
+    <p class="hint" style="margin-top:-6px">Modifică ce vrei și salvează. Dacă adaugi roluri de suport, ele vor vedea și ticketele deja deschise de acest tip. <a href="/tickets/{{ guild_id }}" style="color:#9bb7ff">Anulează editarea</a></p>
+    {% else %}
     <input type="hidden" name="action" value="add_type">
     <h3>➕ Adaugă un tip de ticket</h3>
+    {% endif %}
     <div class="row2">
-      <div><label>Nume (pe buton)</label><input type="text" name="label" placeholder="Suport" required></div>
-      <div><label>Emoji (opțional)</label><input type="text" name="emoji" placeholder="🎫"></div>
+      <div><label>Nume (pe buton)</label><input type="text" name="label" placeholder="Suport" value="{{ editing.label if editing else '' }}" required></div>
+      <div><label>Emoji (opțional)</label><input type="text" name="emoji" placeholder="🎫" value="{{ editing.emoji if editing else '' }}"></div>
     </div>
     <div class="row2">
       <div><label>Culoare buton</label>
         <select name="button_color">
-          <option value="blurple">Albastru</option><option value="green">Verde</option>
-          <option value="red">Roșu</option><option value="grey">Gri</option>
+          <option value="blurple" {% if editing and editing.button_color=='blurple' %}selected{% endif %}>Albastru</option>
+          <option value="green" {% if editing and editing.button_color=='green' %}selected{% endif %}>Verde</option>
+          <option value="red" {% if editing and editing.button_color=='red' %}selected{% endif %}>Roșu</option>
+          <option value="grey" {% if editing and editing.button_color=='grey' %}selected{% endif %}>Gri</option>
         </select>
       </div>
       <div><label>Categoria unde se creează</label>
         <select name="category_id">
           <option value="">— fără categorie —</option>
-          {% for c in categories %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+          {% for c in categories %}<option value="{{ c.id }}" {% if editing and editing.category_id|string == c.id|string %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
         </select>
       </div>
     </div>
@@ -114,25 +126,25 @@
     {% else %}
     <div class="roles">
       {% for r in roles %}{% if not r.default %}
-        <label class="rchip"><input type="checkbox" name="support_roles" value="{{ r.id }}"><span class="dot" style="background:{{ r.color }}"></span>{{ r.name }}</label>
+        <label class="rchip"><input type="checkbox" name="support_roles" value="{{ r.id }}" {% if editing and r.id|string in editing.support_roles|map('string')|list %}checked{% endif %}><span class="dot" style="background:{{ r.color }}"></span>{{ r.name }}</label>
       {% endif %}{% endfor %}
     </div>
     {% endif %}
 
     <label>Mesaj la deschiderea ticketului</label>
-    <textarea name="open_message" placeholder="Salut {user}! Echipa de suport îți va răspunde în curând.">Salut {user}! Echipa de suport îți va răspunde în curând.</textarea>
+    <textarea name="open_message" placeholder="Salut {user}! Echipa de suport îți va răspunde în curând.">{{ editing.open_message if editing else 'Salut {user}! Echipa de suport îți va răspunde în curând.' }}</textarea>
     <p class="hint">Poți folosi {user} și {server}.</p>
 
     <hr class="divider">
     <label>Ce butoane apar în ticket</label>
-    <label class="toggle"><input type="checkbox" name="btn_close" checked> 🔒 Buton „Închide" (normal)</label>
-    <label class="toggle"><input type="checkbox" name="btn_close_reason"> 📝 Buton „Închide cu motiv"</label>
-    <label class="toggle"><input type="checkbox" name="btn_claim"> 🙋 Buton „Claim" (revendicare de staff)</label>
+    <label class="toggle"><input type="checkbox" name="btn_close" {% if not editing or editing.btn_close %}checked{% endif %}> 🔒 Buton „Închide" (normal)</label>
+    <label class="toggle"><input type="checkbox" name="btn_close_reason" {% if editing and editing.btn_close_reason %}checked{% endif %}> 📝 Buton „Închide cu motiv"</label>
+    <label class="toggle"><input type="checkbox" name="btn_claim" {% if editing and editing.btn_claim %}checked{% endif %}> 🙋 Buton „Claim" (revendicare de staff)</label>
     <hr class="divider">
     <label>Opțiuni</label>
-    <label class="toggle"><input type="checkbox" name="one_per_user" checked> Un singur ticket deschis per persoană (acest tip)</label>
-    <label class="toggle"><input type="checkbox" name="ping_support"> Dă ping echipei de suport la deschidere</label>
+    <label class="toggle"><input type="checkbox" name="one_per_user" {% if not editing or editing.one_per_user %}checked{% endif %}> Un singur ticket deschis per persoană (acest tip)</label>
+    <label class="toggle"><input type="checkbox" name="ping_support" {% if editing and editing.ping_support %}checked{% endif %}> Dă ping echipei de suport la deschidere</label>
 
-    <button class="add" type="submit">➕ Adaugă tipul de ticket</button>
+    <button class="add" type="submit">{{ '💾 Salvează modificările' if editing else '➕ Adaugă tipul de ticket' }}</button>
   </form>
 {% endblock %}

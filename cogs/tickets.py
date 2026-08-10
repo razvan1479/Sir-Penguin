@@ -31,7 +31,7 @@ import secrets
 
 import discord
 from discord import app_commands
-from discord.ext import commands
+from discord.ext import commands, tasks
 
 from utils import storage
 from utils.perms import has_bot_access
@@ -106,6 +106,48 @@ class ReasonModal(discord.ui.Modal, title="Inchide ticketul"):
 class Tickets(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        self.perm_sync_loop.start()
+
+    def cog_unload(self):
+        self.perm_sync_loop.cancel()
+
+    # -------- reaplica permisiunile pe ticketele DESCHISE cand editezi un tip --------
+    @tasks.loop(seconds=10)
+    async def perm_sync_loop(self):
+        for guild in list(self.bot.guilds):
+            data = storage.get(guild.id, "tickets", {}) or {}
+            job = data.get("perm_sync")
+            if not job or job.get("status") != "pending":
+                continue
+            data["perm_sync"] = {"status": "running"}
+            storage.set(guild.id, "tickets", data)
+            updated = 0
+            for cid, info in list(data.get("open", {}).items()):
+                channel = guild.get_channel(int(cid))
+                if channel is None:
+                    continue
+                t = _type(data, info.get("type_id"))
+                if not t:
+                    continue
+                for rid in t.get("support_roles", []):
+                    role = guild.get_role(int(rid))
+                    if role is None:
+                        continue
+                    try:
+                        await channel.set_permissions(
+                            role, view_channel=True, send_messages=True,
+                            read_message_history=True,
+                            reason="Rol de suport adaugat (sincronizare tickete)")
+                        updated += 1
+                    except discord.HTTPException:
+                        pass
+            data = storage.get(guild.id, "tickets", {}) or {}
+            data["perm_sync"] = {"status": "done", "updated": updated}
+            storage.set(guild.id, "tickets", data)
+
+    @perm_sync_loop.before_loop
+    async def _before_perm_sync(self):
+        await self.bot.wait_until_ready()
 
     # -------- dispatch butoane (merge si dupa restart) --------
     @commands.Cog.listener()
