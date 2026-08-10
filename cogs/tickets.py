@@ -252,37 +252,17 @@ class Tickets(commands.Cog):
         log_channel = guild.get_channel(int(log_id))
         if not log_channel:
             return
-        rows = []
-        try:
-            async for m in channel.history(limit=1000, oldest_first=True):
-                ts = m.created_at.strftime("%Y-%m-%d %H:%M")
-                content = html.escape(m.content or "")
-                if m.attachments:
-                    content += "".join(f'<br><i>[fisier: {html.escape(a.filename)}]</i>' for a in m.attachments)
-                rows.append(f'<div class="m"><span class="a">{html.escape(str(m.author))}</span>'
-                            f'<span class="t">{ts}</span><div class="c">{content}</div></div>')
-        except discord.HTTPException:
-            pass
+        # embed curat de log (fara fisier transcript, ca sa nu mai apara codul HTML)
         owner = f"<@{info.get('owner_id')}>"
-        doc = (f"<!doctype html><meta charset='utf-8'><title>Transcript {channel.name}</title>"
-               "<style>body{background:#36393f;color:#dcddde;font-family:sans-serif;padding:20px}"
-               ".m{padding:6px 0;border-bottom:1px solid #2f3136}.a{font-weight:700;color:#fff;margin-right:8px}"
-               ".t{color:#888;font-size:12px}.c{margin-top:2px;white-space:pre-wrap}h2{color:#fff}</style>"
-               f"<h2>Transcript · {html.escape(channel.name)}</h2>"
-               f"<p>Ticket #{info.get('number')} · deschis de {html.escape(str(info.get('owner_id')))}</p>"
-               + "".join(rows))
-        buf = io.BytesIO(doc.encode("utf-8"))
-        file = discord.File(buf, filename=f"transcript-{channel.name}.html")
         embed = discord.Embed(title="📋 Ticket inchis", color=discord.Color.orange())
         embed.add_field(name="Ticket", value=f"#{info.get('number')} ({channel.name})", inline=True)
         embed.add_field(name="Deschis de", value=owner, inline=True)
         embed.add_field(name="Inchis de", value=closer.mention, inline=True)
         if info.get("claimed_by"):
             embed.add_field(name="Revendicat de", value=f"<@{info['claimed_by']}>", inline=True)
-        if reason:
-            embed.add_field(name="Motiv", value=reason, inline=False)
+        embed.add_field(name="📝 Motiv", value=reason if reason else "*(închis fără motiv)*", inline=False)
         try:
-            await log_channel.send(embed=embed, file=file)
+            await log_channel.send(embed=embed)
         except discord.HTTPException:
             pass
 
