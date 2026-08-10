@@ -63,6 +63,7 @@ class Invites(commands.Cog):
         self.vanity_cache: dict[int, int] = {}
         self._join_locks: dict[int, asyncio.Lock] = {}
         self.contest_loop.start()
+        self.resync_loop.start()
 
     def _lock_for(self, gid: int) -> "asyncio.Lock":
         lock = self._join_locks.get(gid)
@@ -73,6 +74,39 @@ class Invites(commands.Cog):
 
     def cog_unload(self):
         self.contest_loop.cancel()
+        self.resync_loop.cancel()
+
+    # ------------------------------------------------------------- re-sincronizare
+    @tasks.loop(minutes=5)
+    async def resync_loop(self):
+        """Reimprospateaza periodic lista de invitatii, ca sa prinda invitatii noi
+        pe care le-am ratat (ex. eveniment pierdut). 'Bland': adauga codurile noi si
+        scoate cele sterse, DAR nu atinge folosirile invitatiilor deja urmarite,
+        ca sa nu strice o detectie in curs."""
+        for guild in list(self.bot.guilds):
+            try:
+                invites = await guild.invites()
+            except (discord.Forbidden, discord.HTTPException):
+                continue
+            live = {inv.code: (inv.uses or 0) for inv in invites}
+            async with self._lock_for(guild.id):
+                cache = self.invite_cache.setdefault(guild.id, {})
+                for code, uses in live.items():
+                    if code not in cache:
+                        cache[code] = uses  # invitatie noua pe care am ratat-o
+                for code in list(cache.keys()):
+                    if code not in live:
+                        cache.pop(code, None)  # invitatie stearsa
+            if "VANITY_URL" in guild.features and guild.id not in self.vanity_cache:
+                try:
+                    v = await guild.vanity_invite()
+                    self.vanity_cache[guild.id] = (v.uses or 0) if v else 0
+                except discord.HTTPException:
+                    pass
+
+    @resync_loop.before_loop
+    async def _before_resync(self):
+        await self.bot.wait_until_ready()
 
     # ------------------------------------------------------------- cache
     async def _cache_guild(self, guild: discord.Guild):
