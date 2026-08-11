@@ -27,7 +27,9 @@ Comenzi (admin):
 
 import os
 import re
+import json
 import time
+import asyncio
 import logging
 
 import aiohttp
@@ -43,8 +45,18 @@ log = logging.getLogger("bot")
 UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
                     "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"}
 
-PLATFORMS = ("youtube", "twitch", "kick", "tiktok")
-LIVE_PLATFORMS = ("twitch", "kick")  # restul sunt "video nou"
+PLATFORMS = ("youtube", "tiktok")
+LIVE_PLATFORMS = ()  # doar YouTube (video) si TikTok (video/live, tratat separat)
+
+
+def _matches_keywords(text: str, keywords) -> bool:
+    """True daca textul contine cel putin un cuvant cheie. Fara cuvinte cheie -> mereu True."""
+    if not keywords:
+        return True
+    if not text:
+        return False
+    low = text.lower()
+    return any(k.lower() in low for k in keywords if k.strip())
 
 
 def parse_target(platform, url):
@@ -75,8 +87,6 @@ class Notifications(commands.Cog):
         self._tw_token_exp = 0
         self._providers = {
             "youtube": self.check_youtube,
-            "twitch": self.check_twitch,
-            "kick": self.check_kick,
             "tiktok": self.check_tiktok,
         }
 
@@ -129,9 +139,12 @@ class Notifications(commands.Cog):
             return None
         e = feed.entries[0]
         vid = getattr(e, "yt_videoid", None) or getattr(e, "id", "")
+        title = getattr(e, "title", "Videoclip nou")
+        desc = getattr(e, "summary", "") or getattr(e, "media_description", "") or ""
         return {
             "id": vid,
-            "title": getattr(e, "title", "Videoclip nou"),
+            "title": title,
+            "desc": desc,
             "url": getattr(e, "link", ""),
             "author": feed.feed.get("title", "Creator"),
             "thumb": f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg" if vid else None,
@@ -193,41 +206,117 @@ class Notifications(commands.Cog):
         return {"is_live": False}
 
     async def check_tiktok(self, sub):
-        # TikTok nu are API public; asta e best-effort si poate esua des.
+        # TikTok nu are API public. Folosim mai multe metode cu rezerva:
+        #  1) tikwm.com  (API tert, fiabil, da descriere + thumbnail)  <- principala
+        #  2) pagina TikTok (JSON structurat, apoi regex) <- rezerva + prinde LIVE
         kind, user = parse_target("tiktok", sub["url"])
         if not user:
             return None
+        info = await self._tiktok_tikwm(user)
+        page = await self._tiktok_page(user)
+        if info is None and page is None:
+            return None
+        if info is None:
+            return page
+        # avem video fiabil de la tikwm; luam statusul LIVE din pagina (tikwm nu-l da)
+        if page:
+            info["is_live"] = page.get("is_live", False)
+            if page.get("live_desc"):
+                info["live_desc"] = page.get("live_desc")
+        return info
+
+    async def _tiktok_tikwm(self, user):
+        """Metoda 1 (principala): API-ul tikwm.com — fiabil, da descriere + thumbnail."""
+        try:
+            async with self.session.get(
+                    "https://www.tikwm.com/api/user/posts",
+                    params={"unique_id": user, "count": "1"},
+                    timeout=aiohttp.ClientTimeout(total=15)) as r:
+                if r.status != 200:
+                    return None
+                d = await r.json(content_type=None)
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError):
+            return None
+        if not isinstance(d, dict) or d.get("code") != 0:
+            return None
+        vids = ((d.get("data") or {}).get("videos")) or []
+        if not vids:
+            return None
+        v = vids[0]
+        vid = str(v.get("video_id") or v.get("id") or "")
+        if not vid:
+            return None
+        author = v.get("author") or {}
+        return {"id": vid, "title": "Videoclip nou pe TikTok",
+                "desc": v.get("title") or "",
+                "live_desc": "",
+                "url": f"https://www.tiktok.com/@{user}/video/{vid}",
+                "author": author.get("nickname") or ("@" + user),
+                "thumb": v.get("cover") or v.get("origin_cover"),
+                "is_live": False,
+                "live_title": "🔴 Live pe TikTok",
+                "live_url": f"https://www.tiktok.com/@{user}/live"}
+
+    async def _tiktok_page(self, user):
+        """Metoda 2 (rezerva): pagina TikTok — JSON structurat, apoi regex. Da si LIVE."""
         try:
             async with self.session.get(
                     f"https://www.tiktok.com/@{user}",
                     headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                                            "AppleWebKit/537.36 (KHTML, like Gecko) "
-                                           "Chrome/120.0 Safari/537.36"}) as r:
+                                           "Chrome/120.0 Safari/537.36"},
+                    timeout=aiohttp.ClientTimeout(total=15)) as r:
                 if r.status != 200:
                     return None
                 html = await r.text()
-        except aiohttp.ClientError:
+        except (aiohttp.ClientError, asyncio.TimeoutError):
             return None
 
-        # video nou
-        vid = None
-        m = re.search(r'/video/(\d+)', html)
+        vid, desc, is_live, live_txt, nick = None, "", False, "", "@" + user
+        # JSON structurat din pagina (mai robust decat regex)
+        m = re.search(r'id="__UNIVERSAL_DATA_FOR_REHYDRATION__"[^>]*>(.*?)</script>',
+                      html, re.DOTALL)
         if m:
-            vid = m.group(1)
+            try:
+                data = json.loads(m.group(1))
+                scope = data.get("__DEFAULT_SCOPE__", {})
+                ud = (scope.get("webapp.user-detail", {}) or {}).get("userInfo", {})
+                if ud:
+                    nick = (ud.get("user") or {}).get("nickname") or nick
+                    post = ud.get("post") or {}
+                    items = post.get("data") or post.get("itemList") or []
+                    if items:
+                        vid = str(items[0].get("id") or "") or None
+                        desc = items[0].get("desc") or ""
+                live = scope.get("webapp.live-detail") or scope.get("liveRoom")
+                if live:
+                    is_live = True
+                    if isinstance(live, dict):
+                        live_txt = live.get("title") or live.get("description") or ""
+            except (json.JSONDecodeError, AttributeError, TypeError):
+                pass
 
-        # live (best-effort): cautam indicii de live in JSON-ul paginii
-        is_live = False
-        rm = re.search(r'"roomId":"(\d+)"', html)
-        if rm and rm.group(1) not in ("0", ""):
-            is_live = True
-        compact = html.replace(" ", "")
-        if '"isLive":true' in compact or '"liveRoomId":"' in html or '"LiveRoom"' in html:
-            is_live = True
+        # rezerva pe regex daca JSON n-a mers
+        if not vid:
+            mm = re.search(r'/video/(\d+)', html)
+            if mm:
+                vid = mm.group(1)
+        if not desc:
+            dm = re.search(r'"desc":"([^"]*)"', html)
+            if dm:
+                desc = dm.group(1)
+        if not is_live:
+            rm = re.search(r'"roomId":"(\d+)"', html)
+            if (rm and rm.group(1) not in ("0", "")) or '"isLive":true' in html.replace(" ", ""):
+                is_live = True
 
-        return {"id": vid, "title": "Videoclip nou pe TikTok",
+        if not vid and not is_live:
+            return None
+        return {"id": vid, "title": "Videoclip nou pe TikTok", "desc": desc,
+                "live_desc": live_txt,
                 "url": (f"https://www.tiktok.com/@{user}/video/{vid}" if vid
                         else f"https://www.tiktok.com/@{user}"),
-                "author": "@" + user, "thumb": None,
+                "author": nick, "thumb": None,
                 "is_live": is_live,
                 "live_title": "🔴 Live pe TikTok",
                 "live_url": f"https://www.tiktok.com/@{user}/live"}
@@ -261,6 +350,8 @@ class Notifications(commands.Cog):
         if info is None:
             return
 
+        kws = sub.get("keywords") or []
+
         if sub["platform"] == "tiktok":
             # TikTok: respectam ce a ales userul (live / video / ambele)
             mode = sub.get("tiktok_mode", "both")
@@ -272,40 +363,35 @@ class Notifications(commands.Cog):
             # tranzitie live (doar la trecerea din offline in live)
             live = info.get("is_live", False)
             if mode in ("both", "live") and live and not sub.get("was_live"):
-                live_info = {"author": info.get("author"),
-                             "title": info.get("live_title", "🔴 Live pe TikTok"),
-                             "url": info.get("live_url", info.get("url")),
-                             "thumb": info.get("thumb")}
-                await self._notify(guild, sub, live_info, is_live=True)
+                if _matches_keywords(info.get("live_desc", ""), kws):
+                    live_info = {"author": info.get("author"),
+                                 "title": info.get("live_title", "🔴 Live pe TikTok"),
+                                 "url": info.get("live_url", info.get("url")),
+                                 "thumb": info.get("thumb")}
+                    await self._notify(guild, sub, live_info, is_live=True)
             sub["was_live"] = live
             # video nou
             vid = info.get("id")
             if mode in ("both", "video") and vid and vid != sub.get("last_video_id"):
                 sub["last_video_id"] = vid
-                await self._notify(guild, sub, info, is_live=False)
+                if _matches_keywords(info.get("desc", ""), kws):
+                    await self._notify(guild, sub, info, is_live=False)
             elif vid:
                 sub["last_video_id"] = vid  # tinem evidenta chiar daca nu anuntam
             return
 
-        if sub["platform"] in LIVE_PLATFORMS:
-            live = info.get("is_live", False)
-            if not sub.get("initialized"):
-                sub["was_live"] = live
-                sub["initialized"] = True
-                return
-            if live and not sub.get("was_live"):
-                await self._notify(guild, sub, info, is_live=True)
-            sub["was_live"] = live
-        else:  # video nou (youtube, tiktok)
-            vid = info.get("id")
-            if not vid:
-                return
-            if not sub.get("initialized"):
-                sub["last_video_id"] = vid
-                sub["initialized"] = True
-                return
-            if vid != sub.get("last_video_id"):
-                sub["last_video_id"] = vid
+        # video nou (youtube)
+        vid = info.get("id")
+        if not vid:
+            return
+        if not sub.get("initialized"):
+            sub["last_video_id"] = vid
+            sub["initialized"] = True
+            return
+        if vid != sub.get("last_video_id"):
+            sub["last_video_id"] = vid
+            text = f"{info.get('title','')} {info.get('desc','')}"
+            if _matches_keywords(text, kws):
                 await self._notify(guild, sub, info, is_live=False)
 
     async def _notify(self, guild, sub, info, is_live):

@@ -31,8 +31,6 @@
       <label>Platforma</label>
       <select name="platform" required>
         <option value="youtube">YouTube (video nou)</option>
-        <option value="twitch">Twitch (live)</option>
-        <option value="kick">Kick (live)</option>
         <option value="tiktok">TikTok (live + video — experimental)</option>
       </select>
 
@@ -44,10 +42,14 @@
       </select>
 
       <label>URL canal creator</label>
-      <input type="text" name="url" placeholder="https://youtube.com/@Creator  ·  https://twitch.tv/nume" required>
+      <input type="text" name="url" placeholder="https://youtube.com/@Creator  ·  https://tiktok.com/@nume" required>
 
       <label>ID canal Discord (unde se posteaza)</label>
       <input type="text" name="discord_channel_id" placeholder="ex: 123456789012345678" required>
+
+      <label>Cuvinte cheie (optional) — anunta doar cand apar in descriere</label>
+      <input type="text" name="keywords" placeholder="ex: apollo2, apollo  ·  gol = anunta tot">
+      <p class="hint">Separate prin virgula. Daca lasi gol, anunta orice video/live. Daca pui cuvinte, anunta doar cand descrierea/titlul le contine.</p>
 
       <label>Mesaj (optional)</label>
       <textarea name="message" placeholder="🔴 {creator} e LIVE! {url}"></textarea>
@@ -65,8 +67,8 @@
     {% if subs %}
       {% for s in subs %}
       <div class="sub">
-        <span class="badge {{ {'youtube':'yt','twitch':'tw','kick':'kk','tiktok':'tt'}[s.platform] }}">{{ s.platform }}</span>
-        <div class="info">{{ s.url }}<br><small>→ canal #{{ s.discord_channel_id }}{% if s.role_id %} · ping &lt;@&amp;{{ s.role_id }}&gt;{% endif %} · ID: {{ s.id }}</small></div>
+        <span class="badge {{ {'youtube':'yt','tiktok':'tt'}.get(s.platform,'yt') }}">{{ s.platform }}</span>
+        <div class="info">{{ s.url }}<br><small>→ canal #{{ s.discord_channel_id }}{% if s.role_id %} · ping &lt;@&amp;{{ s.role_id }}&gt;{% endif %}{% if s.keywords %} · 🔎 {{ s.keywords|join(', ') }}{% endif %} · ID: {{ s.id }}</small></div>
         <form method="POST" onsubmit="return confirm('Stergi aceasta urmarire?')">
           <input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="{{ s.id }}">
           <button class="del" title="Sterge">✕</button>
@@ -80,11 +82,10 @@
 
   <div class="panel">
     <p class="note">
-      <b>YouTube</b> — merge fara configurare.<br>
-      <b>Twitch</b> — necesita <code>TWITCH_CLIENT_ID</code> si <code>TWITCH_CLIENT_SECRET</code> in fisierul <code>.env</code> (gratuit de pe dev.twitch.tv).<br>
-      <b>Kick</b> — merge prin API-ul lor neoficial.<br>
-      <b>TikTok</b> — experimental; TikTok nu are API public, deci poate sa nu prinda mereu.<br>
-      Testeaza oricand cu comanda <code>/notify test &lt;ID&gt;</code> in Discord.
+      <b>YouTube</b> — merge fara configurare, anunta cand apare un video nou.<br>
+      <b>TikTok</b> — experimental; TikTok nu are API public, deci poate sa nu prinda mereu (mai ales live-urile).<br>
+      <b>Cuvinte cheie</b> — pune-le ca sa anunti doar continutul relevant (ex. doar clipurile despre „apollo2").<br>
+      Verificarea se face la 5 minute, deci notificarile nu sunt instant. Testeaza cu <code>/notify test &lt;ID&gt;</code>.
     </p>
   </div>
 {% endblock %}

@@ -442,7 +442,10 @@ def notifications(guild_id):
         platform = request.form.get("platform", "")
         url = request.form.get("url", "").strip()
         dch = _to_int(request.form.get("discord_channel_id", ""))
-        if platform in ("youtube", "twitch", "kick", "tiktok") and url and dch:
+        if platform in ("youtube", "tiktok") and url and dch:
+            # cuvinte cheie per creator (separate prin virgula) - gol = anunta tot
+            raw_kw = request.form.get("keywords", "").strip()
+            keywords = [k.strip() for k in raw_kw.split(",") if k.strip()]
             subs.append({
                 "id": uuid.uuid4().hex[:8],
                 "platform": platform,
@@ -451,6 +454,7 @@ def notifications(guild_id):
                 "message": request.form.get("message", "").strip(),
                 "role_id": _to_int(request.form.get("role_id", "")),
                 "tiktok_mode": request.form.get("tiktok_mode", "both"),
+                "keywords": keywords,
                 "identifier": None,
                 "initialized": False,
             })
