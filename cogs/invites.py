@@ -530,20 +530,38 @@ class Invites(commands.Cog):
                        if n > 0 and str(u) not in excluded],
                       key=lambda x: x[1], reverse=True)[:limit]
 
-    def _board_lines(self, ranked):
+    def _inviter_name(self, gid, uid):
+        """Numele salvat al invitatorului (din istoric), ca sa apara si cand mentiunea
+        arata doar @id (userul a plecat sau Discord nu-l rezolva)."""
+        hist = (storage.get(gid, "invites", {}) or {}).get("history", [])
+        for h in reversed(hist):  # cel mai recent nume cunoscut
+            if str(h.get("inviter")) == str(uid) and h.get("inviter_name"):
+                return h["inviter_name"]
+        return None
+
+    def _board_lines(self, gid, ranked):
         out = []
         for i, (uid, n) in enumerate(ranked, 1):
             medal = {1: "🥇", 2: "🥈", 3: "🥉"}.get(i, f"`#{i}`")
-            out.append(f"{medal} <@{uid}> — **{n}** invitatii")
+            name = self._inviter_name(gid, uid)
+            who = f"<@{uid}>" + (f" ({name})" if name else "")
+            out.append(f"{medal} {who} — **{n}** invitatii")
         return "\n".join(out)
 
-    def _final_embed(self, c, ranked):
+    def _final_embed(self, gid, c, ranked):
         wc = max(1, int(c.get("winners_count", 1)))
         winners = ranked[:wc]
-        win_txt = ", ".join(f"<@{u}> (**{n}**)" for u, n in winners) if winners else "nimeni"
+        if winners:
+            parts = []
+            for u, n in winners:
+                nm = self._inviter_name(gid, u)
+                parts.append(f"<@{u}>" + (f" ({nm})" if nm else "") + f" (**{n}**)")
+            win_txt = ", ".join(parts)
+        else:
+            win_txt = "nimeni"
         return discord.Embed(
             title=f"🏆 {c.get('name','Concurs')} · REZULTAT FINAL",
-            description=f"🎉 Castigator(i): {win_txt}\n\n{self._board_lines(ranked) or 'Nicio invitatie.'}",
+            description=f"🎉 Castigator(i): {win_txt}\n\n{self._board_lines(gid, ranked) or 'Nicio invitatie.'}",
             color=discord.Color.gold())
 
     # ------- bucla care porneste/incheie concursurile programate -------
@@ -570,7 +588,7 @@ class Invites(commands.Cog):
                 ch = guild.get_channel(int(c["announce_channel_id"])) if c.get("announce_channel_id") else None
                 if ch:
                     try:
-                        await ch.send(embed=self._final_embed(c, ranked))
+                        await ch.send(embed=self._final_embed(guild.id, c, ranked))
                     except discord.HTTPException:
                         pass
 
@@ -589,7 +607,7 @@ class Invites(commands.Cog):
         ranked = self._contest_board(guild.id)
         embed = discord.Embed(
             title=f"🏁 {c.get('name','Concurs')} · Clasament live",
-            description=self._board_lines(ranked) or "Încă nicio invitație. Fii primul!",
+            description=self._board_lines(guild.id, ranked) or "Încă nicio invitație. Fii primul!",
             color=discord.Color(0x8B5CF6))
         embed.set_footer(text="Se actualizează automat")
         embed.timestamp = discord.utils.utcnow()
@@ -649,7 +667,7 @@ class Invites(commands.Cog):
             return await interaction.response.send_message(
                 f"🏁 **{c.get('name')}** — inca nu a invitat nimeni.")
         embed = discord.Embed(title=f"🏁 {c.get('name')} · Clasament",
-                              description=self._board_lines(ranked), color=discord.Color.gold())
+                              description=self._board_lines(interaction.guild_id, ranked), color=discord.Color.gold())
         await interaction.response.send_message(embed=embed)
 
     @concurs.command(name="stop", description="Opreste concursul acum si anunta castigatorul")
@@ -666,7 +684,7 @@ class Invites(commands.Cog):
         if not ranked:
             return await interaction.response.send_message(
                 f"🏁 **{c.get('name')}** s-a incheiat, dar nu a invitat nimeni. 📭")
-        await interaction.response.send_message(embed=self._final_embed(c, ranked))
+        await interaction.response.send_message(embed=self._final_embed(interaction.guild_id, c, ranked))
 
     @concurs.command(name="status", description="Vezi starea concursului")
     async def concurs_status(self, interaction: discord.Interaction):
