@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Curățare mesaje · {{ meta.get('name','Server') }}{% endblock %}
+
+{% block extra_style %}
+    .panel { padding:26px; }
+    h3 { margin:0 0 4px; font-size:18px; font-weight:800; }
+    .sub { color:var(--muted); font-size:13px; margin:0 0 20px; line-height:1.6; }
+    label { display:block; font-size:13px; color:var(--muted); margin:16px 0 6px; font-weight:600; }
+    input[type=text], select { width:100%; padding:11px; border-radius:8px; border:1px solid var(--glass-border); background:var(--bg); color:var(--text); font-size:14px; box-sizing:border-box; font-family:inherit; }
+    .radio { display:flex; gap:10px; align-items:center; background:var(--input); border:1px solid var(--glass-border); border-radius:10px; padding:12px 14px; margin:8px 0; cursor:pointer; }
+    .radio input { width:auto; }
+    .start { margin-top:20px; background:linear-gradient(135deg,#f43f5e,#e11d48); color:#fff; border:none; padding:13px 28px; border-radius:11px; font-weight:700; font-size:15px; cursor:pointer; }
+    .warn { background:rgba(244,63,94,.1); border:1px solid rgba(244,63,94,.3); color:#fb7185; border-radius:10px; padding:12px 15px; font-size:13px; margin:14px 0; line-height:1.6; }
+    .status { border-radius:10px; padding:12px 15px; font-size:14px; margin-bottom:14px; }
+    .st-run { background:rgba(251,191,36,.12); border:1px solid rgba(251,191,36,.3); color:#fbbf24; }
+    .st-done { background:rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.3); color:#4ade80; }
+    .hint { background:var(--input); border-radius:8px; padding:11px 14px; font-size:12.5px; color:var(--muted); margin-top:8px; line-height:1.7; }
+    #chan-wrap { display:none; }
+{% endblock %}
+
+{% block content %}
+  <div class="panel">
+    <h3>🧹 Curățare mesaje</h3>
+    <p class="sub">Șterge toate mesajele unui membru sau bot — de pe un canal anume sau de pe tot serverul. Șterge orice mesaj, oricât de vechi.</p>
+
+    <div class="warn">⚠️ Atenție: ștergerea e <b>permanentă</b>. Verifică bine ID-ul înainte.</div>
+
+    {% if job and job.status == 'running' %}
+      <div class="status st-run" data-refresh="1">⏳ Se șterg mesajele... ({{ job.deleted or 0 }} șterse până acum) — se actualizează singur</div>
+    {% elif job and job.status == 'done' %}
+      <div class="status st-done">✅ {{ job.result }}</div>
+    {% elif job and job.status == 'error' %}
+      <div class="warn">⚠️ {{ job.result }}</div>
+    {% endif %}
+
+    <form method="POST" onsubmit="return confirm('Sigur ștergi TOATE mesajele acestui membru? Nu se poate anula.')">
+      <input type="hidden" name="action" value="start">
+
+      <label>ID-ul membrului / botului</label>
+      <input type="text" name="user_id" placeholder="ex: 1216202118135021581" required>
+      <p class="hint">Click dreapta pe membru în Discord → „Copiază ID utilizator" (cu Modul dezvoltator pornit).</p>
+
+      <label>De unde ștergem</label>
+      <label class="radio"><input type="radio" name="scope" value="server" checked onchange="document.getElementById('chan-wrap').style.display='none'"> De pe tot serverul</label>
+      <label class="radio"><input type="radio" name="scope" value="channel" onchange="document.getElementById('chan-wrap').style.display='block'"> Doar de pe un canal anume</label>
+
+      <div id="chan-wrap">
+        <label>Canalul</label>
+        <select name="channel_id">
+          <option value="">— alege un canal —</option>
+          {% for ch in channels %}<option value="{{ ch.id }}">#{{ ch.name }}</option>{% endfor %}
+        </select>
+      </div>
+
+      <button class="start" type="submit">🧹 Șterge mesajele</button>
+    </form>
+
+    <p class="hint" style="margin-top:16px">Mesajele mai vechi de 14 zile se șterg unul câte unul (limită Discord), deci pe canale cu mult istoric poate dura. Botul lucrează în fundal și îți arată progresul aici.<br>În Discord poți folosi și <code>/clean</code> (un canal) sau <code>/clean_all</code> (tot serverul).</p>
+  </div>
+
+  <div class="panel" style="margin-top:22px">
+    <h3>🔇 Auto-ștergere (mut dur)</h3>
+    <p class="sub">Alege pe cineva și, de fiecare dată când scrie ceva, botul îi șterge mesajul automat, instant. Pe tot serverul sau doar pe un canal anume.</p>
+
+    {% if autodelete %}
+    <div style="margin-bottom:18px">
+      {% for uid, rule in autodelete.items() %}
+      <div style="display:flex; align-items:center; justify-content:space-between; background:var(--input); border:1px solid var(--glass-border); border-radius:10px; padding:11px 15px; margin-bottom:8px">
+        <div style="font-size:14px">
+          <b>ID: {{ uid }}</b>
+          <span style="color:var(--muted); font-size:12.5px">
+            {% if rule.scope == 'channel' %}· doar pe #{{ ch_names.get(rule.channel_id|string, rule.channel_id) }}{% else %}· pe tot serverul{% endif %}
+          </span>
+        </div>
+        <form method="POST" style="margin:0">
+          <input type="hidden" name="action" value="auto_remove">
+          <input type="hidden" name="user_id" value="{{ uid }}">
+          <button type="submit" style="background:var(--input); border:1px solid var(--glass-border); color:#fb7185; border-radius:8px; padding:6px 14px; cursor:pointer; font-size:13px">✕ Oprește</button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="sub" style="opacity:.7">Nimeni la auto-ștergere momentan.</p>
+    {% endif %}
+
+    <form method="POST">
+      <input type="hidden" name="action" value="auto_add">
+      <label>ID-ul membrului / botului</label>
+      <input type="text" name="user_id" placeholder="ex: 1216202118135021581" required>
+
+      <label>Unde se aplică</label>
+      <label class="radio"><input type="radio" name="scope" value="server" checked onchange="document.getElementById('auto-chan').style.display='none'"> Pe tot serverul</label>
+      <label class="radio"><input type="radio" name="scope" value="channel" onchange="document.getElementById('auto-chan').style.display='block'"> Doar pe un canal anume</label>
+      <div id="auto-chan" style="display:none">
+        <label>Canalul</label>
+        <select name="channel_id">
+          <option value="">— alege un canal —</option>
+          {% for ch in channels %}<option value="{{ ch.id }}">#{{ ch.name }}</option>{% endfor %}
+        </select>
+      </div>
+
+      <button class="start" type="submit" style="background:linear-gradient(135deg,#8b5cf6,#6d28d9)">🔇 Pune la auto-ștergere</button>
+    </form>
+    <p class="hint" style="margin-top:14px">Auto-ștergerea prinde mesajele doar cât botul e pornit. Dacă botul e picat câteva secunde (restart), mesajele din acel moment scapă. În Discord: <code>/autodelete @cineva pornit/oprit</code>.</p>
+  </div>
+{% endblock %}

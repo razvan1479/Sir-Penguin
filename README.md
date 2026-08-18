@@ -1,375 +1,366 @@
-# Sir Penguin — Full Project Documentation
+# 🤖 Sir-Penguin — Bot de Discord modular + Dashboard
 
-A modular Discord bot with a web dashboard, built with `discord.py` and Flask.
-The bot and the dashboard run together in a single process. Everything is
-configured from the dashboard; the bot reads that configuration and acts on it.
+Bot de Discord cu module independente și un panou web (dashboard) de unde
+configurezi totul, cu login prin Discord. Fiecare funcție e un modul separat
+(un „cog"), deci poți adăuga sau modifica funcții fără să strici restul.
+Hostat 24/7, cu auto-deploy din GitHub.
 
-- **Modules (cogs):** 18
-- **Slash commands:** 49
-- **Dashboard pages:** 26 routes
-- **Hosting:** Oracle Cloud Free Tier (Ubuntu, ARM/Always-Free)
-- **Auto-deploy:** GitHub Actions on push to `main`
+## ✨ Module
 
----
-
-## 1. Architecture Overview
-
-```
-run.py                → entry point (starts bot + dashboard together)
-main.py               → bot setup, loads all cogs, global error handler
-cogs/                 → one file per feature (18 modules)
-dashboard/
-  app.py              → Flask app: routes, OAuth login, all config pages
-  discord_api.py      → helpers for talking to the Discord API
-  templates/          → one HTML page per feature (premium dark theme)
-utils/
-  storage.py          → in-memory data store with disk persistence
-  perms.py            → permission checks (bot_access / has_bot_access)
-data/                 → runtime data (store.json), git-ignored
-.env                  → secrets (token, client id/secret) — git-ignored
-.github/workflows/    → deploy.yml (auto-deploy on push)
-deploy.sh             → pulls code + restarts service on the server
-```
-
-### How configuration flows
-1. You log in to the dashboard with Discord (OAuth).
-2. You change a setting on a page and save it.
-3. The dashboard writes it to the shared store (`storage`) under a key such as
-   `colors`, `contest`, `newacc`, `tickets`, etc.
-4. The matching cog reads that key and behaves accordingly — usually within
-   seconds, or on its next background cycle.
-
-### Data storage
-`utils/storage.py` is an in-memory cache keyed by guild ID, persisted to
-`data/store.json`. Reads return a deep copy, so callers can't accidentally
-mutate the cache. Each feature uses its own key (e.g. `guild → "colors"`).
+- **Bun venit** — mesaj de întâmpinare cu avatar, banner și cine a invitat membrul
+- **Invitații** — invite tracker complet cu leaderboard pe perioade
+- **Embed builder** — creezi mesaje frumoase (regulament, anunțuri) și le postezi
+- **Giveaway** — concursuri cu buton, counter live, recurență, restricție pe rol
+- **Notificări** — anunță când un creator postează/intră live (YouTube, Twitch, Kick, TikTok)
+- **Avatar & Banner** — afișează avatarul/bannerul oricui, cu linkuri de descărcare
+- **Rank-uri auto** — ranguri după vechime, cu nickname și roluri automate
+- **Joc numere** — „ghicește cel mai aproape de numărul random"
+- **Piatra-Foarfeca-Hartie** — meci 1v1 cu buton de rematch
+- **Roluri în masă** — dă/scoate roluri la tot serverul sau pe condiții
+- **Dashboard web** — configurezi tot din browser, cu login prin contul tău de Discord
+- **Permisiuni** — alegi din dashboard ce roluri (mai multe) pot folosi comenzile botului
+- **Mesaje DM în masă** — trimite un mesaj în DM membrilor, eșalonat (1/minut), cu preview și progres
+- **Tickete** — sistem de tickete cu panou, tipuri multiple, canale private, claim, transcript
+- **Backup server** — salvezi structura serverului (roluri/canale) și o aplici pe alt server
 
 ---
 
-## 2. Setup & Installation
+## 🚀 Instalare și pornire
 
-### Requirements
-```
-discord.py>=2.4.0
-python-dotenv>=1.0.0
-Flask>=3.0.0
-feedparser>=6.0.0
-requests>=2.31.0
-aiohttp
-```
-Install: `pip install -r requirements.txt`
+### 1. Pregătește botul pe Discord
+1. https://discord.com/developers/applications → creează o aplicație.
+2. La **Bot**, activează *Privileged Gateway Intents*: **SERVER MEMBERS INTENT** și **MESSAGE CONTENT INTENT**.
+3. Copiază tokenul botului (Reset Token).
+4. La invitare, dă-i permisiunile: **Manage Server** (invitații), **Manage Roles** și **Manage Nicknames** (rank-uri/roluri), plus trimitere mesaje/embed-uri.
+5. La **OAuth2**, asigură-te că **„Requires OAuth2 Code Grant" e DEZACTIVAT**.
 
-### Environment variables (`.env`)
+### 2. Configurează fișierul `.env`
 ```
-DISCORD_TOKEN=<bot token>
-DISCORD_CLIENT_ID=<application client id>
-DISCORD_CLIENT_SECRET=<oauth client secret>
-DISCORD_REDIRECT_URI=http://<server-ip>:5000/callback
-FLASK_SECRET=<any random string>
-TWITCH_CLIENT_ID=        (optional / currently unused)
-TWITCH_CLIENT_SECRET=    (optional / currently unused)
+DISCORD_TOKEN=tokenul_botului
+
+# Dashboard (login cu Discord)
+DISCORD_CLIENT_ID=id_aplicatie
+DISCORD_CLIENT_SECRET=secret_oauth2
+DISCORD_REDIRECT_URI=http://localhost:5000/callback
+FLASK_SECRET=orice_text_random_lung
+
+# Opțional — notificări Twitch (gratuit de pe dev.twitch.tv/console)
+TWITCH_CLIENT_ID=
+TWITCH_CLIENT_SECRET=
+```
+> `.env` NU se urcă pe GitHub. Pe server, valorile se pun direct acolo (manual),
+> iar la `DISCORD_REDIRECT_URI` se folosește adresa publică + `/callback`,
+> adăugată identic și în Developer Portal → OAuth2 → Redirects.
+
+### 3. Instalează dependențele
+```
+pip install -r requirements.txt
 ```
 
-> **Important:** `DISCORD_REDIRECT_URI` must match **exactly** what is listed
-> under **OAuth2 → Redirects** in the Discord Developer Portal, otherwise login
-> fails silently.
-
-### Running locally
+### 4. Pornește
 ```
-python run.py
+python run.py            # botul + dashboardul împreună
 ```
-The dashboard is served on port `5000`. The bot connects using `DISCORD_TOKEN`.
+Sau separat: `python main.py` (botul) și `python dashboard/app.py` (dashboard → http://localhost:5000).
 
-### Required bot permissions
-For everything to work, the bot needs **Administrator** (or at minimum:
-Manage Server, Manage Roles, Manage Channels, Kick/Ban, Send Messages,
-Embed Links, Read Message History, Mention Everyone). The bot's role must sit
-**high** in the role list — it can only assign roles **below** its own top role.
+Comenzile slash se sincronizează **automat** la pornire și când intri pe un server
+nou (chiar dacă botul era oprit când a fost adăugat). Nu trebuie nimic manual.
 
 ---
 
-## 3. Hosting & Deployment
+## 📁 Structura proiectului
 
-- **Server:** Oracle Cloud Free Tier, Ubuntu, Always-Free ARM instance.
-- **Service:** systemd unit `sir-penguin`
-  (`WorkingDirectory=/home/ubuntu/Sir-Penguin`, `ExecStart=venv/bin/python run.py`).
-- **Common commands:**
-  ```
-  sudo systemctl status sir-penguin     # is it running?
-  sudo systemctl restart sir-penguin    # restart after changes
-  ```
-- **Dashboard URL:** `http://<server-ip>:5000`
-
-### Auto-deploy
-`.github/workflows/deploy.yml` runs on every push to `main`: it SSHes into the
-server and runs `deploy.sh`, which pulls the latest code, installs dependencies
-**only if `requirements.txt` changed**, and restarts the service.
-GitHub secrets used: `SERVER_IP`, `SERVER_USER`, `SSH_PRIVATE_KEY`.
-
-### Connecting to the server (SSH)
 ```
-ssh -i "<path-to-key>" ubuntu@<server-ip>
+discord-bot/
+├── main.py              # pornește botul + încarcă automat tot din cogs/
+├── run.py               # pornește bot + dashboard împreună (citește PORT din mediu)
+├── .env                 # tokenul și secretele (nu se urcă pe GitHub)
+├── requirements.txt
+├── cogs/                # fiecare modul = un fișier independent
+│   ├── welcome.py        invites.py     embeds.py      giveaway.py
+│   ├── notifications.py  avatar.py      rankup.py      game.py
+│   ├── rps.py            massrole.py    dashboard_sync.py
+├── utils/storage.py     # depozit comun de date (bot + dashboard)
+├── data/store.json      # se creează automat; aici se salvează totul
+└── dashboard/
+    ├── app.py           # serverul web (Flask) + login OAuth2
+    └── templates/       # paginile dashboardului
 ```
-On Windows, if you get *"Bad permissions / UNPROTECTED PRIVATE KEY FILE"*, lock
-the key file down so only your user can read it (via `icacls`, removing
-`Authenticated Users` and `Users`).
 
 ---
 
-## 4. Modules (Cogs)
+## 💬 Comenzile, pe module
 
-Each module is a self-contained feature. Below: what it does, its commands, and
-its dashboard page.
+> 🔒 = cere permisiunea **Manage Server**. 🎭 = cere **Manage Roles**.
 
-### 4.1 Welcome
-Greets new members. Configurable message, embed or plain text, optional banner
-and avatar. When the Invites module is active, the welcome message also shows
-who invited the new member (as a clickable profile link, so it still works even
-if that inviter has left).
-- Commands: `/welcome channel`, `/welcome test`
-- Page: `/guild`
+### 👋 Bun venit
+Embed la intrarea unui membru: mesaj configurabil, avatar (thumbnail), banner și
+opțional cine l-a invitat. Se configurează din dashboard.
 
-### 4.2 Goodbye
-Announces when a member leaves. The member's name is rendered as a clickable
-profile link (never a raw mention that would show as "unknown user").
-Placeholders: `{user}`, `{username}`, `{inviter}`, `{server}`, `{count}`.
-- Page: `/goodbye`
+| Comandă | Ce face |
+|---|---|
+| `/welcome test` 🔒 | Trimite un mesaj de bun venit de test |
+| `/welcome channel <canal>` 🔒 | Setează rapid canalul de bun venit |
 
-### 4.3 Invites (invite tracking + contest)
-Tracks which invite each member used, keeps per-user invite counts, and powers
-the invite **contest**. Invite totals are clamped so they can never go negative;
-fake-account joins are handled correctly.
+Placeholdere în mesaj: `{user}`, `{username}`, `{server}`, `{count}`.
 
-**Reliability features:**
-- Joins are processed **one at a time per guild** (an async lock), so a burst of
-  simultaneous joins (common during a contest) doesn't corrupt the detection.
-- The invite cache is refreshed on startup, on invite create/delete, **and**
-  every 5 minutes (a "gentle" resync that adds new invites and drops deleted
-  ones without disturbing in-progress detection).
+### 📨 Invitații
+Urmărește cine pe cine invită. Categorii: **reale** (au rămas), **plecate**,
+**false** (conturi sub 7 zile), **bonus** (manuale). **Total = reale + bonus − plecate − false.**
 
-**Contest features:**
-- Start/stop/schedule a contest; a live leaderboard can be posted to a channel
-  and **edited in place** on an interval (no spam).
-- Configurable number of entries shown (1–25).
-- **Exclusions:** hide specific users (e.g. the server owner) from the
-  leaderboard without touching their real invite counts.
+| Comandă | Ce face |
+|---|---|
+| `/invites [membru]` | Numărul și detalierea invitațiilor |
+| `/inviter <membru>` | Cine a invitat membrul |
+| `/invitedlist [membru]` | Lista celor invitați de cineva |
+| `/invitecodes [membru]` | Codurile de invitație + folosiri |
+| `/findlink` | Unul dintre linkurile tale de invitație |
+| `/leaderboard [perioadă] [rol]` | Clasament: tot timpul / săptămână / lună |
+| `/addinvites <membru> <nr>` 🔒 | Adaugă invitații bonus |
+| `/removeinvites <membru> <nr>` 🔒 | Scade invitații bonus |
+| `/resetinvites [perioadă] [membru]` 🔒 | Resetează clasamentul: tot timpul / 7 zile / 30 zile, opțional doar un membru |
 
-- Commands: `/invites`, `/inviter`, `/invitedlist`, `/invitecodes`,
-  `/addinvites`, `/removeinvites`, `/resetinvites`, `/leaderboard`,
-  `/concurs start`, `/concurs stop`, `/concurs status`, `/concurs clasament`
-- Pages: `/leaderboard`, `/invitelog`, `/contest`
+**🏁 Concurs de invitații** (sub-comenzi `/concurs`, sau din dashboard → „Concurs invite"):
 
-> **Why "unknown/vanity" can appear:** the bot infers the invite by comparing
-> use-counts before/after each join. It shows *vanity* when someone joined via
-> the server's custom link, and *unknown* when it can't match any invite
-> (e.g. the invite was used while the bot was offline, or the invite was
-> deleted). No Discord bot can achieve 100% here — this is a platform limit.
+| Comandă | Ce face |
+|---|---|
+| `/concurs start [nume]` 🔒 | Pornește un concurs simplu — numără invitațiile de acum încolo (fără durată fixă) |
+| `/concurs clasament` 🔒 | Afișează clasamentul concursului curent (top 10) |
+| `/concurs stop` 🔒 | Încheie concursul acum și anunță câștigătorul |
+| `/concurs status` 🔒 | Starea concursului (programat / activ / timp rămas) |
 
-### 4.4 Colors (name colors)
-`/culori panou` posts a persistent panel of color buttons. Members click a color
-to get a matching role. The bot **creates the color role on first use and reuses
-it afterwards** (never duplicates), keeps a member to a single color, and lets
-them toggle it off. Newly created color roles are moved **just under the bot's
-top role** (via `edit_role_positions`) so the color actually shows on the name.
-21 colors (all circle emojis, including a visible black `#010101`, since Discord
-treats pure `#000000` as "no color"). Can be disabled from the dashboard.
-- Command: `/culori panou`
-- Page: `/culori`
+**Concurs cu durată și anunț automat (din dashboard → „Concurs invite"):**
+În dashboard poți configura un concurs complet:
+- **Numele** concursului
+- **Când începe** — acum sau programat peste X ore
+- **Durata** — în zile + ore (ex: 7 zile); 0 = fără limită, se oprește manual
+- **Canalul** unde se anunță rezultatul
+- **Câți câștigători** se anunță
 
-### 4.5 New Accounts
-Detects members whose Discord account was created recently (age computed from
-the user ID). On join, it can auto-assign a role you choose and/or announce the
-new account in a channel. A dashboard **"Scan whole server"** button applies the
-role to all existing members under the threshold. Threshold, role and channel
-are all set in the dashboard.
-- Commands: `/conturinoi lista`, `/conturinoi verifica`
-- Page: `/conturinoi`
+Botul pornește singur concursul programat la ora stabilită și, când expiră durata,
+**anunță automat câștigătorii + clasamentul** în canalul ales. Vezi clasamentul
+live și în dashboard pe durata concursului.
 
-### 4.6 Giveaway
-`/giveaway` opens a single **modal form** (title, prize, winners, duration in
-minutes, channel — blank channel = current channel). Ping is on by default.
-Submitting posts the giveaway (embed + "Participate" button); the winner(s) are
-drawn automatically at the end. When a giveaway ends, its message is edited to
-"Giveaway ended" so the relative countdown no longer looks active.
-- Commands: `/giveaway`, `/giveaway_start`, `/giveaway_end`, `/giveaway_reroll`
-- Page: `/giveaway`
+Concursul numără doar invitațiile reale (exclude conturile plecate/false) strânse
+de la pornire, fără să afecteze clasamentul „tot timpul". Ideal pentru competiții
+cu start și final clar (spre deosebire de clasamentul pe 7/30 zile, care e o
+fereastră glisantă).
 
-> Performance: many giveaways don't burden the bot — the ticker runs every 30s
-> and ended giveaways are capped at 20 per server (older ones auto-pruned).
+### 🧩 Embed builder
+Creezi embed-uri în dashboard (titlu, text, imagine, footer, culoare), le dai un nume, le postezi.
 
-### 4.7 Tickets
-A full ticket system. You define **ticket types** (name, emoji, button color,
-support roles, category, open message, and which buttons appear: Close /
-Close-with-reason / Claim). A `/ticket_panel` posts the panel members use to
-open tickets.
-- **Editing:** ticket types can be edited after creation (add/remove support
-  roles, change options).
-- **Permission sync:** when you add a support role to a type, the bot re-applies
-  permissions to **already-open** tickets of that type (within ~10s), so the new
-  role can see existing tickets too.
-- **Close log:** on close, a clean embed is sent to the log channel with the
-  ticket number, who opened/closed/claimed it, and the reason (or "closed
-  without reason"). *No HTML transcript file is attached* — the log stays clean.
-- Command: `/ticket_panel`
-- Page: `/tickets`
+| Comandă | Ce face |
+|---|---|
+| `/embed send <nume> [canal]` 🔒 | Postează un embed salvat |
+| `/embed preview <nume>` 🔒 | Îl vezi doar tu, fără să-l postezi |
+| `/embed list` | Lista embed-urilor salvate |
+| `/embed delete <nume>` 🔒 | Șterge un embed |
 
-### 4.8 Notifications (YouTube + TikTok)
-Announces when a followed creator posts new content or goes live. **Only YouTube
-and TikTok** are supported. Each creator can have **keywords** — if set, the bot
-only announces when the video description/title contains one of them (blank =
-announce everything). Checks run every 5 minutes (not instant).
-- **YouTube** — reliable, uses the official RSS feed; announces new videos.
-- **TikTok** — experimental. Uses a multi-method fallback:
-  1. `tikwm.com` API (primary — description + thumbnail),
-  2. TikTok page JSON (fallback — also detects live),
-  3. regex (last resort).
-  TikTok has no public API, so live detection in particular can miss.
-- Live is only announced on the **offline → live transition** (not for a stream
-  that was already live when you added the creator).
-- Commands: `/notify list`, `/notify test`
-- Page: `/notifications`
+### 🎁 Giveaway
+Embed cu buton de înscriere, counter live, se încheie singur la timp, alege
+câștigătorii automat. Afișează cine a organizat giveaway-ul („Organizat de @…",
+cel care dă `/giveaway start"), cronometrul live (`se termină în…", actualizat
+automat de Discord) și ora exactă de final. Configurabil din dashboard (canal,
+premiu, durată, nr. câștigători, text buton, culoare, ping `@everyone`,
+restricție pe rol, recurență).
 
-### 4.9 Rank-up roles
-Automatic roles based on criteria (e.g. invites). Run/inspect from commands or
-the dashboard.
-- Commands: `/rankup run`, `/rankup status`
-- Page: `/rankup`
+| Comandă | Ce face |
+|---|---|
+| `/giveaway start` 🔒 | Postează acum un giveaway |
+| `/giveaway end <message_id>` 🔒 | Încheie un giveaway mai devreme |
+| `/giveaway reroll <message_id>` 🔒 | Alege alt câștigător |
 
-### 4.10 Mass Role
-Bulk add/remove a role to/from members. Jobs submitted from the dashboard are
-executed by the bot within ~10s.
-- Commands: `/massrole give_all`, `/massrole give_to`, `/massrole remove_all`,
-  `/massrole remove_from`
-- Page: `/massrole`
+### 🔔 Notificări
+Anunță conținut nou de la creatori urmăriți. Se adaugă din dashboard. Verifică la ~5 min.
 
-### 4.11 Mass DM
-Send a direct message to many members at once (rate-limited to avoid spam
-flags). Submitted as a job from the dashboard.
-- Commands: `/dm_masa`, `/dm_stop`
-- Page: `/massdm`
+| Comandă | Ce face |
+|---|---|
+| `/notify list` | Creatorii urmăriți |
+| `/notify test <id>` 🔒 | Trimite o notificare de test |
 
-### 4.12 Embeds
-Build, preview, send, list and delete custom embeds.
-- Commands: `/embed send`, `/embed preview`, `/embed list`, `/embed delete`
-- Page: `/embeds`
+Platforme: YouTube (direct), Twitch (cere credențiale în `.env`), Kick, TikTok (experimental).
 
-### 4.13 Backup
-Snapshot/restore server structure (roles, categories, channels).
-- Command: `/backup`
-- Page: `/backups`
+### 🖼️ Avatar & Banner
+| Comandă | Ce face |
+|---|---|
+| `/avatar [user]` | Avatarul cuiva, cu linkuri PNG/JPG/WEBP (și GIF dacă e animat) |
+| `/banner [user]` | Bannerul cuiva, aceleași formate |
+| `/serveravatar` | Iconița (avatarul) serverului, cu linkuri de descărcare |
+| `/serverbanner` | Bannerul serverului, cu linkuri de descărcare |
 
-### 4.14 Games
-- **Number game** (`/randome`) and **Rock-Paper-Scissors** (`/rps`).
-- Also `/add`, `/remove`, `/alege` helpers.
-- Pages: `/game`, `/rps`
+### ⏫ Rank-uri auto
+Rang după vechimea pe server. Definești **câte trepte vrei** în dashboard, fiecare cu
+pragul ei de **zile**, un **emoji** (pus la finalul nickname-ului) și un **rol**.
+Membrul primește rolul + emoji-ul celei mai înalte trepte atinse și pierde rolul
+treptei anterioare (promovare). Verifică la 24h și la pornire.
 
-### 4.15 Avatar / Banner
-Show user/server avatars and banners.
-- Commands: `/avatar`, `/banner`, `/serveravatar`, `/serverbanner`
+| Comandă | Ce face |
+|---|---|
+| `/rankup run` 🔒 | Aplică acum rangurile pe tot serverul (fără să aștepți 24h) |
+| `/rankup status` | Arată configurația curentă |
 
-### 4.16 Admin & utility
-- `/leaveserver`, `/serverlist`, `/findlink`, `/randome`, `/alege`.
-- Owner-only server management (bot removal) via `/servers` page.
+### 🎲 Joc numere
+Ghicești cel mai aproape de un număr random. Admin pornește runda (panou cu
+butoane), jucătorii aleg privat, la final câștigă cel mai apropiat. Configurabil:
+canal, interval de numere, durata countdown-ului.
 
-### 4.17 Dashboard Sync
-Keeps the dashboard's copy of the server's roles/channels/categories up to date
-so the config pages always show current selectors. Runs in the background.
+| Comandă | Ce face |
+|---|---|
+| `/randome` 🔒 | Pregătește o rundă (panou Start/Stop/Reset) |
+| `/alege <număr>` | Alegi privat un număr (cât timp runda e activă) |
+
+### ✊ Piatra-Foarfeca-Hartie
+Meci 1v1 cu meniu de alegere și buton de rematch. Configurabil: canalul permis (sau oriunde).
+
+| Comandă | Ce face |
+|---|---|
+| `/rps <adversar>` | Pornește un meci cu cineva |
+
+### 🎭 Roluri în masă
+Dă sau scoate roluri în masă. Se poate folosi din comenzi SAU din dashboard
+(care trimite o „comandă" pe care botul o execută în câteva secunde).
+
+| Comandă | Ce face |
+|---|---|
+| `/massrole give_all <rol>` 🎭 | Dă rolul tuturor membrilor |
+| `/massrole remove_all <rol>` 🎭 | Scoate rolul de la toți |
+| `/massrole give_to <rol> <condiție>` 🎭 | Dă rolul celor care au deja un anumit rol |
+| `/massrole remove_from <rol> <condiție>` 🎭 | Scoate rolul de la cei care au un anumit rol |
+
+Reguli: nu se poate folosi `@everyone`, roluri de integrări, sau roluri mai sus
+decât rolul botului. Rolul botului trebuie să fie deasupra rolurilor gestionate.
+
+### 🔧 Owner (în chat, prefix `!`)
+| Comandă | Ce face |
+|---|---|
+| `!reload <modul>` | Reîncarcă un cog fără restart (ex: `!reload giveaway`) |
 
 ---
 
-## 5. Dashboard
+## 🖥️ Dashboardul web
 
-### Login
-Discord OAuth. Click "Connect with Discord" → authorize → you land on the server
-picker. Only servers where you have access are shown.
+Te loghezi cu Discord și vezi **doar serverele tale** (unde ești admin/owner) în
+care e și botul, cu nume și poze reale. Pentru fiecare server, în meniul din
+stânga ai câte o pagină pentru fiecare modul configurabil: Bun venit, Invitații
+(leaderboard cu nume reale), Embed builder, Giveaway, Notificări, Rank-uri auto,
+Joc numere, Piatra-foarfeca și Roluri în masă.
 
-> The login button and server/module cards are fully clickable across their
-> whole surface (the glowing border overlay does not intercept taps/clicks).
-
-### Pages (routes)
-| Route | Purpose |
-|-------|---------|
-| `/` | Landing / server picker |
-| `/home/<id>` | Server overview (stats, module grid) |
-| `/guild/<id>` | Welcome settings |
-| `/goodbye/<id>` | Goodbye settings |
-| `/culori/<id>` | Name colors on/off |
-| `/conturinoi/<id>` | New-accounts detection + scan |
-| `/leaderboard/<id>` | Invite leaderboard |
-| `/invitelog/<id>` | Invite journal (view-only) |
-| `/contest/<id>` | Invite contest + live board + exclusions |
-| `/embeds/<id>` | Embed builder |
-| `/giveaway/<id>` | Giveaway config / mode switch |
-| `/notifications/<id>` | YouTube/TikTok notifications |
-| `/rankup/<id>` | Auto rank-up roles |
-| `/game/<id>`, `/rps/<id>` | Game settings |
-| `/permissions/<id>` | Who can use the bot's admin commands |
-| `/massrole/<id>` | Bulk role jobs |
-| `/massdm/<id>` | Mass DM jobs |
-| `/tickets/<id>` | Ticket types (create/edit/delete) |
-| `/backups/<id>` | Server backups |
-| `/appearance/<id>` | Dashboard theme customizer |
-| `/test/<id>` | Version & update check |
-| `/servers` | Owner-only bot management |
-
-### Appearance / theme
-`/appearance` lets you customize the dashboard's look (accent colors,
-background, text, glass blur, animations) with live preview and presets. The
-theme is stored and applied globally across all pages.
-
-### Security
-Every guild-scoped page verifies you actually have access to that guild —
-requests for a guild you don't belong to return **403**.
+Login-ul cere OAuth2 configurat (vezi `.env`) și adresa din `DISCORD_REDIRECT_URI`
+adăugată identic în Developer Portal → OAuth2 → Redirects.
 
 ---
 
-## 6. Background Loops (scheduled work)
+## ✉️ Mesaje DM în masă
 
-| Loop | Interval | What it does |
-|------|----------|--------------|
-| Invites contest | 30s | Starts/ends scheduled contests, posts/edits live board |
-| Invites resync | 5 min | Refreshes invite cache (catches missed invites) |
-| Giveaway ticker | 30s | Ends giveaways on time, safety net after restarts |
-| New-accounts scan | 10s | Runs "scan whole server" jobs from the dashboard |
-| Tickets perm-sync | 10s | Re-applies support-role permissions to open tickets |
-| Notifications poller | 5 min | Checks YouTube/TikTok for new content/live |
-| Mass role / Mass DM | ~10–12s | Executes bulk jobs submitted from the dashboard |
-| Admin sync / leave | periodic | Housekeeping |
+Trimite un mesaj privat (DM) membrilor serverului, **eșalonat** ca să reducă riscul de spam.
+Se configurează din dashboard (pagina „Mesaje DM"):
+- scrii mesajul, cu **previzualizare** cum va arăta în DM
+- alegi pauza între mesaje (implicit 60 sec = 1/minut, minim 10 sec) și limita pe zi
+- opțional, doar către un anumit rol
+- vezi progresul live (trimise / sărite / azi) și ai buton Start/Stop
+
+Comenzi: `/dm_masa` (pornește) și `/dm_stop` (oprește). Botul sare automat boții și
+pe cei cu DM închise (nu reîncearcă).
+
+> ⚠️ **Important:** DM-urile în masă nesolicitate sunt considerate spam de Discord și
+> pot duce la ban-ul botului. Eșalonarea reduce riscul, dar nu îl elimină. Folosește doar
+> pentru mesaje relevante membrilor și pe propria răspundere.
+
+## 🎫 Tickete
+
+Sistem de tickete configurabil (în stil Ticket Tool), din dashboard (pagina „Tickete"):
+
+**Panoul** (aspect configurabil): titlu, descriere, culoare, imagine mare (banner),
+thumbnail. Îl postezi cu `/ticket_panel` în canalul dorit.
+
+**Tipuri de tickete** — adaugi câte vrei, fiecare cu:
+- nume pe buton (denumit cum vrei) + emoji + culoare buton
+- rolurile care văd ticketul (echipa de suport, mai multe roluri)
+- categoria în care se creează canalul
+- mesajul afișat la deschidere (cu `{user}`, `{server}`)
+- ce butoane apar (bifezi tu): 🔒 Închide, 📝 Închide cu motiv, 🙋 Claim
+- opțiuni: un singur ticket/persoană, ping la suport la deschidere
+
+**În ticket:** canal privat vizibil doar pentru deschizător + suport; butoanele
+configurate; la închidere se salvează un **transcript HTML** în canalul de loguri,
+apoi canalul se șterge.
+
+Comenzi: `/ticket_panel` (postează panoul), `/add` și `/remove` (membru/rol în ticket).
+
+## 💾 Backup / clonare server
+
+Salvează structura unui server și aplic-o pe altul (din dashboard, pagina „Backup server"):
+
+- Scrie **/backup** pe serverul de salvat → se salvează roluri (cu ordinea corectă),
+  categorii, toate tipurile de canale (text, voce, anunțuri, forum cu tag-uri, stage),
+  permisiunile pe canale, emoji-urile, stickerele și setările serverului (nivel de
+  verificare, notificări, filtru conținut, canal AFK + timeout, canal de sistem,
+  canale community, iconiță/banner/splash).
+- În dashboard vezi lista backup-urilor, cu **preview** (rolurile colorate + arborele
+  de categorii/canale) înainte să aplici.
+- Alegi pe ce server (unde e botul cu Administrator) să aplici structura.
+
+**Aplicarea:** pe un server gol/proaspăt se aplică direct. Pe un server care are deja
+canale/roluri, trebuie să scrii numele exact al serverului pentru a confirma (structura
+existentă e ștearsă și înlocuită — ireversibil).
+
+> Nu se pot copia mesajele, membrii sau istoricul (limită Discord). Botul aplică doar pe
+> servere unde e deja invitat cu permisiunea Administrator.
+
+## 🔑 Cine poate folosi botul (permisiuni)
+
+În dashboard, pagina **„Permisiuni"** (sus în meniu), per server, alegi ce roluri pot
+folosi comenzile de management (welcome, giveaway, roluri în masă, concurs, embed, etc.).
+Poți bifa **mai multe roluri** deodată.
+
+- **Administratorii** și **proprietarul** serverului au mereu acces, chiar dacă nu bifezi nimic.
+- Oricine are **unul** dintre rolurile bifate poate folosi comenzile.
+- Cine nu are acces primește un mesaj scurt când încearcă o comandă de management.
+- Comenzile publice (ex: `/avatar`, `/alege`, `/rps`, `/leaderboard`) rămân pentru toți.
+
+## ➕ Cum adaugi un modul nou
+
+Pui un fișier în `cogs/` (ex: `cogs/moderare.py`):
+
+```python
+from discord.ext import commands
+from discord import app_commands
+import discord
+
+class Moderare(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+
+    @app_commands.command(name="kick", description="...")
+    async def kick(self, interaction: discord.Interaction):
+        ...
+
+async def setup(bot):
+    await bot.add_cog(Moderare(bot))
+```
+
+`main.py` îl încarcă automat. Comenzile noi se sincronizează singure la pornire.
 
 ---
 
-## 7. Known Limitations (honest notes)
+## ⚠️ Probleme frecvente
 
-- **Invite attribution is not 100%.** "Unknown"/"vanity" appears when Discord
-  doesn't expose which invite was used (bot offline at join time, deleted
-  invite, API lag, or a genuine vanity-link join). Mitigations are in place, but
-  no bot can guarantee 100%.
-- **TikTok is best-effort.** It has no public API; the multi-method fallback
-  makes it much more stable, but it can still break if TikTok changes their
-  site or blocks automated access. YouTube is solid.
-- **HWID / IP alt-detection is impossible.** A Discord bot cannot see a user's
-  hardware ID or IP — only Discord itself has that data. Alt detection can only
-  be approximated via indirect signals (new accounts, burst joins, etc.).
-- **Notifications are not instant** — up to the poll interval (5 min) of delay.
-- **Color visibility on names** depends on role position: a member's name shows
-  the color of their **highest colored role**. If they have a higher colored
-  role, the name-color role won't show.
+- **Comenzile nu apar pe un server:** la invitare, botul trebuie să aibă scope-ul `applications.commands` (din OAuth2 → URL Generator). Botul sincronizează automat la intrare și la pornire.
+- **Rank-uri/roluri nu se aplică:** botul are nevoie de **Manage Roles** și **Manage Nicknames**, iar rolul lui trebuie să fie **mai sus** decât rolurile/membrii gestionați. Pe owner nu se poate schimba nickname-ul (limitare Discord).
+- **Eroare SSL la pornire** (rețele cu proxy + Python 3.13+): codul are deja un fix care relaxează doar verificarea strictă. Alternativ, Python 3.12.
+- **Bannerul nu apare:** majoritatea userilor nu au banner (e feature de Nitro). E normal.
+- **Datele** stau în `data/store.json`. La scară mare se înlocuiește doar `utils/storage.py` cu o bază de date.
+- **`.env` nu se urcă niciodată pe GitHub.** Dacă tokenul se expune, resetează-l.
 
 ---
 
-## 8. Common Operations Cheat-Sheet
+## 🏠 Hosting
 
-- **Deploy new code:** `git push` to `main` → auto-deploy runs → service
-  restarts. (Then Discord may take a few minutes to re-sync slash commands.)
-- **Restart the bot:** `sudo systemctl restart sir-penguin`
-- **Edit secrets:** `nano /home/ubuntu/Sir-Penguin/.env` → save (Ctrl+O, Enter,
-  Ctrl+X) → restart the service.
-- **Rotate a leaked token/secret:** reset it in the Discord Developer Portal,
-  update `.env`, restart. (Always rotate anything that gets pasted somewhere.)
-- **Log in when the button seems dead:** open `http://<server-ip>:5000/login`
-  directly in the address bar.
+Botul trebuie să ruleze non-stop. Recomandat: **VPS** sau **Oracle Cloud Free Tier**
+(rulează 24/7, gratuit), cu botul pornit ca serviciu `systemd` (pornire automată +
+repornire la crash). Planurile gratuite de tip „web service" pot adormi serviciul,
+ceea ce face botul să apară offline — bune doar pentru testat.
 
----
-
-*This document reflects the current state of the project: 18 modules, 49 slash
-commands, 26 dashboard routes.*
+Pe orice host: codul vine din GitHub (`git clone` / `git pull`), iar `.env` se pune
+manual pe server. Cu auto-deploy (GitHub Actions), un `git push` actualizează
+serverul singur și repornește botul.

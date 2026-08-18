@@ -584,6 +584,47 @@ def newacc_settings(guild_id):
                            section="newacc", saved=request.args.get("saved"))
 
 
+@app.route("/cleanup/<guild_id>", methods=["GET", "POST"])
+@guild_required
+def cleanup(guild_id):
+    gid = int(guild_id)
+    if request.method == "POST":
+        action = request.form.get("action")
+        if action == "start":
+            uid = _to_int(request.form.get("user_id", ""))
+            scope = request.form.get("scope", "server")  # "server" sau "channel"
+            job = {"status": "pending", "user_id": uid, "deleted": 0}
+            if scope == "channel":
+                job["channel_id"] = _to_int(request.form.get("channel_id", ""))
+            storage.set(gid, "cleanup_job", job)
+        elif action == "auto_add":
+            uid = _to_int(request.form.get("user_id", ""))
+            if uid:
+                rules = storage.get(gid, "autodelete", {}) or {}
+                if request.form.get("scope", "server") == "channel":
+                    rules[str(uid)] = {"scope": "channel",
+                                       "channel_id": _to_int(request.form.get("channel_id", ""))}
+                else:
+                    rules[str(uid)] = {"scope": "server"}
+                storage.set(gid, "autodelete", rules)
+        elif action == "auto_remove":
+            uid = request.form.get("user_id", "")
+            rules = storage.get(gid, "autodelete", {}) or {}
+            rules.pop(str(uid), None)
+            storage.set(gid, "autodelete", rules)
+        return redirect(url_for("cleanup", guild_id=guild_id))
+
+    channels = storage.get(gid, "channels", {}) or {}
+    ch_list = channels.get("texts", [])
+    ch_names = {str(c["id"]): c["name"] for c in ch_list}
+    return render_template("cleanup.html", guild_id=guild_id,
+                           channels=ch_list, ch_names=ch_names,
+                           job=storage.get(gid, "cleanup_job", None),
+                           autodelete=storage.get(gid, "autodelete", {}) or {},
+                           meta=storage.get(gid, "meta", {}),
+                           section="cleanup")
+
+
 import time as _time
 
 
