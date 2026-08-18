@@ -32,14 +32,17 @@ async def _purge_channel(channel: discord.TextChannel, user_id: int,
     old = []     # mesaje mai vechi (individual)
     try:
         async for m in channel.history(limit=None):
-            if m.author.id != user_id:
-                continue
-            if (now - m.created_at).days < CUTOFF_DAYS:
-                recent.append(m)
-            else:
-                old.append(m)
-    except (discord.Forbidden, discord.HTTPException):
-        return 0
+            try:
+                if m.author.id != user_id:
+                    continue
+                if (now - m.created_at).days < CUTOFF_DAYS:
+                    recent.append(m)
+                else:
+                    old.append(m)
+            except Exception:
+                continue  # un mesaj ciudat nu opreste parcurgerea
+    except Exception:
+        return deleted  # nu putem citi istoricul (permisiuni etc.) -> sarim peste canal
 
     # bulk delete pentru cele recente (in transe de 100)
     for i in range(0, len(recent), 100):
@@ -47,17 +50,20 @@ async def _purge_channel(channel: discord.TextChannel, user_id: int,
         try:
             await channel.delete_messages(batch)
             deleted += len(batch)
-        except (discord.Forbidden, discord.HTTPException):
-            # daca bulk esueaza, incercam individual
+        except Exception:
+            # daca bulk esueaza, incercam individual — si sarim peste ce nu merge
             for msg in batch:
                 try:
                     await msg.delete()
                     deleted += 1
                     await asyncio.sleep(0.7)
-                except discord.HTTPException:
-                    pass
+                except Exception:
+                    continue  # nu putem sterge mesajul asta -> trecem la urmatorul
         if progress:
-            await progress(deleted)
+            try:
+                await progress(deleted)
+            except Exception:
+                pass
 
     # individual pentru cele vechi (mai lent, cu pauza ca sa nu fim rate-limited)
     for msg in old:
@@ -65,10 +71,13 @@ async def _purge_channel(channel: discord.TextChannel, user_id: int,
             await msg.delete()
             deleted += 1
             await asyncio.sleep(0.8)
-        except discord.HTTPException:
-            pass
+        except Exception:
+            continue  # sarim peste mesajul care nu poate fi sters
         if progress and deleted % 10 == 0:
-            await progress(deleted)
+            try:
+                await progress(deleted)
+            except Exception:
+                pass
 
     return deleted
 
@@ -133,38 +142,55 @@ class Cleanup(commands.Cog):
     @tasks.loop(seconds=10)
     async def job_loop(self):
         for guild in list(self.bot.guilds):
-            job = storage.get(guild.id, "cleanup_job", None)
-            if not job or job.get("status") != "pending":
-                continue
-            job["status"] = "running"
-            job["deleted"] = 0
-            storage.set(guild.id, "cleanup_job", job)
-
-            uid = int(job.get("user_id", 0))
-            if not uid:
-                job.update(status="error", result="Lipseste ID-ul membrului.")
+            try:
+                job = storage.get(guild.id, "cleanup_job", None)
+                if not job or job.get("status") != "pending":
+                    continue
+                job["status"] = "running"
+                job["deleted"] = 0
                 storage.set(guild.id, "cleanup_job", job)
+
+                uid = int(job.get("user_id", 0))
+                if not uid:
+                    job.update(status="error", result="Lipseste ID-ul membrului.")
+                    storage.set(guild.id, "cleanup_job", job)
+                    continue
+
+                async def progress(n, gid=guild.id):
+                    try:
+                        j = storage.get(gid, "cleanup_job", {}) or {}
+                        j["deleted"] = n
+                        storage.set(gid, "cleanup_job", j)
+                    except Exception:
+                        pass
+
+                total = 0
+                if job.get("channel_id"):  # un singur canal
+                    ch = guild.get_channel(int(job["channel_id"]))
+                    if ch and ch.permissions_for(guild.me).manage_messages:
+                        total = await _purge_channel(ch, uid, progress)
+                else:  # tot serverul — un canal problematic nu opreste restul
+                    for ch in guild.text_channels:
+                        try:
+                            if ch.permissions_for(guild.me).manage_messages:
+                                total += await _purge_channel(ch, uid, progress)
+                        except Exception:
+                            continue  # sarim peste canalul cu probleme
+
+                job = storage.get(guild.id, "cleanup_job", {}) or {}
+                job.update(status="done", deleted=total,
+                           result=f"Am sters {total} mesaje.")
+                storage.set(guild.id, "cleanup_job", job)
+            except Exception:
+                # orice eroare neasteptata: marcam jobul si mergem mai departe,
+                # bucla NU se opreste (botul nu crapa)
+                try:
+                    j = storage.get(guild.id, "cleanup_job", {}) or {}
+                    j.update(status="error", result="A aparut o eroare, dar botul merge mai departe.")
+                    storage.set(guild.id, "cleanup_job", j)
+                except Exception:
+                    pass
                 continue
-
-            async def progress(n, gid=guild.id):
-                j = storage.get(gid, "cleanup_job", {}) or {}
-                j["deleted"] = n
-                storage.set(gid, "cleanup_job", j)
-
-            total = 0
-            if job.get("channel_id"):  # un singur canal
-                ch = guild.get_channel(int(job["channel_id"]))
-                if ch and ch.permissions_for(guild.me).manage_messages:
-                    total = await _purge_channel(ch, uid, progress)
-            else:  # tot serverul
-                for ch in guild.text_channels:
-                    if ch.permissions_for(guild.me).manage_messages:
-                        total += await _purge_channel(ch, uid, progress)
-
-            job = storage.get(guild.id, "cleanup_job", {}) or {}
-            job.update(status="done", deleted=total,
-                       result=f"Am sters {total} mesaje.")
-            storage.set(guild.id, "cleanup_job", job)
 
     @job_loop.before_loop
     async def _before_job(self):
@@ -175,19 +201,19 @@ class Cleanup(commands.Cog):
     #   { "<user_id>": {"scope": "server"}  sau  {"scope": "channel", "channel_id": <id>} }
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
-        if not message.guild or message.author.id == self.bot.user.id:
-            return
-        rules = storage.get(message.guild.id, "autodelete", {}) or {}
-        rule = rules.get(str(message.author.id))
-        if not rule:
-            return
-        # daca e setat pe un canal anume, stergem doar acolo
-        if rule.get("scope") == "channel" and str(rule.get("channel_id")) != str(message.channel.id):
-            return
         try:
+            if not message.guild or message.author.id == self.bot.user.id:
+                return
+            rules = storage.get(message.guild.id, "autodelete", {}) or {}
+            rule = rules.get(str(message.author.id))
+            if not rule:
+                return
+            # daca e setat pe un canal anume, stergem doar acolo
+            if rule.get("scope") == "channel" and str(rule.get("channel_id")) != str(message.channel.id):
+                return
             await message.delete()
-        except (discord.Forbidden, discord.HTTPException):
-            pass
+        except Exception:
+            pass  # orice eroare (fara permisiune, mesaj deja sters, etc.) -> ignoram, botul merge
 
     @app_commands.command(
         name="autodelete",
