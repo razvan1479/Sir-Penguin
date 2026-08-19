@@ -543,7 +543,9 @@ def rps(guild_id):
 @guild_required
 def colors_settings(guild_id):
     if request.method == "POST":
-        cfg = {"enabled": request.form.get("enabled") == "on"}
+        cfg = storage.get(int(guild_id), "colors", {}) or {}
+        cfg["enabled"] = request.form.get("enabled") == "on"
+        cfg["everyone"] = request.form.get("everyone") == "on"
         storage.set(int(guild_id), "colors", cfg)
         return redirect(url_for("colors_settings", guild_id=guild_id, saved=1))
 

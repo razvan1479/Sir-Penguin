@@ -14,12 +14,24 @@ from discord import app_commands
 from discord.ext import commands
 
 from utils import storage
-from utils.perms import bot_access
+from utils.perms import bot_access, has_bot_access
 
 
 def _enabled(gid) -> bool:
     # pornit implicit; se poate dezactiva din dashboard
     return (storage.get(gid, "colors", {}) or {}).get("enabled", True)
+
+
+def _everyone(gid) -> bool:
+    # daca True, ORICINE poate folosi culorile (chiar daca nu are acces la bot);
+    # daca False, doar persoanele selectate (ca restul botului). Implicit True.
+    return (storage.get(gid, "colors", {}) or {}).get("everyone", True)
+
+
+def _can_use_colors(interaction) -> bool:
+    if _everyone(interaction.guild_id):
+        return True
+    return has_bot_access(interaction)
 
 # prefix pentru rolurile de culoare create de bot (ca sa le recunoastem)
 ROLE_PREFIX = "🎨 "
@@ -54,6 +66,9 @@ async def _assign_color(interaction: discord.Interaction, name: str, color_val: 
     if not _enabled(interaction.guild_id):
         return await interaction.response.send_message(
             "Funcția de culori e dezactivată momentan.", ephemeral=True)
+    if not _can_use_colors(interaction):
+        return await interaction.response.send_message(
+            "Nu ai voie să folosești culorile pe acest server.", ephemeral=True)
     guild = interaction.guild
     member = interaction.user
     role_name = f"{ROLE_PREFIX}{name}"
@@ -135,6 +150,9 @@ class RemoveColorButton(discord.ui.Button):
         if not _enabled(interaction.guild_id):
             return await interaction.response.send_message(
                 "Funcția de culori e dezactivată momentan.", ephemeral=True)
+        if not _can_use_colors(interaction):
+            return await interaction.response.send_message(
+                "Nu ai voie să folosești culorile pe acest server.", ephemeral=True)
         member = interaction.user
         mine = [r for r in member.roles if r.name.startswith(ROLE_PREFIX)]
         if not mine:

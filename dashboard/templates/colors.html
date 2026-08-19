@@ -33,6 +33,11 @@
         <span>Activează culorile la nume</span>
       </label>
 
+      <label class="toggle">
+        <input type="checkbox" name="everyone" {% if cfg.get('everyone', True) %}checked{% endif %}>
+        <span>Toată lumea poate folosi culorile<br><small style="color:var(--muted); font-weight:400">Dacă e debifat, doar persoanele cu acces la bot pot folosi panoul de culori (ca restul comenzilor).</small></span>
+      </label>
+
       <div class="swatches">
         <div class="sw" style="background:#E74C3C"></div>
         <div class="sw" style="background:#FF7043"></div>
