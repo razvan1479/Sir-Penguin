@@ -76,9 +76,13 @@ class Welcome(commands.Cog):
                 from cogs.invites import invite_total
                 members = storage.get(member.guild.id, "invites", {}).get("members", {})
                 total = invite_total(members.get(str(inviter_info["inviter_id"]), {}))
+                # aratam si numele ca text, ca sa se vada cine e chiar daca
+                # mentiunea nu se rezolva (invitatorul a plecat de pe server)
+                iname = inviter_info.get("inviter_name")
+                who = f"<@{inviter_info['inviter_id']}>" + (f" ({iname})" if iname else "")
                 embed.add_field(
                     name="📨 Invitat de",
-                    value=f"<@{inviter_info['inviter_id']}> (acum are **{total}** invitatii)",
+                    value=f"{who} (acum are **{total}** invitatii)",
                     inline=False)
             elif t == "vanity":
                 embed.add_field(name="🔗 A intrat prin",
