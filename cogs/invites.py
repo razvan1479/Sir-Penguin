@@ -165,8 +165,13 @@ class Invites(commands.Cog):
                 self.invite_cache[guild.id] = {inv.code: inv.uses or 0 for inv in after_list}
 
                 if used and used.inviter:
-                    info = {"type": "personal", "inviter_id": used.inviter.id,
-                            "inviter_name": str(used.inviter), "code": used.code}
+                    # cineva NU poate fi creditat ca s-a invitat pe el insusi
+                    if used.inviter.id == member.id:
+                        info = {"type": "unknown", "inviter_id": None,
+                                "inviter_name": None, "code": used.code}
+                    else:
+                        info = {"type": "personal", "inviter_id": used.inviter.id,
+                                "inviter_name": str(used.inviter), "code": used.code}
                 elif "VANITY_URL" in guild.features:
                     try:
                         v = await guild.vanity_invite()
@@ -195,6 +200,11 @@ class Invites(commands.Cog):
         credited = data.get("credited", {})  # member_id -> inviterul care a primit creditul prima data
         rejoin = False
 
+        if info["type"] == "personal" and info["inviter_id"]:
+            # dubla siguranta: nimeni nu se poate invita pe el insusi
+            if str(info["inviter_id"]) == str(member.id):
+                info = {"type": "unknown", "inviter_id": None,
+                        "inviter_name": None, "code": info.get("code")}
         if info["type"] == "personal" and info["inviter_id"]:
             inviter_key = str(info["inviter_id"])
             if str(member.id) in credited:
