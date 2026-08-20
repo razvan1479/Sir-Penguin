@@ -441,6 +441,57 @@ class Invites(commands.Cog):
         await interaction.response.send_message(embed=embed)
 
     # ------------------------------------------------------------- comenzi admin
+    @app_commands.command(name="recalcinvite",
+                          description="Recalculeaza invitatiile pe baza cine chiar e pe server (diagnostic)")
+    @bot_access()
+    async def recalcinvite(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        guild = interaction.guild
+        # diagnostic: putem vedea lista de membri?
+        chunked_before = guild.chunked
+        if not guild.chunked:
+            try:
+                await guild.chunk()
+            except Exception:
+                return await interaction.followup.send(
+                    "⚠️ Nu pot obtine lista completa de membri de la Discord, deci nu pot "
+                    "recalcula sigur. Verifica: **Server Members Intent** e pornit in "
+                    "Discord Developer Portal → Bot → Privileged Gateway Intents.",
+                    ephemeral=True)
+        member_count = len(guild.members)
+
+        data = storage.get(guild.id, "invites", {}) or {}
+        members_before = {k: invite_total(v) for k, v in data.get("members", {}).items()}
+
+        await self._reconcile_leaves(guild, 0)
+
+        data = storage.get(guild.id, "invites", {}) or {}
+        members_after = {k: invite_total(v) for k, v in data.get("members", {}).items()}
+
+        # ce s-a schimbat
+        changes = []
+        for uid, after in sorted(members_after.items(), key=lambda x: -x[1]):
+            before = members_before.get(uid, 0)
+            if before != after:
+                nm = self._inviter_name(guild.id, uid) or uid
+                changes.append(f"• {nm}: {before} → {after}")
+
+        msg = [f"🔎 **Diagnostic recalculare**",
+               f"Lista de membri: {'✅ completa' if guild.chunked else '⚠️ incompleta'} "
+               f"({member_count} membri vazuti)"]
+        if not chunked_before and guild.chunked:
+            msg.append("_(a trebuit sa cer lista de la Discord acum)_")
+        if changes:
+            msg.append("\n**Corectii facute:**")
+            msg.extend(changes[:15])
+            if len(changes) > 15:
+                msg.append(f"…si inca {len(changes)-15}")
+        else:
+            msg.append("\nℹ️ Nicio corectie — totalurile erau deja corecte fata de cine e "
+                       "pe server acum. Daca tot vezi un numar gresit, inseamna ca persoanele "
+                       "respective **inca sunt pe server** (nu au plecat, sau au revenit).")
+        await interaction.followup.send("\n".join(msg), ephemeral=True)
+
     @app_commands.command(name="addinvites", description="Adauga invitatii bonus unui membru")
     @bot_access()
     async def addinvites(self, interaction: discord.Interaction, membru: discord.Member, numar: int):
