@@ -942,7 +942,7 @@ def invitelog(guild_id):
             "code": h.get("code"),
             "ts": h.get("ts"),
             "fake": h.get("fake", False),
-            "left": str(mid) not in joined_by,
+            "left": h.get("left", False),
         })
     return render_template("invitelog.html", guild_id=guild_id, rows=rows,
                            total=len(history), meta=meta,

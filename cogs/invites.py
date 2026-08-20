@@ -359,9 +359,11 @@ class Invites(commands.Cog):
         return self._count_since(guild_id, cutoff)
 
     def _count_since(self, guild_id, since_ts) -> dict:
-        """Numara invitatiile reale (non-false, ramase) de la un moment incoace."""
+        """Numara invitatiile reale (non-false, ramase) de la un moment incoace.
+        Numara fiecare membru O SINGURA DATA (reintrarile nu umfla contorul)."""
         history = storage.get(guild_id, "invites", {}).get("history", [])
         counts = {}
+        counted = set()  # membri deja numarati (anti-dublare la reintrari)
         for e in history:
             if e.get("ts", 0) < since_ts:
                 continue
@@ -370,6 +372,10 @@ class Invites(commands.Cog):
             inv = e.get("inviter")
             if not inv or inv in ("vanity", "unknown"):
                 continue
+            mid = e.get("member")
+            if mid in counted:
+                continue  # aceeasi persoana a reintrat -> nu o numaram de doua ori
+            counted.add(mid)
             counts[inv] = counts.get(inv, 0) + 1
         return counts
 
@@ -566,35 +572,56 @@ class Invites(commands.Cog):
 
     # ------- bucla care porneste/incheie concursurile programate -------
     async def _reconcile_leaves(self, guild, since_ts):
-        """Prinde plecarile ratate cat botul era offline: pentru intrarile din concurs
-        care nu-s deja marcate 'left', daca membrul nu mai e pe server, le marcheaza.
-        Sigur doar cand avem lista completa de membri (guild.chunked)."""
+        """Reconciliaza numaratoarea cu REALITATEA de pe server (autoritativ).
+        Nu se bazeaza pe prinderea fiecarui eveniment de plecare — verifica direct
+        cine mai e pe server si corecteaza: marcheaza 'left' in istoric si RECALCULEAZA
+        cati au plecat pentru fiecare invitator. Sigur doar cand avem lista completa
+        de membri (guild.chunked)."""
         if not guild.chunked:
             try:
                 await guild.chunk()
             except Exception:
-                return  # nu putem confirma cine e pe server -> nu riscam sa marcam gresit
+                return  # nu putem confirma cine e pe server -> nu riscam sa stricam datele
         data = storage.get(guild.id, "invites", {}) or {}
         history = data.get("history", [])
+        members = data.get("members", {})
+        credited = data.get("credited", {})
+
+        def _present(mid):
+            try:
+                return guild.get_member(int(mid)) is not None
+            except (ValueError, TypeError):
+                return False
+
         changed = False
-        seen_left = set()
+        # 1) sincronizam flag-ul 'left' din istoric cu realitatea (in ambele sensuri)
         for e in history:
-            if e.get("ts", 0) < since_ts or e.get("left") or e.get("fake"):
-                continue
             mid = e.get("member")
             if not mid:
                 continue
-            if guild.get_member(int(mid)) is None:  # nu mai e pe server
-                e["left"] = True
+            should_be_left = not _present(mid)
+            if bool(e.get("left")) != should_be_left:
+                e["left"] = should_be_left
                 changed = True
-                # actualizam si statistica globala a invitatorului (o singura data per membru)
-                inv = e.get("inviter")
-                if inv and inv not in ("vanity", "unknown") and mid not in seen_left:
-                    stats = data.get("members", {}).get(inv)
-                    if stats is not None:
-                        stats["left"] = stats.get("left", 0) + 1
-                    seen_left.add(mid)
+
+        # 2) recalculam 'left' pentru fiecare invitator din realitate (autoritativ,
+        #    fara dublari): left = cati membri creditati lui nu mai sunt pe server
+        #    (fara conturile false, care sunt deja anulate separat prin 'fake')
+        fake_members = {str(h.get("member")) for h in history if h.get("fake")}
+        left_by_inviter = {}
+        for m, inv in credited.items():
+            if inv in ("vanity", "unknown") or str(m) in fake_members:
+                continue
+            if not _present(m):
+                left_by_inviter[inv] = left_by_inviter.get(inv, 0) + 1
+        for inv, st in members.items():
+            new_left = left_by_inviter.get(inv, 0)
+            if st.get("left", 0) != new_left:
+                st["left"] = new_left
+                changed = True
+
         if changed:
+            data["members"] = members
             storage.set(guild.id, "invites", data)
 
     @tasks.loop(seconds=30)
