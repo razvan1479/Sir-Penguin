@@ -441,6 +441,60 @@ class Invites(commands.Cog):
         await interaction.response.send_message(embed=embed)
 
     # ------------------------------------------------------------- comenzi admin
+    @app_commands.command(name="inviteaudit",
+                          description="Detaliu: pe cine crede botul ca a adus cineva, cu statusul fiecaruia")
+    @bot_access()
+    async def inviteaudit(self, interaction: discord.Interaction, membru: discord.Member):
+        await interaction.response.defer(ephemeral=True)
+        guild = interaction.guild
+        if not guild.chunked:
+            try:
+                await guild.chunk()
+            except Exception:
+                pass
+        data = storage.get(guild.id, "invites", {}) or {}
+        history = data.get("history", [])
+        tid = str(membru.id)
+        # toate intrarile din istoric atribuite acestui invitator
+        seen = {}
+        for h in history:
+            if str(h.get("inviter")) != tid:
+                continue
+            mid = str(h.get("member") or "")
+            if not mid:
+                continue
+            seen[mid] = h  # pastram cea mai recenta intrare per membru
+        if not seen:
+            return await interaction.followup.send(
+                f"Botul nu are in istoric pe nimeni adus de {membru.mention}. "
+                f"Poate au intrat cand botul era offline, sau au fost atribuiti la "
+                f"„necunoscut”/altcineva.", ephemeral=True)
+        lines = []
+        present_cnt = left_cnt = fake_cnt = 0
+        for mid, h in list(seen.items())[:20]:
+            on_server = guild.get_member(int(mid)) is not None
+            name = h.get("member_name") or f"ID {mid}"
+            if h.get("fake"):
+                fake_cnt += 1
+                tag = "🆕 cont nou"
+            elif on_server:
+                present_cnt += 1
+                tag = "✅ pe server"
+            else:
+                left_cnt += 1
+                tag = "❌ a plecat"
+            lines.append(f"{tag} — {name}")
+        stats = data.get("members", {}).get(tid, {})
+        msg = [f"🔎 **Audit invitatii — {membru.display_name}**",
+               f"In istoric: {len(seen)} membri distincti",
+               f"✅ pe server: {present_cnt}  ❌ plecati: {left_cnt}  🆕 conturi noi: {fake_cnt}",
+               f"Total afisat de bot acum: **{invite_total(stats)}**",
+               ""]
+        msg.extend(lines)
+        if len(seen) > 20:
+            msg.append(f"…si inca {len(seen)-20}")
+        await interaction.followup.send("\n".join(msg), ephemeral=True)
+
     @app_commands.command(name="recalcinvite",
                           description="Recalculeaza invitatiile pe baza cine chiar e pe server (diagnostic)")
     @bot_access()
