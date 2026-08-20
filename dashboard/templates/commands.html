@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Comenzi · {{ meta.get('name','Server') }}{% endblock %}
+{% block extra_style %}
+  .head { margin-bottom:18px; }
+  .head h2 { margin:0 0 4px; font-size:24px; }
+  .head p { color:var(--muted); margin:0; }
+  .search { width:100%; padding:13px 16px; border-radius:12px; border:1px solid var(--glass-border); background:var(--card); color:var(--text); font-size:15px; box-sizing:border-box; margin-bottom:22px; }
+  .grp { margin-bottom:26px; }
+  .grp h3 { font-size:16px; margin:0 0 12px; padding-bottom:8px; border-bottom:1px solid var(--glass-border); }
+  .cmd { display:flex; align-items:baseline; gap:14px; padding:10px 14px; border-radius:10px; background:var(--card); border:1px solid var(--glass-border); margin-bottom:7px; }
+  .cmd code { color:var(--accent); font-weight:700; font-size:14px; white-space:nowrap; font-family:ui-monospace,monospace; }
+  .cmd span { color:var(--muted); font-size:13.5px; }
+  .none { display:none; text-align:center; color:var(--muted); padding:30px; }
+{% endblock %}
+{% block content %}
+  <div class="head">
+    <h2>📖 Toate comenzile</h2>
+    <p>{{ total }} comenzi. Scrie-le în Discord cu <b>/</b>. Cele marcate „(admin)” cer acces la bot.</p>
+  </div>
+
+  <input class="search" id="q" type="text" placeholder="🔍 Caută o comandă (ex: invitații, culori, ban)..." oninput="filt()">
+
+  <div id="list">
+    {% for title, cmds in groups %}
+    <div class="grp" data-grp>
+      <h3>{{ title }}</h3>
+      {% for name, desc in cmds %}
+      <div class="cmd" data-txt="{{ (name ~ ' ' ~ desc)|lower }}">
+        <code>{{ name }}</code><span>{{ desc }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+  <div class="none" id="none">Nicio comandă găsită. Încearcă alt cuvânt.</div>
+
+  <script>
+    function filt() {
+      const q = document.getElementById('q').value.toLowerCase().trim();
+      let any = false;
+      document.querySelectorAll('[data-grp]').forEach(g => {
+        let vis = 0;
+        g.querySelectorAll('.cmd').forEach(c => {
+          const show = !q || c.dataset.txt.includes(q);
+          c.style.display = show ? '' : 'none';
+          if (show) vis++;
+        });
+        g.style.display = vis ? '' : 'none';
+        if (vis) any = true;
+      });
+      document.getElementById('none').style.display = any ? 'none' : 'block';
+    }
+  </script>
+{% endblock %}

@@ -1020,6 +1020,103 @@ def inject_theme():
     return {"theme": theme}
 
 
+@app.route("/comenzi/<guild_id>")
+@guild_required
+def commands_list(guild_id):
+    gid = int(guild_id)
+    # lista comenzilor, grupate pe categorii (descrieri scurte, prietenoase)
+    groups = [
+        ("👋 Bun venit & plecări", [
+            ("/welcome channel", "Setează canalul de bun venit"),
+            ("/welcome test", "Trimite un mesaj de test de bun venit"),
+        ]),
+        ("📨 Invitații & concurs", [
+            ("/invites", "Vezi câte invitații ai (tu sau alt membru)"),
+            ("/inviter", "Cine a invitat un membru"),
+            ("/invitedlist", "Lista celor invitați de cineva"),
+            ("/invitecodes", "Codurile de invitație ale cuiva"),
+            ("/findlink", "Unul dintre linkurile tale de invitație"),
+            ("/leaderboard", "Clasamentul invitatorilor"),
+            ("/concurs start", "Pornește un concurs de invitații"),
+            ("/concurs stop", "Oprește concursul și anunță câștigătorul"),
+            ("/concurs status", "Vezi starea concursului"),
+            ("/concurs clasament", "Clasamentul concursului curent"),
+            ("/addinvites", "Adaugă invitații bonus unui membru (admin)"),
+            ("/removeinvites", "Scade invitații bonus unui membru (admin)"),
+            ("/resetinvites", "Resetează invitațiile (admin)"),
+            ("/recalcinvite", "Recalculează invitațiile după cine e pe server (admin)"),
+            ("/inviteaudit", "Detaliu pe cine a adus cineva, cu status (admin)"),
+        ]),
+        ("🎨 Culori", [
+            ("/culori panou", "Postează panoul cu butoane de culoare (admin)"),
+        ]),
+        ("🎫 Tickete", [
+            ("/ticket_panel", "Postează panoul de tickete în canal (admin)"),
+            ("/add", "Adaugă un membru/rol în ticketul curent"),
+            ("/remove", "Scoate un membru/rol din ticketul curent"),
+        ]),
+        ("🎁 Giveaway", [
+            ("/giveaway", "Deschide formularul și pornește un giveaway"),
+            ("/giveaway_start", "Postează un giveaway configurat în dashboard"),
+            ("/giveaway_end", "Încheie acum un giveaway"),
+            ("/giveaway_reroll", "Alege alt câștigător"),
+        ]),
+        ("🔔 Notificări", [
+            ("/notify list", "Creatorii urmăriți (YouTube/TikTok)"),
+            ("/notify test", "Trimite o notificare de test"),
+        ]),
+        ("🆕 Conturi noi", [
+            ("/conturinoi lista", "Membrii cu cont creat sub pragul setat (admin)"),
+            ("/conturinoi verifica", "Verifică vechimea contului unui membru (admin)"),
+        ]),
+        ("🧹 Curățare mesaje", [
+            ("/clean", "Șterge mesajele unui membru de pe un canal (admin)"),
+            ("/clean_all", "Șterge mesajele unui membru de pe tot serverul (admin)"),
+            ("/autodelete", "Șterge automat tot ce scrie cineva (admin)"),
+        ]),
+        ("🎭 Roluri în masă", [
+            ("/massrole give_all", "Dă un rol tuturor membrilor (admin)"),
+            ("/massrole give_to", "Dă un rol celor care au deja un rol (admin)"),
+            ("/massrole remove_all", "Scoate un rol de la toți (admin)"),
+            ("/massrole remove_from", "Scoate un rol de la cei cu un rol (admin)"),
+        ]),
+        ("🏆 Ranguri", [
+            ("/rankup run", "Aplică rangurile pe tot serverul (admin)"),
+            ("/rankup status", "Vezi configurația rangurilor (admin)"),
+        ]),
+        ("💬 Embed-uri & DM", [
+            ("/embed send", "Postează un embed salvat (admin)"),
+            ("/embed preview", "Vezi un embed fără să-l postezi (admin)"),
+            ("/embed list", "Lista embed-urilor salvate (admin)"),
+            ("/embed delete", "Șterge un embed salvat (admin)"),
+            ("/dm_masa", "Pornește o campanie de DM (admin)"),
+            ("/dm_stop", "Oprește campania de DM (admin)"),
+        ]),
+        ("🖼️ Avatar & imagini", [
+            ("/avatar", "Arată avatarul unui user"),
+            ("/banner", "Arată bannerul unui user"),
+            ("/serveravatar", "Arată iconița serverului"),
+            ("/serverbanner", "Arată bannerul serverului"),
+        ]),
+        ("🎮 Distracție", [
+            ("/rps", "Piatră / Foarfece / Hârtie"),
+            ("/randome", "Pregătește o rundă nouă de joc"),
+            ("/alege", "Alege un număr (privat)"),
+        ]),
+        ("💾 Backup", [
+            ("/backup", "Salvează structura serverului ca backup (admin)"),
+        ]),
+        ("👑 Owner bot", [
+            ("/serverlist", "Lista serverelor pe care e botul (owner)"),
+            ("/leaveserver", "Scoate botul de pe un server (owner)"),
+        ]),
+    ]
+    total = sum(len(cmds) for _, cmds in groups)
+    return render_template("commands.html", guild_id=guild_id, groups=groups,
+                           total=total, meta=storage.get(gid, "meta", {}),
+                           section="comenzi")
+
+
 @app.route("/restart", methods=["POST"])
 def restart_bot():
     if "user" not in session:

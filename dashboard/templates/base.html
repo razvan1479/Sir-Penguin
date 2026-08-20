@@ -91,6 +91,7 @@
   <div class="layout {% if section not in CMD_SECTIONS %}no-help{% endif %}">
     <aside class="sidebar">
       <a class="nav {% if section=='home' %}active{% endif %}" href="/home/{{ guild_id }}"><span class="ic">🏠</span> Acasă</a>
+      <a class="nav {% if section=='comenzi' %}active{% endif %}" href="/comenzi/{{ guild_id }}"><span class="ic">📖</span> Toate comenzile</a>
 
       <p class="side-title">⚙️ General</p>
       <a class="nav {% if section=='permissions' %}active{% endif %}" href="/permissions/{{ guild_id }}"><span class="ic">🔑</span> Permisiuni</a>
