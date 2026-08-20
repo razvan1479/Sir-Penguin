@@ -103,6 +103,12 @@ class Invites(commands.Cog):
                     self.vanity_cache[guild.id] = (v.uses or 0) if v else 0
                 except discord.HTTPException:
                     pass
+            # reconciliem plecarile cu realitatea si pentru jurnal/clasament general
+            # (nu doar in concurs), ca numerele sa fie mereu corecte
+            try:
+                await self._reconcile_leaves(guild, 0)
+            except Exception:
+                pass
 
     @resync_loop.before_loop
     async def _before_resync(self):
@@ -604,18 +610,23 @@ class Invites(commands.Cog):
                 e["left"] = should_be_left
                 changed = True
 
-        # 2) recalculam 'left' pentru fiecare invitator din realitate (autoritativ,
-        #    fara dublari): left = cati membri creditati lui nu mai sunt pe server
-        #    (fara conturile false, care sunt deja anulate separat prin 'fake')
+        # 2) recalculam 'left' pentru fiecare invitator DIN ISTORIC (sursa completa,
+        #    nu din lista 'credited' care poate fi incompleta pentru date vechi).
+        #    Numaram membri DISTINCTI (reintrarile nu dubleaza), fara conturile false
+        #    (care sunt deja anulate separat prin 'fake'). left = cati din ei nu mai sunt.
         fake_members = {str(h.get("member")) for h in history if h.get("fake")}
-        left_by_inviter = {}
-        for m, inv in credited.items():
-            if inv in ("vanity", "unknown") or str(m) in fake_members:
+        invited = {}  # inviter -> set de membri reali (non-fake) pe care i-a adus
+        for h in history:
+            inv = h.get("inviter")
+            m = str(h.get("member") or "")
+            if not inv or inv in ("vanity", "unknown") or not m:
                 continue
-            if not _present(m):
-                left_by_inviter[inv] = left_by_inviter.get(inv, 0) + 1
-        for inv, st in members.items():
-            new_left = left_by_inviter.get(inv, 0)
+            if m in fake_members:
+                continue
+            invited.setdefault(inv, set()).add(m)
+        for inv, member_set in invited.items():
+            new_left = sum(1 for m in member_set if not _present(m))
+            st = members.setdefault(inv, _empty_stats())
             if st.get("left", 0) != new_left:
                 st["left"] = new_left
                 changed = True

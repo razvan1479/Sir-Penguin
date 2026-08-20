@@ -89,6 +89,14 @@
       <a class="btn ghost" href="/test/{{ guild_id }}">↺ Reîmprospătează</a>
     </div>
 
+    <div style="margin-top:24px; padding-top:22px; border-top:1px solid var(--glass-border)">
+      <h3 style="margin:0 0 6px">🔄 Repornește botul</h3>
+      <p class="hint" style="margin:0 0 14px">Repornește botul ca să încarce ultimul cod (util după un push). Durează ~15 secunde. Doar owner-ul botului poate face asta.</p>
+      <form method="POST" action="/restart" onsubmit="return confirm('Repornești botul acum? Va fi indisponibil ~15 secunde.')">
+        <button class="btn" type="submit" style="background:linear-gradient(135deg,#f59e0b,#d97706)">🔄 Repornește botul acum</button>
+      </form>
+    </div>
+
     <div class="hint">
       <b>Cum funcționează:</b><br>
       Versiunea de mai sus e luată direct din Git, de pe server — e exact ultimul commit care rulează acum.<br>

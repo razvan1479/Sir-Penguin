@@ -1020,6 +1020,27 @@ def inject_theme():
     return {"theme": theme}
 
 
+@app.route("/restart", methods=["POST"])
+def restart_bot():
+    if "user" not in session:
+        return redirect(url_for("index"))
+    # DOAR owner-ul botului poate reporni
+    owner_id = storage.get(0, "bot_owner_id", None)
+    if owner_id and str(session["user"]["id"]) != str(owner_id):
+        return "Doar owner-ul botului poate reporni.", 403
+
+    # botul si dashboardul ruleaza in acelasi proces; ne inchidem singuri,
+    # iar systemd (Restart=always) porneste botul la loc in cateva secunde cu codul nou.
+    import threading, time, os
+
+    def _bye():
+        time.sleep(2)  # lasam raspunsul HTTP sa ajunga la utilizator inainte sa iesim
+        os._exit(0)
+
+    threading.Thread(target=_bye, daemon=True).start()
+    return render_template("restart.html", section=None)
+
+
 @app.route("/servers", methods=["GET", "POST"])
 def servers():
     if "user" not in session:

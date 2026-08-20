@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Repornire...{% endblock %}
+{% block extra_style %}
+  .rbox { max-width:520px; margin:60px auto; text-align:center; background:var(--card); border:1px solid var(--glass-border); border-radius:22px; padding:44px 34px; }
+  .rbox h2 { margin:0 0 12px; font-size:24px; }
+  .rbox p { color:var(--muted); line-height:1.7; }
+  .spin { width:52px; height:52px; margin:0 auto 22px; border:4px solid var(--glass-border); border-top-color:var(--accent); border-radius:50%; animation:sp 1s linear infinite; }
+  @keyframes sp { to { transform:rotate(360deg); } }
+  #count { font-weight:800; color:var(--accent); }
+{% endblock %}
+{% block content %}
+  <div class="rbox">
+    <div class="spin"></div>
+    <h2>🔄 Botul repornește...</h2>
+    <p>Se închide și pornește la loc cu ultimul cod. Dashboard-ul revine în <span id="count">15</span> secunde.</p>
+    <p style="font-size:13px; margin-top:16px">Dacă după ce revii tot vezi date vechi, mai reîncarcă pagina o dată.</p>
+  </div>
+  <script>
+    let n = 15;
+    const el = document.getElementById('count');
+    const t = setInterval(() => {
+      n--; if (el) el.textContent = n;
+      if (n <= 0) { clearInterval(t); location.href = '/'; }
+    }, 1000);
+  </script>
+{% endblock %}
