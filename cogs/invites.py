@@ -565,6 +565,38 @@ class Invites(commands.Cog):
             color=discord.Color.gold())
 
     # ------- bucla care porneste/incheie concursurile programate -------
+    async def _reconcile_leaves(self, guild, since_ts):
+        """Prinde plecarile ratate cat botul era offline: pentru intrarile din concurs
+        care nu-s deja marcate 'left', daca membrul nu mai e pe server, le marcheaza.
+        Sigur doar cand avem lista completa de membri (guild.chunked)."""
+        if not guild.chunked:
+            try:
+                await guild.chunk()
+            except Exception:
+                return  # nu putem confirma cine e pe server -> nu riscam sa marcam gresit
+        data = storage.get(guild.id, "invites", {}) or {}
+        history = data.get("history", [])
+        changed = False
+        seen_left = set()
+        for e in history:
+            if e.get("ts", 0) < since_ts or e.get("left") or e.get("fake"):
+                continue
+            mid = e.get("member")
+            if not mid:
+                continue
+            if guild.get_member(int(mid)) is None:  # nu mai e pe server
+                e["left"] = True
+                changed = True
+                # actualizam si statistica globala a invitatorului (o singura data per membru)
+                inv = e.get("inviter")
+                if inv and inv not in ("vanity", "unknown") and mid not in seen_left:
+                    stats = data.get("members", {}).get(inv)
+                    if stats is not None:
+                        stats["left"] = stats.get("left", 0) + 1
+                    seen_left.add(mid)
+        if changed:
+            storage.set(guild.id, "invites", data)
+
     @tasks.loop(seconds=30)
     async def contest_loop(self):
         import time
@@ -572,6 +604,13 @@ class Invites(commands.Cog):
         for guild in self.bot.guilds:
             c = self._contest(guild.id)
             status = c.get("status")
+            # reconciliem plecarile ratate (ex. cand botul era offline la 1 noaptea):
+            # marcam ca "left" oricine nu mai e pe server, ca sa scada corect din concurs
+            if status == "running":
+                try:
+                    await self._reconcile_leaves(guild, c.get("start_ts", 0))
+                except Exception:
+                    pass
             if status == "scheduled" and now >= c.get("start_ts", 0):
                 c["status"] = "running"
                 storage.set(guild.id, "contest", c)
