@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Alege regatul · {{ meta.get('name','Server') }}{% endblock %}
+{% block extra_style %}
+  .panel { padding:26px; margin-bottom:22px; }
+  h3 { margin:0 0 4px; font-size:18px; }
+  .sub { color:var(--muted); font-size:13px; margin:0 0 18px; line-height:1.6; }
+  label { display:block; font-size:13px; color:var(--muted); margin:14px 0 6px; font-weight:600; }
+  input[type=text], textarea, select { width:100%; padding:11px; border-radius:8px; border:1px solid var(--glass-border); background:var(--bg); color:var(--text); font-size:14px; box-sizing:border-box; font-family:inherit; }
+  textarea { min-height:70px; resize:vertical; }
+  .row3 { display:grid; grid-template-columns:1fr 90px 130px; gap:10px; }
+  .row2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .save { margin-top:18px; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; border:none; padding:12px 26px; border-radius:11px; font-weight:700; font-size:14px; cursor:pointer; }
+  .opt { display:flex; align-items:center; gap:12px; background:var(--input); border:1px solid var(--glass-border); border-radius:10px; padding:12px 15px; margin-bottom:8px; }
+  .opt .btn-prev { padding:6px 14px; border-radius:8px; font-weight:700; font-size:13px; color:#fff; white-space:nowrap; }
+  .b-blurple { background:#5865f2; } .b-green { background:#248046; } .b-red { background:#da373c; } .b-grey { background:#4e5058; }
+  .opt .role { color:var(--muted); font-size:13px; flex:1; }
+  .del { background:var(--card); border:1px solid var(--glass-border); color:#fb7185; border-radius:8px; padding:6px 12px; cursor:pointer; font-size:13px; }
+  .saved { background:rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.3); color:#4ade80; border-radius:10px; padding:11px 15px; margin-bottom:16px; font-size:14px; }
+  .hint { background:var(--input); border-radius:8px; padding:11px 14px; font-size:12.5px; color:var(--muted); margin-top:10px; line-height:1.7; }
+{% endblock %}
+{% block content %}
+  {% if saved %}<div class="saved">✅ Salvat!</div>{% endif %}
+
+  <div class="panel">
+    <h3>🏰 Alege regatul</h3>
+    <p class="sub">Un panou cu butoane prin care membrii își aleg un regat (facțiune) și primesc rolul aferent. Un singur regat odată — dacă aleg altul, se schimbă. Dacă apasă regatul pe care-l au, îl părăsesc.</p>
+
+    <form method="POST">
+      <input type="hidden" name="action" value="settings">
+      <label>Titlu (pe panou)</label>
+      <input type="text" name="title" value="{{ cfg.get('title','Alege regatul') }}" placeholder="Alege regatul">
+      <label>Descriere (optional)</label>
+      <textarea name="description" placeholder="Apasă pe un buton ca să-ți alegi regatul.">{{ cfg.get('description','') }}</textarea>
+      <button class="save" type="submit">💾 Salvează textul</button>
+    </form>
+  </div>
+
+  <div class="panel">
+    <h3>Regatele ({{ options|length }}/5)</h3>
+    <p class="sub">Fiecare buton = un regat cu rolul lui. Poți pune între 1 și 5.</p>
+
+    {% if options %}
+      {% for o in options %}
+      <div class="opt">
+        <span class="btn-prev b-{{ o.style }}">{{ o.emoji }} {{ o.label }}</span>
+        <span class="role">→ rol: {{ rname.get(o.role_id|string, o.role_id) }}</span>
+        <form method="POST" style="margin:0">
+          <input type="hidden" name="action" value="del_option">
+          <input type="hidden" name="idx" value="{{ loop.index0 }}">
+          <button class="del" type="submit">✕ Șterge</button>
+        </form>
+      </div>
+      {% endfor %}
+    {% else %}
+      <p class="sub" style="opacity:.7">Niciun regat încă. Adaugă mai jos.</p>
+    {% endif %}
+
+    {% if options|length < 5 %}
+    <form method="POST" style="margin-top:16px; border-top:1px solid var(--glass-border); padding-top:16px">
+      <input type="hidden" name="action" value="add_option">
+      <div class="row3">
+        <div><label>Nume pe buton</label><input type="text" name="label" placeholder="Red" required></div>
+        <div><label>Emoji</label><input type="text" name="emoji" placeholder="🔴"></div>
+        <div><label>Culoare buton</label>
+          <select name="style">
+            <option value="red">Roșu</option>
+            <option value="blurple">Albastru</option>
+            <option value="green">Verde</option>
+            <option value="grey">Gri</option>
+          </select>
+        </div>
+      </div>
+      <label>Rolul primit</label>
+      <select name="role_id" required>
+        <option value="">— alege rolul —</option>
+        {% for r in roles %}<option value="{{ r.id }}">{{ r.name }}</option>{% endfor %}
+      </select>
+      <button class="save" type="submit">➕ Adaugă regat</button>
+    </form>
+    {% endif %}
+
+    <p class="hint">
+      💡 <b>Discord permite doar 4 culori de buton</b> (albastru, verde, roșu, gri) — galbenul nu există ca buton. Pune emoji-ul 🟡 ca să se vadă culoarea galbenă.<br>
+      După ce ai adăugat regatele, scrie <b>/kingdom_panel</b> în canalul unde vrei panoul.
+    </p>
+  </div>
+{% endblock %}

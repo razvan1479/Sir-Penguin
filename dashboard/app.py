@@ -1020,6 +1020,45 @@ def inject_theme():
     return {"theme": theme}
 
 
+@app.route("/kingdoms/<guild_id>", methods=["GET", "POST"])
+@guild_required
+def kingdoms(guild_id):
+    gid = int(guild_id)
+    if request.method == "POST":
+        action = request.form.get("action")
+        cfg = storage.get(gid, "kingdoms", {}) or {}
+        cfg.setdefault("options", [])
+        if action == "settings":
+            cfg["title"] = request.form.get("title", "").strip() or "Alege regatul"
+            cfg["description"] = request.form.get("description", "").strip()
+        elif action == "add_option":
+            if len(cfg["options"]) < 5:
+                rid = _to_int(request.form.get("role_id", ""))
+                if rid:
+                    cfg["options"].append({
+                        "label": request.form.get("label", "").strip() or "Regat",
+                        "emoji": request.form.get("emoji", "").strip(),
+                        "style": request.form.get("style", "grey"),
+                        "role_id": rid,
+                    })
+        elif action == "del_option":
+            idx = _to_int(request.form.get("idx", ""))
+            if idx is not None and 0 <= idx < len(cfg["options"]):
+                cfg["options"].pop(idx)
+        storage.set(gid, "kingdoms", cfg)
+        return redirect(url_for("kingdoms", guild_id=guild_id, saved=1))
+
+    roles = storage.get(gid, "roles", {}) or {}
+    cfg = storage.get(gid, "kingdoms", {}) or {}
+    # atasam numele rolului la fiecare optiune (pentru afisare)
+    rname = {str(r["id"]): r["name"] for r in roles.get("list", [])}
+    return render_template("kingdoms.html", guild_id=guild_id, cfg=cfg,
+                           options=cfg.get("options", []), rname=rname,
+                           roles=[r for r in roles.get("list", []) if not r.get("default")],
+                           meta=storage.get(gid, "meta", {}),
+                           section="kingdoms", saved=request.args.get("saved"))
+
+
 @app.route("/comenzi/<guild_id>")
 @guild_required
 def commands_list(guild_id):
