@@ -10,6 +10,8 @@ Butoanele sunt persistente (merg si dupa restart) prin custom_id `kingdom:<role_
 tratate in on_interaction (nu depind de un View static, fiindcă sunt dinamice).
 """
 
+import re
+
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -25,6 +27,23 @@ STYLE_MAP = {
     "grey": discord.ButtonStyle.secondary,
 }
 
+# emoji custom de server: <:nume:123> sau <a:nume:123> (animat)
+_CUSTOM_RE = re.compile(r"<(a?):([A-Za-z0-9_]+):(\d+)>")
+
+
+def _parse_emoji(raw):
+    """Accepta si emoji standard (🔴), si custom de server (<:nume:123>).
+    Intoarce ceva ce merge pus pe un buton, sau None daca e gol."""
+    if not raw:
+        return None
+    raw = raw.strip()
+    m = _CUSTOM_RE.fullmatch(raw)
+    if m:
+        animated = bool(m.group(1))
+        return discord.PartialEmoji(name=m.group(2), id=int(m.group(3)),
+                                    animated=animated)
+    return raw  # emoji standard (caracter unicode)
+
 
 def _cfg(gid):
     return storage.get(gid, "kingdoms", {}) or {}
@@ -38,7 +57,10 @@ def _build_view(options):
         if not rid:
             continue
         style = STYLE_MAP.get(opt.get("style", "grey"), discord.ButtonStyle.secondary)
-        emoji = opt.get("emoji") or None
+        try:
+            emoji = _parse_emoji(opt.get("emoji"))
+        except Exception:
+            emoji = None  # emoji invalid -> butonul apare fara emoji, nu crapa
         btn = discord.ui.Button(
             label=opt.get("label", "Regat"),
             emoji=emoji,
