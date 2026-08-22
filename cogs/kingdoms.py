@@ -50,24 +50,28 @@ def _cfg(gid):
 
 
 def _build_view(options):
-    """Construieste panoul din optiunile configurate (dinamic)."""
+    """Construieste panoul din optiunile configurate (dinamic).
+    Daca un emoji e invalid, butonul apare FARA emoji (nu crapa tot panoul)."""
     view = discord.ui.View(timeout=None)
     for opt in options:
         rid = opt.get("role_id")
         if not rid:
             continue
         style = STYLE_MAP.get(opt.get("style", "grey"), discord.ButtonStyle.secondary)
+        label = opt.get("label", "Regat") or "Regat"
+        cid = f"kingdom:{rid}"
+        btn = None
+        # incercam cu emoji; daca da orice eroare, punem butonul fara emoji
         try:
             emoji = _parse_emoji(opt.get("emoji"))
+            btn = discord.ui.Button(label=label, emoji=emoji, style=style, custom_id=cid)
         except Exception:
-            emoji = None  # emoji invalid -> butonul apare fara emoji, nu crapa
-        btn = discord.ui.Button(
-            label=opt.get("label", "Regat"),
-            emoji=emoji,
-            style=style,
-            custom_id=f"kingdom:{rid}",
-        )
-        view.add_item(btn)
+            try:
+                btn = discord.ui.Button(label=label, style=style, custom_id=cid)
+            except Exception:
+                btn = None
+        if btn is not None:
+            view.add_item(btn)
     return view
 
 
@@ -152,7 +156,22 @@ class Kingdoms(commands.Cog):
                                 "Apasă pe un buton ca să-ți alegi regatul. "
                                 "Poți schimba oricând — dacă alegi altul, se schimbă."),
             color=discord.Color(0x8B5CF6))
-        await interaction.response.send_message(embed=embed, view=_build_view(options))
+        try:
+            await interaction.response.send_message(embed=embed, view=_build_view(options))
+        except discord.HTTPException:
+            # cel mai des: un emoji custom de pe alt server, refuzat de Discord.
+            # reincercam fara emoji-uri, ca panoul sa apara oricum.
+            safe = [{**o, "emoji": ""} for o in options]
+            try:
+                await interaction.response.send_message(embed=embed, view=_build_view(safe))
+                await interaction.followup.send(
+                    "⚠️ Am postat panoul, dar **fără emoji-uri** — unul dintre ele nu e valid "
+                    "(cel mai des: un emoji custom de pe alt server decât acesta). Folosește "
+                    "emoji standard sau emoji custom **de pe acest server**.", ephemeral=True)
+            except discord.HTTPException:
+                await interaction.followup.send(
+                    "Nu am putut posta panoul. Verifică emoji-urile din dashboard.",
+                    ephemeral=True)
 
 
 async def setup(bot: commands.Bot):

@@ -1017,7 +1017,11 @@ def inject_theme():
     theme = {}
     if gid and str(gid).isdigit():
         theme = storage.get(int(gid), "theme", {}) or {}
-    return {"theme": theme}
+    # esti owner-ul botului? (pentru a arata/ascunde actiunile globale in UI)
+    owner_id = storage.get(0, "bot_owner_id", None)
+    is_owner = bool(owner_id and "user" in session
+                    and str(session["user"]["id"]) == str(owner_id))
+    return {"theme": theme, "is_owner": is_owner}
 
 
 @app.route("/kingdoms/<guild_id>", methods=["GET", "POST"])
@@ -1160,9 +1164,10 @@ def commands_list(guild_id):
 def restart_bot():
     if "user" not in session:
         return redirect(url_for("index"))
-    # DOAR owner-ul botului poate reporni
+    # DOAR owner-ul botului poate reporni. Fail-safe: daca nu stim sigur cine e
+    # owner (nesetat) SAU nu esti tu -> refuzam.
     owner_id = storage.get(0, "bot_owner_id", None)
-    if owner_id and str(session["user"]["id"]) != str(owner_id):
+    if not owner_id or str(session["user"]["id"]) != str(owner_id):
         return "Doar owner-ul botului poate reporni.", 403
 
     # botul si dashboardul ruleaza in acelasi proces; ne inchidem singuri,
@@ -1182,9 +1187,10 @@ def servers():
     if "user" not in session:
         return redirect(url_for("index"))
 
-    # DOAR owner-ul botului poate vedea/folosi aceasta pagina
+    # DOAR owner-ul botului poate vedea/folosi aceasta pagina. Fail-safe: daca nu
+    # stim sigur cine e owner SAU nu esti tu -> blocat.
     owner_id = storage.get(0, "bot_owner_id", None)
-    if owner_id and str(session["user"]["id"]) != str(owner_id):
+    if not owner_id or str(session["user"]["id"]) != str(owner_id):
         return render_template("servers.html", servers=[], leave_status=None,
                                section="servers", denied=True)
 

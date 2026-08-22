@@ -74,6 +74,18 @@ class MyBot(commands.Bot):
     async def on_ready(self):
         log.info("Conectat ca %s (ID: %s) — pe %d servere.",
                  self.user, self.user.id, len(self.guilds))
+        # retinem cine e owner-ul aplicatiei (cel care a creat botul), ca dashboardul
+        # sa stie cine are voie la actiuni globale (restart, lista servere). Se seteaza
+        # automat, nu poate fi schimbat de altcineva.
+        try:
+            from utils import storage
+            app = await self.application_info()
+            owner = app.team.owner_id if app.team else app.owner.id
+            if owner:
+                storage.set(0, "bot_owner_id", str(owner))
+                log.info("Owner bot: %s", owner)
+        except Exception as e:
+            log.warning("Nu am putut seta owner-ul botului: %s", e)
         await self._auto_sync()
 
     async def _auto_sync(self):
