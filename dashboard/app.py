@@ -1057,6 +1057,18 @@ def metin2(guild_id):
             idx = _to_int(request.form.get("idx", ""))
             if idx is not None and 0 <= idx < len(cfg["cat_map"]):
                 cfg["cat_map"].pop(idx)
+        elif action == "add_all_maps":
+            # creeaza cate o ruta pentru fiecare categorie din joc incarcata
+            # (fara sa dubleze pe cele care exista deja); folosesc setarile implicite
+            existing = {(m.get("game_category") or "").lower() for m in cfg["cat_map"]}
+            for gc in cfg.get("game_categories", []):
+                if gc and gc.lower() not in existing and len(cfg["cat_map"]) < 25:
+                    cfg["cat_map"].append({
+                        "game_category": gc,
+                        "category_id": None,      # implicit
+                        "staff_role_ids": [],     # implicit
+                    })
+                    existing.add(gc.lower())
         elif action == "load_categories":
             # incarcam categoriile direct din API-ul jocului (GET /categories)
             base = (cfg.get("api_base") or "").rstrip("/")

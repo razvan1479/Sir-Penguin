@@ -21,6 +21,8 @@
   .map { display:flex; align-items:center; gap:14px; background:var(--input); border:1px solid var(--glass-border); border-radius:10px; padding:13px 16px; margin-bottom:8px; }
   .map .gc { font-weight:700; font-size:14px; min-width:140px; }
   .map .dest { color:var(--muted); font-size:13px; flex:1; line-height:1.5; }
+  .loaded { background:var(--input); border:1px solid var(--glass-border); border-radius:10px; padding:14px 16px; margin-bottom:16px; font-size:13px; color:var(--muted); line-height:1.6; }
+  .loaded b { color:var(--text); }
   .del { background:var(--card); border:1px solid var(--glass-border); color:#fb7185; border-radius:8px; padding:6px 12px; cursor:pointer; font-size:13px; }
   .msel { position:relative; }
   .msel-btn { width:100%; padding:11px; border-radius:8px; border:1px solid var(--glass-border); background:var(--bg); color:var(--text); font-size:14px; text-align:left; cursor:pointer; display:flex; justify-content:space-between; align-items:center; gap:8px; font-family:inherit; }
@@ -59,7 +61,7 @@
 
       <div class="row2">
         <div>
-          <label>Categoria Discord implicită</label>
+          <label>💬 Categoria de pe DISCORD (implicită) — unde se creează canalele</label>
           <select name="category_id">
             <option value="">— fără categorie —</option>
             {% for cat in categories %}
@@ -68,7 +70,7 @@
           </select>
         </div>
       </div>
-      <label>Roluri staff implicite (acces + ping)</label>
+      <label>👥 Roluri staff de pe DISCORD (implicite) — acces + ping</label>
       {% set sel = (cfg.get('staff_role_ids') or ([cfg.get('staff_role_id')] if cfg.get('staff_role_id') else []))|map('string')|list %}
       <div class="msel" data-msel>
         <button type="button" class="msel-btn"><span class="msel-label" data-ph="— alege rolurile —">— alege rolurile —</span><span>▾</span></button>
@@ -90,6 +92,15 @@
   <div class="panel">
     <h3>🗂️ Rute pe categorii ({{ cat_map|length }})</h3>
     <p class="sub">Ca la tipurile de tickete: fiecare categorie din joc poate avea <b>categoria ei Discord</b> și <b>rolul ei de staff</b>. Ce nu e mapat aici merge pe setările implicite de sus.</p>
+    {% if game_categories %}
+    <div class="loaded">
+      <b>🎮 Categorii găsite în joc:</b> {{ game_categories|join(', ') }}
+      <form method="POST" style="margin:10px 0 0">
+        <input type="hidden" name="action" value="add_all_maps">
+        <button class="save small" type="submit">➕ Adaugă toate ca rute (pe setările implicite)</button>
+      </form>
+    </div>
+    {% endif %}
 
     {% if cat_map %}
       {% for m in cat_map %}
@@ -116,14 +127,18 @@
       <input type="hidden" name="action" value="add_map">
       <div class="row3">
         <div>
-          <label>Categoria din joc</label>
-          <input type="text" name="game_category" list="gcats" placeholder="Account Issues" required>
-          <datalist id="gcats">
-            {% for g in game_categories %}<option value="{{ g }}">{% endfor %}
-          </datalist>
+          <label>🎮 Categoria din JOC (Metin2)</label>
+          {% if game_categories %}
+          <select name="game_category" required>
+            <option value="">— alege categoria din joc —</option>
+            {% for g in game_categories %}<option value="{{ g }}">{{ g }}</option>{% endfor %}
+          </select>
+          {% else %}
+          <input type="text" name="game_category" placeholder="Account Issues" required>
+          {% endif %}
         </div>
         <div>
-          <label>Categoria Discord</label>
+          <label>💬 Categoria de pe DISCORD</label>
           <select name="category_id">
             <option value="">— implicită —</option>
             {% for cat in categories %}<option value="{{ cat.id }}">{{ cat.name }}</option>{% endfor %}
