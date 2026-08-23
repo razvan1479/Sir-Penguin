@@ -1024,6 +1024,32 @@ def inject_theme():
     return {"theme": theme, "is_owner": is_owner}
 
 
+@app.route("/metin2/<guild_id>", methods=["GET", "POST"])
+@guild_required
+def metin2(guild_id):
+    gid = int(guild_id)
+    if request.method == "POST":
+        cfg = storage.get(gid, "metin2", {}) or {}
+        cfg["enabled"] = request.form.get("enabled") == "on"
+        cfg["api_base"] = request.form.get("api_base", "").strip()
+        cfg["api_token"] = request.form.get("api_token", "").strip()
+        cfg["category_id"] = _to_int(request.form.get("category_id", "")) or None
+        cfg["staff_role_id"] = _to_int(request.form.get("staff_role_id", "")) or None
+        ps = _to_int(request.form.get("poll_seconds", "")) or 10
+        cfg["poll_seconds"] = max(5, ps)
+        storage.set(gid, "metin2", cfg)
+        return redirect(url_for("metin2", guild_id=guild_id, saved=1))
+
+    roles = storage.get(gid, "roles", {}) or {}
+    channels = storage.get(gid, "channels", {}) or {}
+    return render_template("metin2.html", guild_id=guild_id,
+                           cfg=storage.get(gid, "metin2", {}) or {},
+                           roles=[r for r in roles.get("list", []) if not r.get("default")],
+                           categories=channels.get("categories", []),
+                           meta=storage.get(gid, "meta", {}),
+                           section="metin2", saved=request.args.get("saved"))
+
+
 @app.route("/kingdoms/<guild_id>", methods=["GET", "POST"])
 @guild_required
 def kingdoms(guild_id):
