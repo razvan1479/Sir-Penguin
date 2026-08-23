@@ -22,7 +22,10 @@
   .map .gc { font-weight:700; font-size:14px; min-width:140px; }
   .map .dest { color:var(--muted); font-size:13px; flex:1; line-height:1.5; }
   .del { background:var(--card); border:1px solid var(--glass-border); color:#fb7185; border-radius:8px; padding:6px 12px; cursor:pointer; font-size:13px; }
-  .rchips { display:flex; flex-wrap:wrap; gap:8px; margin-top:4px; }
+  .rchips { display:flex; flex-wrap:wrap; gap:8px; margin-top:4px; max-height:150px; overflow-y:auto; padding:10px; background:var(--bg); border:1px solid var(--glass-border); border-radius:10px; }
+  .rchips::-webkit-scrollbar { width:8px; }
+  .rchips::-webkit-scrollbar-thumb { background:var(--glass-border); border-radius:8px; }
+  .rchips::-webkit-scrollbar-track { background:transparent; }
   .rchip { display:inline-flex; align-items:center; gap:7px; background:var(--input); border:1px solid var(--glass-border); border-radius:20px; padding:7px 13px; font-size:13px; cursor:pointer; user-select:none; }
   .rchip input { width:15px; height:15px; accent-color:var(--accent); }
   .rchip .dot { width:9px; height:9px; border-radius:50%; }
