@@ -265,9 +265,8 @@ class Metin2Bridge(commands.Cog):
                                                  ticket_id, cfg)
             if ok:
                 await interaction.response.send_message(
-                    f"✅ {interaction.user.mention} a marcat ticketul **rezolvat** "
-                    f"(trimis în joc). 🗑️ Canalul se șterge în "
-                    f"**{self.RESOLVE_DELETE_DELAY} secunde**.")
+                    f"✅ Ticket-ul a fost rezolvat de {interaction.user.mention} "
+                    f"și se va șterge în **10s**.")
             else:
                 await interaction.response.send_message(
                     "⚠️ N-am putut trimite statusul la API. Canalul rămâne. Mai încearcă.",
@@ -312,8 +311,8 @@ class Metin2Bridge(commands.Cog):
             try:
                 if ok:
                     await message.channel.send(
-                        f"✅ Ticket marcat ca **rezolvat** (trimis în joc). "
-                        f"🗑️ Canalul se șterge în **{self.RESOLVE_DELETE_DELAY} secunde**.")
+                        f"✅ Ticket-ul a fost rezolvat de {message.author.mention} "
+                        f"și se va șterge în **10s**.")
                 else:
                     await message.channel.send(
                         "⚠️ N-am putut trimite statusul la API. Canalul rămâne.")
