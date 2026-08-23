@@ -1,29 +1,48 @@
 {% extends "base.html" %}
 {% block title %}Metin2 Tickete · {{ meta.get('name','Server') }}{% endblock %}
 {% block extra_style %}
-  .panel { padding:26px; margin-bottom:20px; }
-  h3 { margin:0 0 4px; font-size:18px; }
-  .sub { color:var(--muted); font-size:13px; margin:0 0 18px; line-height:1.6; }
-  label { display:block; font-size:13px; color:var(--muted); margin:14px 0 6px; font-weight:600; }
-  input[type=text], input[type=password], select { width:100%; padding:11px; border-radius:8px; border:1px solid var(--glass-border); background:var(--bg); color:var(--text); font-size:14px; box-sizing:border-box; }
-  .toggle { display:flex; align-items:center; gap:12px; background:var(--input); border:1px solid var(--glass-border); border-radius:12px; padding:16px 18px; margin-bottom:6px; }
-  .toggle input { width:20px; height:20px; accent-color:var(--accent); }
+  .panel { padding:0; margin-bottom:22px; overflow:hidden; }
+  .panel-head { padding:20px 24px; border-bottom:1px solid var(--glass-border); background:rgba(255,255,255,.02); }
+  .panel-head h3 { margin:0 0 4px; font-size:18px; }
+  .panel-body { padding:22px 24px; }
+  .sub { color:var(--muted); font-size:13px; margin:0; line-height:1.6; }
+
+  /* fiecare camp e o "cutie" distincta */
+  .field { background:var(--input); border:1px solid var(--glass-border); border-radius:12px; padding:14px 16px; margin-bottom:12px; }
+  .field > label { display:block; font-size:12.5px; color:var(--muted); margin:0 0 9px; font-weight:700; text-transform:uppercase; letter-spacing:.3px; }
+  .field.game { border-left:3px solid var(--gold); }
+  .field.disc { border-left:3px solid var(--accent); }
+  input[type=text], input[type=password], select { width:100%; padding:11px; border-radius:8px; border:1px solid var(--glass-border); background:var(--bg); color:var(--text); font-size:14px; box-sizing:border-box; font-family:inherit; }
+
+  .toggle { display:flex; align-items:center; gap:12px; background:linear-gradient(135deg,rgba(88,101,242,.12),rgba(88,101,242,.04)); border:1px solid var(--glass-border); border-radius:12px; padding:16px 18px; margin-bottom:16px; }
+  .toggle input { width:20px; height:20px; accent-color:var(--accent); flex:none; }
   .toggle b { font-size:15px; }
-  .save { margin-top:20px; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; border:none; padding:12px 26px; border-radius:11px; font-weight:700; font-size:14px; cursor:pointer; }
-  .save.small { margin-top:0; padding:9px 18px; font-size:13px; }
+
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  @media (max-width:640px){ .grid2 { grid-template-columns:1fr; } }
+
+  .save { margin-top:6px; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; border:none; padding:12px 26px; border-radius:11px; font-weight:700; font-size:14px; cursor:pointer; }
+  .save.small { padding:9px 18px; font-size:13px; margin:0; }
+  .save.ghost { background:var(--input); color:var(--text); border:1px solid var(--glass-border); }
+
   .saved { background:rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.3); color:#4ade80; border-radius:10px; padding:11px 15px; margin-bottom:16px; font-size:14px; }
   .err { background:rgba(251,113,133,.12); border:1px solid rgba(251,113,133,.3); color:#fb7185; border-radius:10px; padding:11px 15px; margin-bottom:16px; font-size:14px; }
-  .row2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
-  .row3 { display:grid; grid-template-columns:1.2fr 1fr; gap:12px; }
-  .hint { background:var(--input); border-radius:8px; padding:13px 15px; font-size:12.5px; color:var(--muted); margin-top:14px; line-height:1.75; }
-  .status-badge { display:inline-block; padding:3px 12px; border-radius:20px; font-size:12px; font-weight:700; margin-left:8px; }
+  .status-badge { display:inline-block; padding:3px 12px; border-radius:20px; font-size:12px; font-weight:700; margin-left:8px; vertical-align:middle; }
   .on { background:rgba(34,197,94,.15); color:#4ade80; } .off { background:rgba(148,163,184,.15); color:#94a3b8; }
-  .map { display:flex; align-items:center; gap:14px; background:var(--input); border:1px solid var(--glass-border); border-radius:10px; padding:13px 16px; margin-bottom:8px; }
-  .map .gc { font-weight:700; font-size:14px; min-width:140px; }
+
+  .loaded { background:linear-gradient(135deg,rgba(234,179,8,.1),rgba(234,179,8,.03)); border:1px solid rgba(234,179,8,.25); border-radius:12px; padding:15px 17px; margin-bottom:18px; font-size:13px; color:var(--text); line-height:1.7; }
+
+  .map { display:flex; align-items:center; gap:14px; background:var(--input); border:1px solid var(--glass-border); border-left:3px solid var(--gold); border-radius:10px; padding:13px 16px; margin-bottom:9px; }
+  .map .gc { font-weight:700; font-size:14px; min-width:130px; }
   .map .dest { color:var(--muted); font-size:13px; flex:1; line-height:1.5; }
-  .loaded { background:var(--input); border:1px solid var(--glass-border); border-radius:10px; padding:14px 16px; margin-bottom:16px; font-size:13px; color:var(--muted); line-height:1.6; }
-  .loaded b { color:var(--text); }
-  .del { background:var(--card); border:1px solid var(--glass-border); color:#fb7185; border-radius:8px; padding:6px 12px; cursor:pointer; font-size:13px; }
+  .del { background:var(--card); border:1px solid var(--glass-border); color:#fb7185; border-radius:8px; padding:6px 12px; cursor:pointer; font-size:13px; flex:none; }
+
+  .addbox { background:rgba(255,255,255,.02); border:1px dashed var(--glass-border); border-radius:12px; padding:18px; margin-top:14px; }
+  .addbox h4 { margin:0 0 14px; font-size:14px; }
+
+  .divider { height:1px; background:var(--glass-border); margin:22px 0; border:0; }
+
+  /* dropdown multi-select (roluri) */
   .msel { position:relative; }
   .msel-btn { width:100%; padding:11px; border-radius:8px; border:1px solid var(--glass-border); background:var(--bg); color:var(--text); font-size:14px; text-align:left; cursor:pointer; display:flex; justify-content:space-between; align-items:center; gap:8px; font-family:inherit; }
   .msel-label { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--muted); }
@@ -32,36 +51,45 @@
   .msel.open .msel-panel { display:block; }
   .msel-opt { display:flex; align-items:center; gap:9px; padding:9px 10px; border-radius:8px; cursor:pointer; font-size:13.5px; }
   .msel-opt:hover { background:var(--input); }
-  .msel-opt input { width:16px; height:16px; accent-color:var(--accent); }
+  .msel-opt input { width:16px; height:16px; accent-color:var(--accent); flex:none; }
   .msel-opt .dot { width:9px; height:9px; border-radius:50%; flex:none; }
+  .help { font-size:12px; color:var(--muted); margin:6px 2px 0; line-height:1.55; }
 {% endblock %}
 {% block content %}
   {% if saved %}<div class="saved">✅ Salvat!</div>{% endif %}
-  {% if cats=='ok' %}<div class="saved">✅ Categoriile din joc au fost încărcate!</div>{% endif %}
+  {% if cats=='ok' %}<div class="saved">✅ Categoriile din joc au fost încărcate! Le vezi mai jos, la „Rute pe categorii”.</div>{% endif %}
   {% if cats=='err' %}<div class="err">⚠️ Nu am putut încărca categoriile. Verifică adresa API + tokenul (și că API-ul rulează), apoi salvează și încearcă iar.</div>{% endif %}
 
-  <div class="panel">
-    <h3>🎮 Punte tickete Metin2 ⇆ Discord
-      {% if cfg.get('enabled') %}<span class="status-badge on">PORNIT</span>{% else %}<span class="status-badge off">OPRIT</span>{% endif %}
-    </h3>
-    <p class="sub">Jucătorii deschid tickete în joc → apar aici pe Discord cu butoane (Rezolvat / În lucru / Claim); staff-ul răspunde pe Discord → apare în joc. <b>Nu afectează</b> ticketele normale de Discord.</p>
+  <!-- ========== PANOU 1: CONEXIUNE ========== -->
+  <div class="card panel">
+    <div class="panel-head">
+      <h3>🎮 Punte tickete Metin2 ⇆ Discord
+        {% if cfg.get('enabled') %}<span class="status-badge on">PORNIT</span>{% else %}<span class="status-badge off">OPRIT</span>{% endif %}
+      </h3>
+      <p class="sub">Jucătorii deschid tickete în joc → apar aici pe Discord cu butoane; staff-ul răspunde pe Discord → apare în joc. <b>Nu afectează</b> ticketele normale de Discord.</p>
+    </div>
+    <div class="panel-body">
+      <form method="POST">
+        <input type="hidden" name="action" value="settings">
+        <div class="toggle">
+          <input type="checkbox" name="enabled" id="en" {% if cfg.get('enabled') %}checked{% endif %}>
+          <div><b>Activează puntea Metin2</b><br><span class="sub">Cât e pornită, botul verifică periodic API-ul tău și sincronizează ticketele.</span></div>
+        </div>
 
-    <form method="POST">
-      <input type="hidden" name="action" value="settings">
-      <div class="toggle">
-        <input type="checkbox" name="enabled" id="en" {% if cfg.get('enabled') %}checked{% endif %}>
-        <div><b>Activează puntea Metin2</b><br><span class="sub" style="margin:0">Cât e pornită, botul verifică periodic API-ul tău și sincronizează ticketele.</span></div>
-      </div>
+        <div class="field game">
+          <label>🎮 Adresa API-ului tău (de pe site/joc)</label>
+          <input type="text" name="api_base" value="{{ cfg.get('api_base','') }}" placeholder="https://site-ul-tau.ro/tickets/api.php">
+        </div>
+        <div class="field game">
+          <label>🎮 Token secret — același ca în api.php</label>
+          <input type="password" name="api_token" value="{{ cfg.get('api_token','') }}" placeholder="tokenul tau secret">
+        </div>
 
-      <label>Adresa API-ului tău (base URL)</label>
-      <input type="text" name="api_base" value="{{ cfg.get('api_base','') }}" placeholder="https://site-ul-tau.ro/tickets/api.php">
+        <hr class="divider">
+        <p class="help" style="margin-bottom:12px"><b>Setările implicite de pe Discord</b> — se folosesc pentru categoriile din joc care nu au o rută proprie (mai jos).</p>
 
-      <label>Token secret (Bearer) — același ca în api.php</label>
-      <input type="password" name="api_token" value="{{ cfg.get('api_token','') }}" placeholder="tokenul tau secret">
-
-      <div class="row2">
-        <div>
-          <label>💬 Categoria de pe DISCORD (implicită) — unde se creează canalele</label>
+        <div class="field disc">
+          <label>💬 Categoria de pe DISCORD — unde se creează canalele</label>
           <select name="category_id">
             <option value="">— fără categorie —</option>
             {% for cat in categories %}
@@ -69,105 +97,118 @@
             {% endfor %}
           </select>
         </div>
-      </div>
-      <label>👥 Roluri staff de pe DISCORD (implicite) — acces + ping</label>
-      {% set sel = (cfg.get('staff_role_ids') or ([cfg.get('staff_role_id')] if cfg.get('staff_role_id') else []))|map('string')|list %}
-      <div class="msel" data-msel>
-        <button type="button" class="msel-btn"><span class="msel-label" data-ph="— alege rolurile —">— alege rolurile —</span><span>▾</span></button>
-        <div class="msel-panel">
-          {% for r in roles %}
-          <label class="msel-opt"><input type="checkbox" name="staff_role_ids" value="{{ r.id }}" data-name="{{ r.name }}" {% if r.id|string in sel %}checked{% endif %}><span class="dot" style="background:{{ r.color or '#888' }}"></span>{{ r.name }}</label>
-          {% endfor %}
+        <div class="field disc">
+          <label>💬 Roluri staff de pe DISCORD — acces + ping</label>
+          {% set sel = (cfg.get('staff_role_ids') or ([cfg.get('staff_role_id')] if cfg.get('staff_role_id') else []))|map('string')|list %}
+          <div class="msel" data-msel>
+            <button type="button" class="msel-btn"><span class="msel-label" data-ph="— alege rolurile —">— alege rolurile —</span><span>▾</span></button>
+            <div class="msel-panel">
+              {% for r in roles %}
+              <label class="msel-opt"><input type="checkbox" name="staff_role_ids" value="{{ r.id }}" data-name="{{ r.name }}" {% if r.id|string in sel %}checked{% endif %}><span class="dot" style="background:{{ r.color or '#888' }}"></span>{{ r.name }}</label>
+              {% endfor %}
+            </div>
+          </div>
         </div>
-      </div>
-      <p class="sub" style="margin:8px 0 0">Setările implicite se folosesc pentru categoriile din joc care <b>nu au</b> o rută proprie mai jos.</p>
 
-      <label>Cât de des verifică (secunde, minim 5)</label>
-      <input type="text" name="poll_seconds" value="{{ cfg.get('poll_seconds', 10) }}" placeholder="10">
+        <div class="field disc">
+          <label>⏱️ Cât de des verifică (secunde, minim 5)</label>
+          <input type="text" name="poll_seconds" value="{{ cfg.get('poll_seconds', 10) }}" placeholder="10">
+        </div>
 
-      <button class="save" type="submit">💾 Salvează</button>
-    </form>
-  </div>
-
-  <div class="panel">
-    <h3>🗂️ Rute pe categorii ({{ cat_map|length }})</h3>
-    <p class="sub">Ca la tipurile de tickete: fiecare categorie din joc poate avea <b>categoria ei Discord</b> și <b>rolul ei de staff</b>. Ce nu e mapat aici merge pe setările implicite de sus.</p>
-    {% if game_categories %}
-    <div class="loaded">
-      <b>🎮 Categorii găsite în joc:</b> {{ game_categories|join(', ') }}
-      <form method="POST" style="margin:10px 0 0">
-        <input type="hidden" name="action" value="add_all_maps">
-        <button class="save small" type="submit">➕ Adaugă toate ca rute (pe setările implicite)</button>
+        <button class="save" type="submit">💾 Salvează</button>
       </form>
     </div>
-    {% endif %}
+  </div>
 
-    {% if cat_map %}
-      {% for m in cat_map %}
-      <div class="map">
-        <span class="gc">🎮 {{ m.game_category }}</span>
-        <span class="dest">
-          → 📁 {{ cat_name.get(m.category_id|string, 'implicit') if m.category_id else 'categoria implicită' }}
-          &nbsp;·&nbsp; 👥
-          {%- set mids = (m.get('staff_role_ids') or ([m.get('staff_role_id')] if m.get('staff_role_id') else []))|map('string')|list -%}
-          {%- if mids %} {% for rid in mids %}{{ role_name.get(rid, rid) }}{% if not loop.last %}, {% endif %}{% endfor %}{% else %} rolurile implicite{% endif %}
-        </span>
-        <form method="POST" style="margin:0">
-          <input type="hidden" name="action" value="del_map">
-          <input type="hidden" name="idx" value="{{ loop.index0 }}">
-          <button class="del" type="submit">✕ Șterge</button>
+  <!-- ========== PANOU 2: RUTE PE CATEGORII ========== -->
+  <div class="card panel">
+    <div class="panel-head">
+      <h3>🗂️ Rute pe categorii ({{ cat_map|length }})</h3>
+      <p class="sub">Fiecare categorie din <b>joc</b> poate merge într-o anumită categorie de pe <b>Discord</b>, cu rolurile ei de staff. Ce nu e aici → merge pe setările implicite de sus.</p>
+    </div>
+    <div class="panel-body">
+      {% if game_categories %}
+      <div class="loaded">
+        <b>🎮 Categorii găsite în joc:</b> {{ game_categories|join(', ') }}
+        <form method="POST" style="margin:12px 0 0">
+          <input type="hidden" name="action" value="add_all_maps">
+          <button class="save small" type="submit">➕ Adaugă toate ca rute (pe setările implicite)</button>
         </form>
       </div>
-      {% endfor %}
-    {% else %}
-      <p class="sub" style="opacity:.7">Nicio rută încă — toate ticketele merg pe setările implicite. Adaugă mai jos.</p>
-    {% endif %}
+      {% endif %}
 
-    <form method="POST" style="margin-top:16px; border-top:1px solid var(--glass-border); padding-top:16px">
-      <input type="hidden" name="action" value="add_map">
-      <div class="row3">
-        <div>
-          <label>🎮 Categoria din JOC (Metin2)</label>
-          {% if game_categories %}
-          <select name="game_category" required>
-            <option value="">— alege categoria din joc —</option>
-            {% for g in game_categories %}<option value="{{ g }}">{{ g }}</option>{% endfor %}
-          </select>
-          {% else %}
-          <input type="text" name="game_category" placeholder="Account Issues" required>
-          {% endif %}
+      {% if cat_map %}
+        {% for m in cat_map %}
+        <div class="map">
+          <span class="gc">🎮 {{ m.game_category }}</span>
+          <span class="dest">
+            → 💬 {{ cat_name.get(m.category_id|string, 'implicită') if m.category_id else 'categoria implicită' }}
+            &nbsp;·&nbsp; 👥
+            {%- set mids = (m.get('staff_role_ids') or ([m.get('staff_role_id')] if m.get('staff_role_id') else []))|map('string')|list -%}
+            {%- if mids %} {% for rid in mids %}{{ role_name.get(rid, rid) }}{% if not loop.last %}, {% endif %}{% endfor %}{% else %} rolurile implicite{% endif %}
+          </span>
+          <form method="POST" style="margin:0">
+            <input type="hidden" name="action" value="del_map">
+            <input type="hidden" name="idx" value="{{ loop.index0 }}">
+            <button class="del" type="submit">✕ Șterge</button>
+          </form>
         </div>
-        <div>
-          <label>💬 Categoria de pe DISCORD</label>
-          <select name="category_id">
-            <option value="">— implicită —</option>
-            {% for cat in categories %}<option value="{{ cat.id }}">{{ cat.name }}</option>{% endfor %}
-          </select>
-        </div>
+        {% endfor %}
+      {% else %}
+        <p class="sub" style="opacity:.7; margin-bottom:4px">Nicio rută încă — toate ticketele merg pe setările implicite. Adaugă mai jos.</p>
+      {% endif %}
+
+      <div class="addbox">
+        <h4>➕ Adaugă o rută nouă</h4>
+        <form method="POST">
+          <input type="hidden" name="action" value="add_map">
+          <div class="grid2">
+            <div class="field game" style="margin:0">
+              <label>🎮 Categoria din JOC</label>
+              {% if game_categories %}
+              <select name="game_category" required>
+                <option value="">— alege din joc —</option>
+                {% for g in game_categories %}<option value="{{ g }}">{{ g }}</option>{% endfor %}
+              </select>
+              {% else %}
+              <input type="text" name="game_category" placeholder="Account Issues" required>
+              {% endif %}
+            </div>
+            <div class="field disc" style="margin:0">
+              <label>💬 Categoria de pe DISCORD</label>
+              <select name="category_id">
+                <option value="">— implicită —</option>
+                {% for cat in categories %}<option value="{{ cat.id }}">{{ cat.name }}</option>{% endfor %}
+              </select>
+            </div>
+          </div>
+          <div class="field disc" style="margin:12px 0 0">
+            <label>💬 Roluri staff (gol = rolurile implicite)</label>
+            <div class="msel" data-msel>
+              <button type="button" class="msel-btn"><span class="msel-label" data-ph="— rolurile implicite —">— rolurile implicite —</span><span>▾</span></button>
+              <div class="msel-panel">
+                {% for r in roles %}
+                <label class="msel-opt"><input type="checkbox" name="staff_role_ids" value="{{ r.id }}" data-name="{{ r.name }}"><span class="dot" style="background:{{ r.color or '#888' }}"></span>{{ r.name }}</label>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+          <button class="save" type="submit" style="margin-top:16px">➕ Adaugă ruta</button>
+        </form>
       </div>
-      <label>Roluri staff pentru această categorie (gol = rolurile implicite)</label>
-      <div class="msel" data-msel>
-        <button type="button" class="msel-btn"><span class="msel-label" data-ph="— rolurile implicite —">— rolurile implicite —</span><span>▾</span></button>
-        <div class="msel-panel">
-          {% for r in roles %}
-          <label class="msel-opt"><input type="checkbox" name="staff_role_ids" value="{{ r.id }}" data-name="{{ r.name }}"><span class="dot" style="background:{{ r.color or '#888' }}"></span>{{ r.name }}</label>
-          {% endfor %}
-        </div>
-      </div>
-      <button class="save" type="submit">➕ Adaugă ruta</button>
-    </form>
 
-    <form method="POST" style="margin-top:10px">
-      <input type="hidden" name="action" value="load_categories">
-      <button class="save small" type="submit" style="background:var(--input); color:var(--text); border:1px solid var(--glass-border)">🔄 Încarcă categoriile din joc (de la API)</button>
-    </form>
+      <form method="POST" style="margin-top:12px">
+        <input type="hidden" name="action" value="load_categories">
+        <button class="save ghost small" type="submit">🔄 Încarcă categoriile din joc (de la API)</button>
+      </form>
 
-    <p class="hint">
-      🎫 Fiecare ticket din joc apare cu butoane, ca la ticketele de Discord: <b>✅ Rezolvat</b> · <b>🛠️ În lucru</b> (trimit statusul în joc) · <b>🙋 Claim</b> (staff-ul îl preia).<br>
-      💬 Orice mesaj scris de staff în canalul ticketului ajunge automat la jucător în joc.<br>
-      🔄 „Încarcă categoriile din joc" cere lista de la API-ul tău (<code>GET /categories</code>) — apoi le ai gata de ales la „Categoria din joc".
-    </p>
+      <p class="help" style="margin-top:14px">
+        🎫 Fiecare ticket apare cu butoane: <b>✅ Rezolvat</b> (+ șterge canalul în 10s) · <b>🛠️ În lucru</b> · <b>🙋 Claim</b>.<br>
+        💬 Mesajele staff-ului din canal ajung automat la jucător în joc.
+      </p>
+    </div>
   </div>
+
   <script>
     // dropdown cu checkbox-uri: deschide/inchide, arata rolurile alese pe buton
     document.querySelectorAll('[data-msel]').forEach(ms => {
