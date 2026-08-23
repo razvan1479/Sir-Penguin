@@ -216,6 +216,32 @@ class Metin2Bridge(commands.Cog):
         await self._post(cfg, f"/tickets/{t.get('id')}/link",
                          {"discord_channel_id": str(channel.id)})
 
+    RESOLVE_DELETE_DELAY = 10  # secunde pana la stergerea canalului dupa Rezolvat
+
+    async def _resolve_and_cleanup(self, guild, channel, ticket_id, cfg):
+        """Marcheaza rezolvat in joc; daca a mers, sterge canalul dupa cateva secunde.
+        Nu sterge nimic daca statusul nu a ajuns la API (sa nu pierdem conversatia)."""
+        ok = await self._post(cfg, f"/tickets/{ticket_id}/status", {"status": "resolved"})
+        if not ok:
+            return False
+        # curatam evidentele intai (poll-ul sa nu mai trimita nimic aici)
+        open_map = storage.get(guild.id, "metin2_open", {}) or {}
+        open_map.pop(str(channel.id), None)
+        storage.set(guild.id, "metin2_open", open_map)
+        claims = storage.get(guild.id, "metin2_claims", {}) or {}
+        claims.pop(str(channel.id), None)
+        storage.set(guild.id, "metin2_claims", claims)
+
+        async def _delete_later():
+            await asyncio.sleep(self.RESOLVE_DELETE_DELAY)
+            try:
+                await channel.delete(reason="Ticket Metin2 rezolvat")
+            except (discord.HTTPException, AttributeError):
+                pass  # canal deja sters / fara permisiuni -> nu crapam
+
+        asyncio.create_task(_delete_later())
+        return True
+
     # ------------------------------------------- butoanele de pe tickete
     @commands.Cog.listener()
     async def on_interaction(self, interaction: discord.Interaction):
@@ -235,14 +261,17 @@ class Metin2Bridge(commands.Cog):
                 "Acest canal nu mai e legat de un ticket din joc.", ephemeral=True)
         cfg = _cfg(guild.id)
         if action == "resolve":
-            ok = await self._post(cfg, f"/tickets/{ticket_id}/status",
-                                  {"status": "resolved"})
+            ok = await self._resolve_and_cleanup(guild, interaction.channel,
+                                                 ticket_id, cfg)
             if ok:
                 await interaction.response.send_message(
-                    f"✅ {interaction.user.mention} a marcat ticketul **rezolvat** (trimis în joc).")
+                    f"✅ {interaction.user.mention} a marcat ticketul **rezolvat** "
+                    f"(trimis în joc). 🗑️ Canalul se șterge în "
+                    f"**{self.RESOLVE_DELETE_DELAY} secunde**.")
             else:
                 await interaction.response.send_message(
-                    "⚠️ N-am putut trimite statusul la API. Mai încearcă.", ephemeral=True)
+                    "⚠️ N-am putut trimite statusul la API. Canalul rămâne. Mai încearcă.",
+                    ephemeral=True)
         elif action == "progress":
             ok = await self._post(cfg, f"/tickets/{ticket_id}/status",
                                   {"status": "in_progress"})
@@ -278,9 +307,16 @@ class Metin2Bridge(commands.Cog):
         # comenzi de status simple in canal
         content = message.content.strip()
         if content.lower() in ("!rezolvat", "!resolved", "!close"):
-            await self._post(cfg, f"/tickets/{ticket_id}/status", {"status": "resolved"})
+            ok = await self._resolve_and_cleanup(message.guild, message.channel,
+                                                 ticket_id, cfg)
             try:
-                await message.channel.send("✅ Ticket marcat ca **rezolvat** (trimis în joc).")
+                if ok:
+                    await message.channel.send(
+                        f"✅ Ticket marcat ca **rezolvat** (trimis în joc). "
+                        f"🗑️ Canalul se șterge în **{self.RESOLVE_DELETE_DELAY} secunde**.")
+                else:
+                    await message.channel.send(
+                        "⚠️ N-am putut trimite statusul la API. Canalul rămâne.")
             except discord.HTTPException:
                 pass
             return
