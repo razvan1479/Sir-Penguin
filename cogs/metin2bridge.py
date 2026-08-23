@@ -31,15 +31,31 @@ def _cfg(gid):
     return storage.get(gid, "metin2", {}) or {}
 
 
+def _staff_ids(d):
+    """Rolurile de staff dintr-o configurare — accepta si formatul nou (lista),
+    si pe cel vechi (un singur rol), ca nimic sa nu se strice la trecere."""
+    ids = list(d.get("staff_role_ids") or [])
+    old = d.get("staff_role_id")
+    if old and str(old) not in [str(x) for x in ids]:
+        ids.append(old)
+    out = []
+    for x in ids:
+        try:
+            out.append(int(x))
+        except (ValueError, TypeError):
+            pass
+    return out
+
+
 def _route_for(cfg, game_category):
-    """Gaseste ruta pentru o categorie din joc: (categoria Discord, rolul staff).
+    """Gaseste ruta pentru o categorie din joc: (categoria Discord, rolurile staff).
     Daca nu exista mapare pentru categoria respectiva -> setarile implicite."""
     gc = (game_category or "").strip().lower()
     for m in cfg.get("cat_map", []):
         if (m.get("game_category") or "").strip().lower() == gc and gc:
-            return (m.get("category_id") or cfg.get("category_id"),
-                    m.get("staff_role_id") or cfg.get("staff_role_id"))
-    return cfg.get("category_id"), cfg.get("staff_role_id")
+            roles = _staff_ids(m) or _staff_ids(cfg)
+            return (m.get("category_id") or cfg.get("category_id"), roles)
+    return cfg.get("category_id"), _staff_ids(cfg)
 
 
 def _ticket_buttons():
@@ -158,15 +174,15 @@ class Metin2Bridge(commands.Cog):
         # deja creat? (nu dublam)
         if str(t.get("id")) in open_map.values():
             return
-        # ruta per categorie (ca la tipurile de tickete): fiecare categorie din joc
-        # poate avea categoria ei Discord + rolul ei de staff
-        cat_id, staff_id = _route_for(cfg, t.get("category"))
+        # ruta per categorie: fiecare categorie din joc poate avea categoria ei
+        # Discord + rolurile ei de staff (unul sau mai multe)
+        cat_id, staff_ids = _route_for(cfg, t.get("category"))
         category = guild.get_channel(int(cat_id)) if cat_id else None
         name = f"metin-{t.get('id')}-{(t.get('player_name') or 'jucator')[:20]}"
         try:
             overwrites = {guild.default_role: discord.PermissionOverwrite(view_channel=False)}
-            if staff_id:
-                role = guild.get_role(int(staff_id))
+            for rid in staff_ids:
+                role = guild.get_role(rid)
                 if role:
                     overwrites[role] = discord.PermissionOverwrite(
                         view_channel=True, send_messages=True, read_message_history=True)
@@ -187,7 +203,7 @@ class Metin2Bridge(commands.Cog):
         embed.add_field(name="Categorie", value=t.get("category", "—"), inline=True)
         embed.add_field(name="Status", value=t.get("status", "open"), inline=True)
         embed.set_footer(text=f"Ticket #{t.get('id')} · din joc")
-        ping = f"<@&{staff_id}>" if staff_id else ""
+        ping = " ".join(f"<@&{rid}>" for rid in staff_ids)
         try:
             await channel.send(content=ping or None, embed=embed, view=_ticket_buttons())
         except discord.HTTPException:

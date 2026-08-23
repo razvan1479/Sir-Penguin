@@ -14,7 +14,7 @@
   .saved { background:rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.3); color:#4ade80; border-radius:10px; padding:11px 15px; margin-bottom:16px; font-size:14px; }
   .err { background:rgba(251,113,133,.12); border:1px solid rgba(251,113,133,.3); color:#fb7185; border-radius:10px; padding:11px 15px; margin-bottom:16px; font-size:14px; }
   .row2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
-  .row3 { display:grid; grid-template-columns:1.2fr 1fr 1fr; gap:12px; }
+  .row3 { display:grid; grid-template-columns:1.2fr 1fr; gap:12px; }
   .hint { background:var(--input); border-radius:8px; padding:13px 15px; font-size:12.5px; color:var(--muted); margin-top:14px; line-height:1.75; }
   .status-badge { display:inline-block; padding:3px 12px; border-radius:20px; font-size:12px; font-weight:700; margin-left:8px; }
   .on { background:rgba(34,197,94,.15); color:#4ade80; } .off { background:rgba(148,163,184,.15); color:#94a3b8; }
@@ -22,6 +22,10 @@
   .map .gc { font-weight:700; font-size:14px; min-width:140px; }
   .map .dest { color:var(--muted); font-size:13px; flex:1; line-height:1.5; }
   .del { background:var(--card); border:1px solid var(--glass-border); color:#fb7185; border-radius:8px; padding:6px 12px; cursor:pointer; font-size:13px; }
+  .rchips { display:flex; flex-wrap:wrap; gap:8px; margin-top:4px; }
+  .rchip { display:inline-flex; align-items:center; gap:7px; background:var(--input); border:1px solid var(--glass-border); border-radius:20px; padding:7px 13px; font-size:13px; cursor:pointer; user-select:none; }
+  .rchip input { width:15px; height:15px; accent-color:var(--accent); }
+  .rchip .dot { width:9px; height:9px; border-radius:50%; }
 {% endblock %}
 {% block content %}
   {% if saved %}<div class="saved">✅ Salvat!</div>{% endif %}
@@ -57,15 +61,13 @@
             {% endfor %}
           </select>
         </div>
-        <div>
-          <label>Rol staff implicit (acces + ping)</label>
-          <select name="staff_role_id">
-            <option value="">— fără —</option>
-            {% for r in roles %}
-            <option value="{{ r.id }}" {% if cfg.get('staff_role_id')|string==r.id|string %}selected{% endif %}>{{ r.name }}</option>
-            {% endfor %}
-          </select>
-        </div>
+      </div>
+      <label>Roluri staff implicite (acces + ping) — bifezi câte vrei</label>
+      <div class="rchips">
+        {% set sel = (cfg.get('staff_role_ids') or ([cfg.get('staff_role_id')] if cfg.get('staff_role_id') else []))|map('string')|list %}
+        {% for r in roles %}
+        <label class="rchip"><input type="checkbox" name="staff_role_ids" value="{{ r.id }}" {% if r.id|string in sel %}checked{% endif %}><span class="dot" style="background:{{ r.color or '#888' }}"></span>{{ r.name }}</label>
+        {% endfor %}
       </div>
       <p class="sub" style="margin:8px 0 0">Setările implicite se folosesc pentru categoriile din joc care <b>nu au</b> o rută proprie mai jos.</p>
 
@@ -86,7 +88,9 @@
         <span class="gc">🎮 {{ m.game_category }}</span>
         <span class="dest">
           → 📁 {{ cat_name.get(m.category_id|string, 'implicit') if m.category_id else 'categoria implicită' }}
-          &nbsp;·&nbsp; 👥 {{ role_name.get(m.staff_role_id|string, 'implicit') if m.staff_role_id else 'rolul implicit' }}
+          &nbsp;·&nbsp; 👥
+          {%- set mids = (m.get('staff_role_ids') or ([m.get('staff_role_id')] if m.get('staff_role_id') else []))|map('string')|list -%}
+          {%- if mids %} {% for rid in mids %}{{ role_name.get(rid, rid) }}{% if not loop.last %}, {% endif %}{% endfor %}{% else %} rolurile implicite{% endif %}
         </span>
         <form method="POST" style="margin:0">
           <input type="hidden" name="action" value="del_map">
@@ -116,13 +120,12 @@
             {% for cat in categories %}<option value="{{ cat.id }}">{{ cat.name }}</option>{% endfor %}
           </select>
         </div>
-        <div>
-          <label>Rol staff</label>
-          <select name="staff_role_id">
-            <option value="">— implicit —</option>
-            {% for r in roles %}<option value="{{ r.id }}">{{ r.name }}</option>{% endfor %}
-          </select>
-        </div>
+      </div>
+      <label>Roluri staff pentru această categorie (gol = rolurile implicite)</label>
+      <div class="rchips">
+        {% for r in roles %}
+        <label class="rchip"><input type="checkbox" name="staff_role_ids" value="{{ r.id }}"><span class="dot" style="background:{{ r.color or '#888' }}"></span>{{ r.name }}</label>
+        {% endfor %}
       </div>
       <button class="save" type="submit">➕ Adaugă ruta</button>
     </form>

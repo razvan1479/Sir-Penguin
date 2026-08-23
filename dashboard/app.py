@@ -1037,7 +1037,8 @@ def metin2(guild_id):
             cfg["api_base"] = request.form.get("api_base", "").strip()
             cfg["api_token"] = request.form.get("api_token", "").strip()
             cfg["category_id"] = _to_int(request.form.get("category_id", "")) or None
-            cfg["staff_role_id"] = _to_int(request.form.get("staff_role_id", "")) or None
+            cfg["staff_role_ids"] = [i for i in (_to_int(x) for x in request.form.getlist("staff_role_ids")) if i]
+            cfg.pop("staff_role_id", None)  # formatul vechi (un rol) nu mai e necesar
             ps = _to_int(request.form.get("poll_seconds", "")) or 10
             cfg["poll_seconds"] = max(5, ps)
         elif action == "add_map":
@@ -1050,7 +1051,7 @@ def metin2(guild_id):
                     cfg["cat_map"].append({
                         "game_category": gc,
                         "category_id": _to_int(request.form.get("category_id", "")) or None,
-                        "staff_role_id": _to_int(request.form.get("staff_role_id", "")) or None,
+                        "staff_role_ids": [i for i in (_to_int(x) for x in request.form.getlist("staff_role_ids")) if i],
                     })
         elif action == "del_map":
             idx = _to_int(request.form.get("idx", ""))
