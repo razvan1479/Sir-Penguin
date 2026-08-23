@@ -31,6 +31,32 @@ def _cfg(gid):
     return storage.get(gid, "metin2", {}) or {}
 
 
+def _route_for(cfg, game_category):
+    """Gaseste ruta pentru o categorie din joc: (categoria Discord, rolul staff).
+    Daca nu exista mapare pentru categoria respectiva -> setarile implicite."""
+    gc = (game_category or "").strip().lower()
+    for m in cfg.get("cat_map", []):
+        if (m.get("game_category") or "").strip().lower() == gc and gc:
+            return (m.get("category_id") or cfg.get("category_id"),
+                    m.get("staff_role_id") or cfg.get("staff_role_id"))
+    return cfg.get("category_id"), cfg.get("staff_role_id")
+
+
+def _ticket_buttons():
+    """Butoanele de pe fiecare ticket din joc (ca la ticketele de Discord)."""
+    view = discord.ui.View(timeout=None)
+    view.add_item(discord.ui.Button(label="Rezolvat", emoji="✅",
+                                    style=discord.ButtonStyle.success,
+                                    custom_id="m2t:resolve"))
+    view.add_item(discord.ui.Button(label="În lucru", emoji="🛠️",
+                                    style=discord.ButtonStyle.primary,
+                                    custom_id="m2t:progress"))
+    view.add_item(discord.ui.Button(label="Claim", emoji="🙋",
+                                    style=discord.ButtonStyle.secondary,
+                                    custom_id="m2t:claim"))
+    return view
+
+
 class Metin2Bridge(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -132,12 +158,15 @@ class Metin2Bridge(commands.Cog):
         # deja creat? (nu dublam)
         if str(t.get("id")) in open_map.values():
             return
-        category = guild.get_channel(int(cfg["category_id"])) if cfg.get("category_id") else None
+        # ruta per categorie (ca la tipurile de tickete): fiecare categorie din joc
+        # poate avea categoria ei Discord + rolul ei de staff
+        cat_id, staff_id = _route_for(cfg, t.get("category"))
+        category = guild.get_channel(int(cat_id)) if cat_id else None
         name = f"metin-{t.get('id')}-{(t.get('player_name') or 'jucator')[:20]}"
         try:
             overwrites = {guild.default_role: discord.PermissionOverwrite(view_channel=False)}
-            if cfg.get("staff_role_id"):
-                role = guild.get_role(int(cfg["staff_role_id"]))
+            if staff_id:
+                role = guild.get_role(int(staff_id))
                 if role:
                     overwrites[role] = discord.PermissionOverwrite(
                         view_channel=True, send_messages=True, read_message_history=True)
@@ -158,11 +187,9 @@ class Metin2Bridge(commands.Cog):
         embed.add_field(name="Categorie", value=t.get("category", "—"), inline=True)
         embed.add_field(name="Status", value=t.get("status", "open"), inline=True)
         embed.set_footer(text=f"Ticket #{t.get('id')} · din joc")
-        ping = ""
-        if cfg.get("staff_role_id"):
-            ping = f"<@&{cfg['staff_role_id']}>"
+        ping = f"<@&{staff_id}>" if staff_id else ""
         try:
-            await channel.send(content=ping or None, embed=embed)
+            await channel.send(content=ping or None, embed=embed, view=_ticket_buttons())
         except discord.HTTPException:
             pass
 
@@ -172,6 +199,53 @@ class Metin2Bridge(commands.Cog):
         # confirmam la API ca l-am preluat
         await self._post(cfg, f"/tickets/{t.get('id')}/link",
                          {"discord_channel_id": str(channel.id)})
+
+    # ------------------------------------------- butoanele de pe tickete
+    @commands.Cog.listener()
+    async def on_interaction(self, interaction: discord.Interaction):
+        if interaction.type != discord.InteractionType.component:
+            return
+        cid = (interaction.data or {}).get("custom_id", "")
+        if not cid.startswith("m2t:"):
+            return
+        action = cid.split(":", 1)[1]
+        guild = interaction.guild
+        if guild is None:
+            return
+        open_map = storage.get(guild.id, "metin2_open", {}) or {}
+        ticket_id = open_map.get(str(interaction.channel_id))
+        if ticket_id is None:
+            return await interaction.response.send_message(
+                "Acest canal nu mai e legat de un ticket din joc.", ephemeral=True)
+        cfg = _cfg(guild.id)
+        if action == "resolve":
+            ok = await self._post(cfg, f"/tickets/{ticket_id}/status",
+                                  {"status": "resolved"})
+            if ok:
+                await interaction.response.send_message(
+                    f"✅ {interaction.user.mention} a marcat ticketul **rezolvat** (trimis în joc).")
+            else:
+                await interaction.response.send_message(
+                    "⚠️ N-am putut trimite statusul la API. Mai încearcă.", ephemeral=True)
+        elif action == "progress":
+            ok = await self._post(cfg, f"/tickets/{ticket_id}/status",
+                                  {"status": "in_progress"})
+            if ok:
+                await interaction.response.send_message(
+                    f"🛠️ {interaction.user.mention} a marcat ticketul **în lucru** (trimis în joc).")
+            else:
+                await interaction.response.send_message(
+                    "⚠️ N-am putut trimite statusul la API. Mai încearcă.", ephemeral=True)
+        elif action == "claim":
+            claims = storage.get(guild.id, "metin2_claims", {}) or {}
+            existing = claims.get(str(interaction.channel_id))
+            if existing and str(existing) != str(interaction.user.id):
+                return await interaction.response.send_message(
+                    f"Ticketul e deja preluat de <@{existing}>.", ephemeral=True)
+            claims[str(interaction.channel_id)] = str(interaction.user.id)
+            storage.set(guild.id, "metin2_claims", claims)
+            await interaction.response.send_message(
+                f"🙋 {interaction.user.mention} a preluat acest ticket.")
 
     # -------------------------------------------------- staff scrie in canal -> trimite in joc
     @commands.Cog.listener()

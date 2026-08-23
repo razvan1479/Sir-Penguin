@@ -1029,25 +1029,71 @@ def inject_theme():
 def metin2(guild_id):
     gid = int(guild_id)
     if request.method == "POST":
+        action = request.form.get("action", "settings")
         cfg = storage.get(gid, "metin2", {}) or {}
-        cfg["enabled"] = request.form.get("enabled") == "on"
-        cfg["api_base"] = request.form.get("api_base", "").strip()
-        cfg["api_token"] = request.form.get("api_token", "").strip()
-        cfg["category_id"] = _to_int(request.form.get("category_id", "")) or None
-        cfg["staff_role_id"] = _to_int(request.form.get("staff_role_id", "")) or None
-        ps = _to_int(request.form.get("poll_seconds", "")) or 10
-        cfg["poll_seconds"] = max(5, ps)
+        cfg.setdefault("cat_map", [])
+        if action == "settings":
+            cfg["enabled"] = request.form.get("enabled") == "on"
+            cfg["api_base"] = request.form.get("api_base", "").strip()
+            cfg["api_token"] = request.form.get("api_token", "").strip()
+            cfg["category_id"] = _to_int(request.form.get("category_id", "")) or None
+            cfg["staff_role_id"] = _to_int(request.form.get("staff_role_id", "")) or None
+            ps = _to_int(request.form.get("poll_seconds", "")) or 10
+            cfg["poll_seconds"] = max(5, ps)
+        elif action == "add_map":
+            gc = request.form.get("game_category", "").strip()[:100]
+            if gc and len(cfg["cat_map"]) < 25:
+                # nu dublam aceeasi categorie
+                exists = any((m.get("game_category") or "").lower() == gc.lower()
+                             for m in cfg["cat_map"])
+                if not exists:
+                    cfg["cat_map"].append({
+                        "game_category": gc,
+                        "category_id": _to_int(request.form.get("category_id", "")) or None,
+                        "staff_role_id": _to_int(request.form.get("staff_role_id", "")) or None,
+                    })
+        elif action == "del_map":
+            idx = _to_int(request.form.get("idx", ""))
+            if idx is not None and 0 <= idx < len(cfg["cat_map"]):
+                cfg["cat_map"].pop(idx)
+        elif action == "load_categories":
+            # incarcam categoriile direct din API-ul jocului (GET /categories)
+            base = (cfg.get("api_base") or "").rstrip("/")
+            token = cfg.get("api_token") or ""
+            fetched = None
+            if base and token:
+                try:
+                    import requests as _rq
+                    r = _rq.get(base + "/categories",
+                                headers={"Authorization": f"Bearer {token}"}, timeout=8)
+                    if r.status_code == 200:
+                        fetched = r.json().get("categories")
+                except Exception:
+                    fetched = None
+            if isinstance(fetched, list) and fetched:
+                cfg["game_categories"] = [str(x)[:100] for x in fetched][:50]
+                storage.set(gid, "metin2", cfg)
+                return redirect(url_for("metin2", guild_id=guild_id, cats="ok"))
+            storage.set(gid, "metin2", cfg)
+            return redirect(url_for("metin2", guild_id=guild_id, cats="err"))
         storage.set(gid, "metin2", cfg)
         return redirect(url_for("metin2", guild_id=guild_id, saved=1))
 
     roles = storage.get(gid, "roles", {}) or {}
     channels = storage.get(gid, "channels", {}) or {}
-    return render_template("metin2.html", guild_id=guild_id,
-                           cfg=storage.get(gid, "metin2", {}) or {},
+    cfg = storage.get(gid, "metin2", {}) or {}
+    # nume categorii/roluri pentru afisare in lista de mapari
+    cat_name = {str(c["id"]): c["name"] for c in channels.get("categories", [])}
+    role_name = {str(r["id"]): r["name"] for r in roles.get("list", [])}
+    return render_template("metin2.html", guild_id=guild_id, cfg=cfg,
+                           cat_map=cfg.get("cat_map", []),
+                           game_categories=cfg.get("game_categories", []),
+                           cat_name=cat_name, role_name=role_name,
                            roles=[r for r in roles.get("list", []) if not r.get("default")],
                            categories=channels.get("categories", []),
                            meta=storage.get(gid, "meta", {}),
-                           section="metin2", saved=request.args.get("saved"))
+                           section="metin2", saved=request.args.get("saved"),
+                           cats=request.args.get("cats"))
 
 
 @app.route("/kingdoms/<guild_id>", methods=["GET", "POST"])

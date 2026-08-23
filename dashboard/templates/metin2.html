@@ -10,36 +10,46 @@
   .toggle input { width:20px; height:20px; accent-color:var(--accent); }
   .toggle b { font-size:15px; }
   .save { margin-top:20px; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; border:none; padding:12px 26px; border-radius:11px; font-weight:700; font-size:14px; cursor:pointer; }
+  .save.small { margin-top:0; padding:9px 18px; font-size:13px; }
   .saved { background:rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.3); color:#4ade80; border-radius:10px; padding:11px 15px; margin-bottom:16px; font-size:14px; }
+  .err { background:rgba(251,113,133,.12); border:1px solid rgba(251,113,133,.3); color:#fb7185; border-radius:10px; padding:11px 15px; margin-bottom:16px; font-size:14px; }
   .row2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .row3 { display:grid; grid-template-columns:1.2fr 1fr 1fr; gap:12px; }
   .hint { background:var(--input); border-radius:8px; padding:13px 15px; font-size:12.5px; color:var(--muted); margin-top:14px; line-height:1.75; }
   .status-badge { display:inline-block; padding:3px 12px; border-radius:20px; font-size:12px; font-weight:700; margin-left:8px; }
   .on { background:rgba(34,197,94,.15); color:#4ade80; } .off { background:rgba(148,163,184,.15); color:#94a3b8; }
+  .map { display:flex; align-items:center; gap:14px; background:var(--input); border:1px solid var(--glass-border); border-radius:10px; padding:13px 16px; margin-bottom:8px; }
+  .map .gc { font-weight:700; font-size:14px; min-width:140px; }
+  .map .dest { color:var(--muted); font-size:13px; flex:1; line-height:1.5; }
+  .del { background:var(--card); border:1px solid var(--glass-border); color:#fb7185; border-radius:8px; padding:6px 12px; cursor:pointer; font-size:13px; }
 {% endblock %}
 {% block content %}
   {% if saved %}<div class="saved">✅ Salvat!</div>{% endif %}
+  {% if cats=='ok' %}<div class="saved">✅ Categoriile din joc au fost încărcate!</div>{% endif %}
+  {% if cats=='err' %}<div class="err">⚠️ Nu am putut încărca categoriile. Verifică adresa API + tokenul (și că API-ul rulează), apoi salvează și încearcă iar.</div>{% endif %}
 
   <div class="panel">
     <h3>🎮 Punte tickete Metin2 ⇆ Discord
       {% if cfg.get('enabled') %}<span class="status-badge on">PORNIT</span>{% else %}<span class="status-badge off">OPRIT</span>{% endif %}
     </h3>
-    <p class="sub">Leagă ticketele din jocul tău de Metin2 cu Discord. Jucătorii deschid tickete în joc → apar aici pe Discord; staff-ul răspunde pe Discord → apare în joc. <b>Nu afectează</b> ticketele normale de Discord — e un sistem separat, opțional.</p>
+    <p class="sub">Jucătorii deschid tickete în joc → apar aici pe Discord cu butoane (Rezolvat / În lucru / Claim); staff-ul răspunde pe Discord → apare în joc. <b>Nu afectează</b> ticketele normale de Discord.</p>
 
     <form method="POST">
+      <input type="hidden" name="action" value="settings">
       <div class="toggle">
         <input type="checkbox" name="enabled" id="en" {% if cfg.get('enabled') %}checked{% endif %}>
         <div><b>Activează puntea Metin2</b><br><span class="sub" style="margin:0">Cât e pornită, botul verifică periodic API-ul tău și sincronizează ticketele.</span></div>
       </div>
 
       <label>Adresa API-ului tău (base URL)</label>
-      <input type="text" name="api_base" value="{{ cfg.get('api_base','') }}" placeholder="https://jocultau.ro/api">
+      <input type="text" name="api_base" value="{{ cfg.get('api_base','') }}" placeholder="https://site-ul-tau.ro/tickets/api.php">
 
-      <label>Token secret (Bearer)</label>
+      <label>Token secret (Bearer) — același ca în api.php</label>
       <input type="password" name="api_token" value="{{ cfg.get('api_token','') }}" placeholder="tokenul tau secret">
 
       <div class="row2">
         <div>
-          <label>Categoria unde apar ticketele</label>
+          <label>Categoria Discord implicită</label>
           <select name="category_id">
             <option value="">— fără categorie —</option>
             {% for cat in categories %}
@@ -48,7 +58,7 @@
           </select>
         </div>
         <div>
-          <label>Rol staff (primește acces + ping)</label>
+          <label>Rol staff implicit (acces + ping)</label>
           <select name="staff_role_id">
             <option value="">— fără —</option>
             {% for r in roles %}
@@ -57,18 +67,75 @@
           </select>
         </div>
       </div>
+      <p class="sub" style="margin:8px 0 0">Setările implicite se folosesc pentru categoriile din joc care <b>nu au</b> o rută proprie mai jos.</p>
 
       <label>Cât de des verifică (secunde, minim 5)</label>
       <input type="text" name="poll_seconds" value="{{ cfg.get('poll_seconds', 10) }}" placeholder="10">
 
       <button class="save" type="submit">💾 Salvează</button>
     </form>
+  </div>
+
+  <div class="panel">
+    <h3>🗂️ Rute pe categorii ({{ cat_map|length }})</h3>
+    <p class="sub">Ca la tipurile de tickete: fiecare categorie din joc poate avea <b>categoria ei Discord</b> și <b>rolul ei de staff</b>. Ce nu e mapat aici merge pe setările implicite de sus.</p>
+
+    {% if cat_map %}
+      {% for m in cat_map %}
+      <div class="map">
+        <span class="gc">🎮 {{ m.game_category }}</span>
+        <span class="dest">
+          → 📁 {{ cat_name.get(m.category_id|string, 'implicit') if m.category_id else 'categoria implicită' }}
+          &nbsp;·&nbsp; 👥 {{ role_name.get(m.staff_role_id|string, 'implicit') if m.staff_role_id else 'rolul implicit' }}
+        </span>
+        <form method="POST" style="margin:0">
+          <input type="hidden" name="action" value="del_map">
+          <input type="hidden" name="idx" value="{{ loop.index0 }}">
+          <button class="del" type="submit">✕ Șterge</button>
+        </form>
+      </div>
+      {% endfor %}
+    {% else %}
+      <p class="sub" style="opacity:.7">Nicio rută încă — toate ticketele merg pe setările implicite. Adaugă mai jos.</p>
+    {% endif %}
+
+    <form method="POST" style="margin-top:16px; border-top:1px solid var(--glass-border); padding-top:16px">
+      <input type="hidden" name="action" value="add_map">
+      <div class="row3">
+        <div>
+          <label>Categoria din joc</label>
+          <input type="text" name="game_category" list="gcats" placeholder="Account Issues" required>
+          <datalist id="gcats">
+            {% for g in game_categories %}<option value="{{ g }}">{% endfor %}
+          </datalist>
+        </div>
+        <div>
+          <label>Categoria Discord</label>
+          <select name="category_id">
+            <option value="">— implicită —</option>
+            {% for cat in categories %}<option value="{{ cat.id }}">{{ cat.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label>Rol staff</label>
+          <select name="staff_role_id">
+            <option value="">— implicit —</option>
+            {% for r in roles %}<option value="{{ r.id }}">{{ r.name }}</option>{% endfor %}
+          </select>
+        </div>
+      </div>
+      <button class="save" type="submit">➕ Adaugă ruta</button>
+    </form>
+
+    <form method="POST" style="margin-top:10px">
+      <input type="hidden" name="action" value="load_categories">
+      <button class="save small" type="submit" style="background:var(--input); color:var(--text); border:1px solid var(--glass-border)">🔄 Încarcă categoriile din joc (de la API)</button>
+    </form>
 
     <p class="hint">
-      📋 <b>Cum funcționează:</b> botul întreabă API-ul tău la câteva secunde ce tickete/mesaje noi sunt.<br>
-      💬 În canalul unui ticket, staff-ul scrie normal → mesajul ajunge în joc. Comenzi rapide: <code>!rezolvat</code> (marchează rezolvat), <code>!inlucru</code> (în lucru).<br>
-      📄 Formatul exact al API-ului e în fișierul <b>METIN2_TICKET_API.md</b> din proiect — implementează rutele de acolo, pune base URL + token aici, și pornește.<br>
-      ⚠️ Cât timp nu ai completat base URL + token, puntea stă oprită chiar dacă bifezi (n-are unde să se conecteze).
+      🎫 Fiecare ticket din joc apare cu butoane, ca la ticketele de Discord: <b>✅ Rezolvat</b> · <b>🛠️ În lucru</b> (trimit statusul în joc) · <b>🙋 Claim</b> (staff-ul îl preia).<br>
+      💬 Orice mesaj scris de staff în canalul ticketului ajunge automat la jucător în joc.<br>
+      🔄 „Încarcă categoriile din joc" cere lista de la API-ul tău (<code>GET /categories</code>) — apoi le ai gata de ales la „Categoria din joc".
     </p>
   </div>
 {% endblock %}
