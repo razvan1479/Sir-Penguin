@@ -22,13 +22,16 @@
   .map .gc { font-weight:700; font-size:14px; min-width:140px; }
   .map .dest { color:var(--muted); font-size:13px; flex:1; line-height:1.5; }
   .del { background:var(--card); border:1px solid var(--glass-border); color:#fb7185; border-radius:8px; padding:6px 12px; cursor:pointer; font-size:13px; }
-  .rchips { display:flex; flex-wrap:wrap; gap:8px; margin-top:4px; max-height:150px; overflow-y:auto; padding:10px; background:var(--bg); border:1px solid var(--glass-border); border-radius:10px; }
-  .rchips::-webkit-scrollbar { width:8px; }
-  .rchips::-webkit-scrollbar-thumb { background:var(--glass-border); border-radius:8px; }
-  .rchips::-webkit-scrollbar-track { background:transparent; }
-  .rchip { display:inline-flex; align-items:center; gap:7px; background:var(--input); border:1px solid var(--glass-border); border-radius:20px; padding:7px 13px; font-size:13px; cursor:pointer; user-select:none; }
-  .rchip input { width:15px; height:15px; accent-color:var(--accent); }
-  .rchip .dot { width:9px; height:9px; border-radius:50%; }
+  .msel { position:relative; }
+  .msel-btn { width:100%; padding:11px; border-radius:8px; border:1px solid var(--glass-border); background:var(--bg); color:var(--text); font-size:14px; text-align:left; cursor:pointer; display:flex; justify-content:space-between; align-items:center; gap:8px; font-family:inherit; }
+  .msel-label { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--muted); }
+  .msel-label.has { color:var(--text); }
+  .msel-panel { display:none; position:absolute; z-index:30; left:0; right:0; top:calc(100% + 6px); background:var(--card); border:1px solid var(--glass-border); border-radius:10px; max-height:220px; overflow-y:auto; padding:6px; box-shadow:0 10px 30px rgba(0,0,0,.35); }
+  .msel.open .msel-panel { display:block; }
+  .msel-opt { display:flex; align-items:center; gap:9px; padding:9px 10px; border-radius:8px; cursor:pointer; font-size:13.5px; }
+  .msel-opt:hover { background:var(--input); }
+  .msel-opt input { width:16px; height:16px; accent-color:var(--accent); }
+  .msel-opt .dot { width:9px; height:9px; border-radius:50%; flex:none; }
 {% endblock %}
 {% block content %}
   {% if saved %}<div class="saved">✅ Salvat!</div>{% endif %}
@@ -65,12 +68,15 @@
           </select>
         </div>
       </div>
-      <label>Roluri staff implicite (acces + ping) — bifezi câte vrei</label>
-      <div class="rchips">
-        {% set sel = (cfg.get('staff_role_ids') or ([cfg.get('staff_role_id')] if cfg.get('staff_role_id') else []))|map('string')|list %}
-        {% for r in roles %}
-        <label class="rchip"><input type="checkbox" name="staff_role_ids" value="{{ r.id }}" {% if r.id|string in sel %}checked{% endif %}><span class="dot" style="background:{{ r.color or '#888' }}"></span>{{ r.name }}</label>
-        {% endfor %}
+      <label>Roluri staff implicite (acces + ping)</label>
+      {% set sel = (cfg.get('staff_role_ids') or ([cfg.get('staff_role_id')] if cfg.get('staff_role_id') else []))|map('string')|list %}
+      <div class="msel" data-msel>
+        <button type="button" class="msel-btn"><span class="msel-label" data-ph="— alege rolurile —">— alege rolurile —</span><span>▾</span></button>
+        <div class="msel-panel">
+          {% for r in roles %}
+          <label class="msel-opt"><input type="checkbox" name="staff_role_ids" value="{{ r.id }}" data-name="{{ r.name }}" {% if r.id|string in sel %}checked{% endif %}><span class="dot" style="background:{{ r.color or '#888' }}"></span>{{ r.name }}</label>
+          {% endfor %}
+        </div>
       </div>
       <p class="sub" style="margin:8px 0 0">Setările implicite se folosesc pentru categoriile din joc care <b>nu au</b> o rută proprie mai jos.</p>
 
@@ -125,10 +131,13 @@
         </div>
       </div>
       <label>Roluri staff pentru această categorie (gol = rolurile implicite)</label>
-      <div class="rchips">
-        {% for r in roles %}
-        <label class="rchip"><input type="checkbox" name="staff_role_ids" value="{{ r.id }}"><span class="dot" style="background:{{ r.color or '#888' }}"></span>{{ r.name }}</label>
-        {% endfor %}
+      <div class="msel" data-msel>
+        <button type="button" class="msel-btn"><span class="msel-label" data-ph="— rolurile implicite —">— rolurile implicite —</span><span>▾</span></button>
+        <div class="msel-panel">
+          {% for r in roles %}
+          <label class="msel-opt"><input type="checkbox" name="staff_role_ids" value="{{ r.id }}" data-name="{{ r.name }}"><span class="dot" style="background:{{ r.color or '#888' }}"></span>{{ r.name }}</label>
+          {% endfor %}
+        </div>
       </div>
       <button class="save" type="submit">➕ Adaugă ruta</button>
     </form>
@@ -144,4 +153,27 @@
       🔄 „Încarcă categoriile din joc" cere lista de la API-ul tău (<code>GET /categories</code>) — apoi le ai gata de ales la „Categoria din joc".
     </p>
   </div>
+  <script>
+    // dropdown cu checkbox-uri: deschide/inchide, arata rolurile alese pe buton
+    document.querySelectorAll('[data-msel]').forEach(ms => {
+      const btn = ms.querySelector('.msel-btn');
+      const label = ms.querySelector('.msel-label');
+      const ph = label.dataset.ph;
+      function upd() {
+        const names = [...ms.querySelectorAll('input:checked')].map(i => i.dataset.name);
+        if (names.length) { label.textContent = names.join(', '); label.classList.add('has'); }
+        else { label.textContent = ph; label.classList.remove('has'); }
+      }
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        document.querySelectorAll('[data-msel].open').forEach(o => { if (o !== ms) o.classList.remove('open'); });
+        ms.classList.toggle('open');
+      });
+      ms.querySelectorAll('input').forEach(i => i.addEventListener('change', upd));
+      upd();
+    });
+    document.addEventListener('click', e => {
+      document.querySelectorAll('[data-msel].open').forEach(o => { if (!o.contains(e.target)) o.classList.remove('open'); });
+    });
+  </script>
 {% endblock %}
