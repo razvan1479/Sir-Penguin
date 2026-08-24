@@ -1041,6 +1041,9 @@ def metin2(guild_id):
             cfg.pop("staff_role_id", None)  # formatul vechi (un rol) nu mai e necesar
             ps = _to_int(request.form.get("poll_seconds", "")) or 10
             cfg["poll_seconds"] = max(5, ps)
+            style = request.form.get("msg_style", "simplu")
+            if style in ("simplu", "embed", "citat", "terminal"):
+                cfg["msg_style"] = style
         elif action == "add_map":
             gc = request.form.get("game_category", "").strip()[:100]
             if gc and len(cfg["cat_map"]) < 25:

@@ -54,6 +54,16 @@
   .msel-opt input { width:16px; height:16px; accent-color:var(--accent); flex:none; }
   .msel-opt .dot { width:9px; height:9px; border-radius:50%; flex:none; }
   .help { font-size:12px; color:var(--muted); margin:6px 2px 0; line-height:1.55; }
+  .styles { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:4px; }
+  @media (max-width:640px){ .styles { grid-template-columns:1fr; } }
+  .style-opt { display:block; background:var(--bg); border:2px solid var(--glass-border); border-radius:10px; padding:12px; cursor:pointer; transition:border-color .15s; }
+  .style-opt.on { border-color:var(--accent); }
+  .style-opt input { display:none; }
+  .style-opt > span { display:block; margin-top:8px; font-size:13px; font-weight:700; color:var(--text); }
+  .prev { background:var(--card); border-radius:6px; padding:8px; }
+  .pv { background:var(--input); border-radius:4px; padding:8px 10px; font-size:12px; color:var(--text); line-height:1.5; }
+  .pv b { font-size:11px; }
+  .pv.mono { font-family:ui-monospace,monospace; font-size:11px; }
 {% endblock %}
 {% block content %}
   {% if saved %}<div class="saved">✅ Salvat!</div>{% endif %}
@@ -113,6 +123,33 @@
         <div class="field disc">
           <label>⏱️ Cât de des verifică (secunde, minim 5)</label>
           <input type="text" name="poll_seconds" value="{{ cfg.get('poll_seconds', 10) }}" placeholder="10">
+        </div>
+
+        <div class="field disc">
+          <label>💬 Stilul mesajelor de la jucători pe Discord</label>
+          {% set st = cfg.get('msg_style','simplu') %}
+          <div class="styles">
+            <label class="style-opt {% if st=='simplu' %}on{% endif %}">
+              <input type="radio" name="msg_style" value="simplu" {% if st=='simplu' %}checked{% endif %}>
+              <div class="prev"><div class="pv"><b>🎮 ionut26</b><br>bai iDeaL da te n plm</div></div>
+              <span>Simplu (fără embed)</span>
+            </label>
+            <label class="style-opt {% if st=='embed' %}on{% endif %}">
+              <input type="radio" name="msg_style" value="embed" {% if st=='embed' %}checked{% endif %}>
+              <div class="prev"><div class="pv" style="border-left:4px solid #eb459e"><b>ionut26</b><br>bai iDeaL da te n plm<br><small style="opacity:.6">Ticket #14</small></div></div>
+              <span>Embed complet</span>
+            </label>
+            <label class="style-opt {% if st=='citat' %}on{% endif %}">
+              <input type="radio" name="msg_style" value="citat" {% if st=='citat' %}checked{% endif %}>
+              <div class="prev"><div class="pv"><b>🎮 ionut26</b><br><span style="border-left:3px solid #4e5058;padding-left:8px;display:inline-block">bai iDeaL da te n plm</span></div></div>
+              <span>Citat (quote)</span>
+            </label>
+            <label class="style-opt {% if st=='terminal' %}on{% endif %}">
+              <input type="radio" name="msg_style" value="terminal" {% if st=='terminal' %}checked{% endif %}>
+              <div class="prev"><div class="pv mono" style="color:#2aa198">ionut26 · #14<br><span style="color:var(--text)">bai iDeaL da te n plm</span></div></div>
+              <span>Terminal / joc</span>
+            </label>
+          </div>
         </div>
 
         <button class="save" type="submit">💾 Salvează</button>
@@ -230,6 +267,13 @@
     });
     document.addEventListener('click', e => {
       document.querySelectorAll('[data-msel].open').forEach(o => { if (!o.contains(e.target)) o.classList.remove('open'); });
+    });
+    // selector stil mesaj: evidentiaza cardul bifat
+    document.querySelectorAll('.style-opt input').forEach(r => {
+      r.addEventListener('change', () => {
+        document.querySelectorAll('.style-opt').forEach(o => o.classList.remove('on'));
+        if (r.checked) r.closest('.style-opt').classList.add('on');
+      });
     });
   </script>
 {% endblock %}

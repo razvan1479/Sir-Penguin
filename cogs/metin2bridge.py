@@ -27,6 +27,53 @@ from utils import storage
 # ca sa stim, cand scrie staff intr-un canal, la ce ticket din joc apartine.
 
 
+def _player_message(m, style="simplu"):
+    """Construieste mesajul unui jucator in stilul ales din dashboard.
+    Intoarce (content, embed) — content e text simplu, embed poate fi None.
+    Stiluri: simplu, embed, citat, terminal."""
+    name = m.get("sender_name", "Jucator")
+    text = m.get("text", "") or ""
+    img = m.get("image_url")
+    tid = m.get("ticket_id", "")
+
+    if style == "embed":
+        # embed complet: bara colorata + autor cu iconita + footer cu numarul ticketului
+        e = discord.Embed(description=text or "\u200b", color=discord.Color(0xEB459E))
+        e.set_author(name=name)
+        e.set_footer(text=f"Ticket #{tid}")
+        if img:
+            e.set_image(url=img)
+        return None, e
+
+    if style == "citat":
+        # numele + mesajul ca un citat (blockquote Discord: „> ")
+        quoted = "\n".join(f"> {line}" for line in text.split("\n")) if text else "> \u200b"
+        content = f"🎮 **{name}**\n{quoted}"
+        e = None
+        if img:
+            e = discord.Embed(color=discord.Color(0x4E5058))
+            e.set_image(url=img)
+        return content, e
+
+    if style == "terminal":
+        # bloc de cod colorat, doar numele + numarul ticketului (fara [JOC])
+        body = text.replace("```", "'''")
+        content = f"```ansi\n\u001b[36m{name}\u001b[0m \u001b[30m· #{tid}\u001b[0m\n{body}\n```"
+        e = None
+        if img:
+            e = discord.Embed(color=discord.Color(0x2B2D31))
+            e.set_image(url=img)
+        return content, e
+
+    # implicit „simplu” — mesaj normal, fara embed: 🎮 nume + text
+    content = f"🎮 **{name}**\n{text}" if text else f"🎮 **{name}**"
+    e = None
+    if img:
+        e = discord.Embed(color=discord.Color(0x3BA55D))
+        e.set_image(url=img)
+    return content, e
+
+
 def _cfg(gid):
     return storage.get(gid, "metin2", {}) or {}
 
@@ -155,14 +202,9 @@ class Metin2Bridge(commands.Cog):
                 channel = guild.get_channel(int(cid))
                 if channel is None:
                     continue
-                embed = discord.Embed(
-                    description=m.get("text", ""),
-                    color=discord.Color(0x3BA55D))
-                embed.set_author(name=f"🎮 {m.get('sender_name','Jucator')}")
-                if m.get("image_url"):
-                    embed.set_image(url=m["image_url"])
+                content, embed = _player_message(m, cfg.get("msg_style", "simplu"))
                 try:
-                    await channel.send(embed=embed)
+                    await channel.send(content=content, embed=embed)
                     acked.append(m.get("id"))
                 except discord.HTTPException:
                     pass
