@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Surse invite · {{ meta.get('name','Server') }}{% endblock %}
+
+{% block extra_style %}
+  .cfg { background:var(--card); border-radius:14px; padding:22px; margin-bottom:18px; }
+  h3 { margin:0 0 6px; font-size:16px; }
+  .sub { color:var(--muted); font-size:13px; margin:0 0 16px; line-height:1.6; }
+  .empty { background:var(--input); border-radius:10px; padding:24px; color:var(--muted); text-align:center; line-height:1.6; }
+  .src { background:var(--card); border:1px solid var(--glass-border, #ffffff14); border-left:4px solid var(--accent); border-radius:14px; padding:0; margin-bottom:16px; overflow:hidden; }
+  .src-head { display:flex; align-items:center; gap:14px; padding:16px 20px; background:rgba(255,255,255,.02); flex-wrap:wrap; }
+  .src-name { font-size:17px; font-weight:700; }
+  .badges { display:flex; gap:8px; }
+  .b { font-size:12px; font-weight:700; padding:3px 11px; border-radius:20px; }
+  .b.on { background:#1e3a23; color:#3ba55d; }
+  .b.off { background:#3a1e1e; color:#ed4245; }
+  .b.tot { background:var(--input); color:var(--muted); }
+  .link { margin-left:auto; display:flex; align-items:center; gap:8px; }
+  .link code { background:var(--input); padding:6px 12px; border-radius:8px; font-size:13px; color:#9bb7ff; }
+  .del { background:var(--input); border:none; color:#ed4245; border-radius:8px; padding:7px 12px; cursor:pointer; font-size:13px; }
+  .src-body { padding:14px 20px 18px; }
+  .members { display:flex; flex-direction:column; gap:7px; max-height:340px; overflow-y:auto; }
+  .m { display:flex; align-items:center; gap:10px; background:var(--input); border-radius:9px; padding:9px 13px; font-size:14px; }
+  .m .nm { font-weight:600; }
+  .m .when { color:var(--muted); font-size:12px; margin-left:auto; }
+  .m.left { opacity:.55; }
+  .none { color:var(--muted); font-size:13px; padding:6px 0; }
+  .help { background:var(--input); border-radius:12px; padding:16px 18px; font-size:13px; color:var(--muted); line-height:1.7; margin-bottom:18px; }
+  .help b { color:var(--text); }
+{% endblock %}
+
+{% block content %}
+  <div class="cfg">
+    <h3>🔗 Surse de invite</h3>
+    <p class="sub">Linkuri de invite etichetate pe surse (site, TikTok, etc.). Pune linkul pe site și vezi aici <b>cine</b> a intrat prin el.</p>
+    <div class="help">
+      Creezi o sursă din Discord cu <b>/sursa creaza <nume></b> (ex. <code>/sursa creaza Site</code>) — botul îți dă un link.<br>
+      Pui linkul pe site. Cine intră prin el apare mai jos, cu ✅ dacă e încă pe server sau ❌ dacă a plecat.
+    </div>
+  </div>
+
+  {% if not sources %}
+    <div class="empty">
+      Nicio sursă încă.<br>
+      Creează una din Discord: <b>/sursa creaza Site</b>, apoi pune linkul primit pe site.
+    </div>
+  {% else %}
+    {% for s in sources %}
+    <div class="src">
+      <div class="src-head">
+        <span class="src-name">{{ s.label }}</span>
+        <div class="badges">
+          <span class="b on">✅ {{ s.present }} pe server</span>
+          {% if s.left %}<span class="b off">❌ {{ s.left }} plecați</span>{% endif %}
+          <span class="b tot">{{ s.total }} total</span>
+        </div>
+        <div class="link">
+          <code>{{ s.link }}</code>
+          <form method="POST" onsubmit="return confirm('Ștergi sursa „{{ s.label }}” din evidență? (linkul de invite rămâne activ pe Discord)')" style="margin:0">
+            <input type="hidden" name="action" value="delete">
+            <input type="hidden" name="code" value="{{ s.code }}">
+            <button class="del" type="submit">🗑️ Șterge</button>
+          </form>
+        </div>
+      </div>
+      <div class="src-body">
+        {% if s.joins %}
+        <div class="members">
+          {% for j in s.joins %}
+          <div class="m {% if j.left %}left{% endif %}">
+            <span>{% if j.left %}❌{% else %}✅{% endif %}</span>
+            <span class="nm">{{ j.member_name }}</span>
+            {% if j.when %}<span class="when">{{ j.when }}</span>{% endif %}
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="none">Încă n-a intrat nimeni prin acest link.</div>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  {% endif %}
+{% endblock %}

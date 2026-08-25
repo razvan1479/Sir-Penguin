@@ -60,6 +60,7 @@
       <label>Text (descriere)</label>
       <textarea name="description" id="description" placeholder="**1. Dispozitii Generale**&#10;• Regula 1&#10;• Regula 2">{{ current.get('description','') }}</textarea>
       <p class="hint">Markdown: <code>**ingrosat**</code> <code>*inclinat*</code> · linie noua = Enter · bullet: incepe randul cu <code>•</code> sau <code>-</code></p>
+      <p class="hint">🔗 Linkuri către canale: scrie <code>#nume-canal</code> (ex. <code>#rules</code>) și botul îl face automat link clicabil care duce la canal. Numele trebuie scris exact ca al canalului.</p>
 
       <label>Culoare</label>
       <input type="color" name="color" id="color" value="{{ current.get('color','#1abc9c') }}">

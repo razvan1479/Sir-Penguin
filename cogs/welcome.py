@@ -72,7 +72,22 @@ class Welcome(commands.Cog):
         # linia cu sursa invitatiei
         if cfg.get("show_inviter", True) and inviter_info:
             t = inviter_info.get("type")
-            if t == "personal" and inviter_info.get("inviter_id"):
+            # daca a intrat printr-un link-sursa etichetat (ex. "discordcreator"),
+            # aratam numele sursei ca invitator, indiferent cine a creat linkul
+            src_label = None
+            code = inviter_info.get("code")
+            if code:
+                srcs = storage.get(member.guild.id, "invite_sources", {}) or {}
+                src = srcs.get(code)
+                if src:
+                    src_label = src.get("label")
+
+            if src_label:
+                embed.add_field(
+                    name="📨 Invitat de",
+                    value=f"**{src_label}**",
+                    inline=False)
+            elif t == "personal" and inviter_info.get("inviter_id"):
                 from cogs.invites import invite_total
                 members = storage.get(member.guild.id, "invites", {}).get("members", {})
                 total = invite_total(members.get(str(inviter_info["inviter_id"]), {}))

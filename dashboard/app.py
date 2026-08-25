@@ -911,9 +911,51 @@ def backups(guild_id):
                            meta=storage.get(gid, "meta", {}), section="backups")
 
 
-@app.route("/invitelog/<guild_id>", methods=["GET", "POST"])
+@app.route("/surse/<guild_id>", methods=["GET", "POST"])
 @guild_required
-def invitelog(guild_id):
+def invite_sources_page(guild_id):
+    gid = int(guild_id)
+    srcs = storage.get(gid, "invite_sources", {}) or {}
+
+    if request.method == "POST":
+        action = request.form.get("action")
+        if action == "delete":
+            code = request.form.get("code")
+            if code in srcs:
+                srcs.pop(code, None)
+                storage.set(gid, "invite_sources", srcs)
+        return redirect(url_for("invite_sources_page", guild_id=guild_id))
+
+    # din istoricul de invitatii: cine a intrat prin fiecare cod-sursa
+    hist = (storage.get(gid, "invites", {}) or {}).get("history", [])
+    sources = []
+    for code, s in sorted(srcs.items(), key=lambda kv: kv[1].get("label", "")):
+        seen, joins = set(), []
+        for e in hist:
+            if e.get("code") != code or e.get("member") in seen:
+                continue
+            seen.add(e.get("member"))
+            _ts = e.get("ts", 0)
+            joins.append({"member_id": e.get("member"),
+                          "member_name": e.get("member_name") or e.get("member"),
+                          "ts": _ts,
+                          "when": (time.strftime("%d.%m.%Y %H:%M", time.localtime(_ts))
+                                   if _ts else ""),
+                          "left": e.get("left", False)})
+        joins.sort(key=lambda j: -j["ts"])
+        sources.append({
+            "code": code, "label": s.get("label", "?"),
+            "link": f"https://discord.gg/{code}",
+            "present": sum(1 for j in joins if not j["left"]),
+            "left": sum(1 for j in joins if j["left"]),
+            "total": len(joins), "joins": joins})
+
+    return render_template("sources.html", guild_id=guild_id,
+                           sources=sources, meta=storage.get(gid, "meta", {}),
+                           section="surse")
+
+
+
     gid = int(guild_id)
 
     data = storage.get(gid, "invites", {}) or {}

@@ -31,6 +31,25 @@ from utils import storage
 from utils.perms import bot_access
 
 
+def _linkify_channels(text: str, guild) -> str:
+    """Transforma #nume-canal in <#ID> ca Discord sa-l faca link clicabil.
+    Cauta canalul dupa nume pe server; daca nu-l gaseste, lasa textul asa cum e."""
+    if not text or guild is None:
+        return text or ""
+    # numele de canale pe Discord: litere mici, cifre, cratime, underscore
+    import re
+
+    def repl(m):
+        raw = m.group(1)
+        name = raw.lower().replace(" ", "-")
+        ch = discord.utils.get(guild.channels, name=name) \
+            or discord.utils.get(guild.channels, name=raw)
+        return f"<#{ch.id}>" if ch else m.group(0)
+
+    # prinde #ceva (dar nu daca e deja <#123> — acelea incep cu <)
+    return re.sub(r"(?<!<)#([A-Za-z0-9_\- ]{1,90}?)(?=\s|$|[.,;:!?)\]])", repl, text)
+
+
 def _color_from_hex(value: str) -> discord.Color:
     try:
         return discord.Color(int(str(value).lstrip("#"), 16))
@@ -38,11 +57,13 @@ def _color_from_hex(value: str) -> discord.Color:
         return discord.Color.blurple()
 
 
-def build_embed(data: dict) -> discord.Embed:
-    """Construieste un discord.Embed dintr-un dict salvat in dashboard."""
+def build_embed(data: dict, guild=None) -> discord.Embed:
+    """Construieste un discord.Embed dintr-un dict salvat in dashboard.
+    Daca primeste guild, transforma #nume-canal in linkuri clicabile."""
+    desc = _linkify_channels(data.get("description") or "", guild) or None
     embed = discord.Embed(
         title=(data.get("title") or None),
-        description=(data.get("description") or None),
+        description=desc,
         color=_color_from_hex(data.get("color", "#5865f2")),
     )
     if data.get("thumbnail"):
@@ -53,6 +74,11 @@ def build_embed(data: dict) -> discord.Embed:
         embed.set_footer(text=data["footer"])
     if data.get("author"):
         embed.set_author(name=data["author"])
+    for f in data.get("fields", []):
+        embed.add_field(
+            name=_linkify_channels(f.get("name", "\u200b"), guild) or "\u200b",
+            value=_linkify_channels(f.get("value", "\u200b"), guild) or "\u200b",
+            inline=bool(f.get("inline", False)))
     return embed
 
 
@@ -75,7 +101,7 @@ class Embeds(commands.Cog):
 
         target = canal or interaction.channel
         try:
-            await target.send(embed=build_embed(data))
+            await target.send(embed=build_embed(data, interaction.guild))
         except discord.HTTPException as e:
             return await interaction.response.send_message(
                 f"Nu am putut posta embed-ul: `{e}` (verifica linkurile imaginilor).", ephemeral=True)
@@ -89,7 +115,7 @@ class Embeds(commands.Cog):
         if not data:
             return await interaction.response.send_message(
                 f"Nu exista un embed numit `{nume}`.", ephemeral=True)
-        await interaction.response.send_message(embed=build_embed(data), ephemeral=True)
+        await interaction.response.send_message(embed=build_embed(data, interaction.guild), ephemeral=True)
 
     @group.command(name="list", description="Lista embed-urilor salvate")
     async def list_embeds(self, interaction: discord.Interaction):
