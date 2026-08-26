@@ -56,10 +56,15 @@
   .help { font-size:12px; color:var(--muted); margin:6px 2px 0; line-height:1.55; }
   .styles { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:4px; }
   @media (max-width:640px){ .styles { grid-template-columns:1fr; } }
-  .style-opt { display:block; background:var(--bg); border:2px solid var(--glass-border); border-radius:10px; padding:12px; cursor:pointer; transition:border-color .15s; }
-  .style-opt.on { border-color:var(--accent); }
-  .style-opt input { display:none; }
-  .style-opt > span { display:block; margin-top:8px; font-size:13px; font-weight:700; color:var(--text); }
+  .style-opt { position:relative; display:block; background:var(--bg); border:2px solid var(--glass-border); border-radius:10px; padding:12px 12px 12px 40px; cursor:pointer; transition:border-color .15s, background .15s; }
+  .style-opt .tick { position:absolute; left:13px; top:13px; width:18px; height:18px; border-radius:50%; border:2px solid var(--glass-border); background:var(--card); transition:all .15s; }
+  .style-opt input { position:absolute; opacity:0; width:0; height:0; }
+  /* evidentiere prin CSS pur — merge chiar daca JS-ul nu ruleaza */
+  .style-opt:has(input:checked) { border-color:var(--accent); background:rgba(88,101,242,.06); }
+  .style-opt:has(input:checked) .tick { border-color:var(--accent); background:var(--accent); box-shadow:inset 0 0 0 3px var(--card); }
+  .style-opt.on { border-color:var(--accent); background:rgba(88,101,242,.06); }  /* fallback JS */
+  .style-opt.on .tick { border-color:var(--accent); background:var(--accent); box-shadow:inset 0 0 0 3px var(--card); }
+  .style-opt .lbl { display:block; margin-top:8px; font-size:13px; font-weight:700; color:var(--text); }
   .prev { background:var(--card); border-radius:6px; padding:8px; }
   .pv { background:var(--input); border-radius:4px; padding:8px 10px; font-size:12px; color:var(--text); line-height:1.5; }
   .pv b { font-size:11px; }
@@ -129,25 +134,29 @@
           <label>💬 Stilul mesajelor de la jucători pe Discord</label>
           {% set st = cfg.get('msg_style','simplu') %}
           <div class="styles">
-            <label class="style-opt {% if st=='simplu' %}on{% endif %}">
-              <input type="radio" name="msg_style" value="simplu" {% if st=='simplu' %}checked{% endif %}>
+            <label class="style-opt" for="ms_simplu">
+              <input type="radio" name="msg_style" id="ms_simplu" value="simplu" {% if st=='simplu' %}checked{% endif %}>
+              <span class="tick"></span>
               <div class="prev"><div class="pv"><b>🎮 ionut26</b><br>bai iDeaL da te n plm</div></div>
-              <span>Simplu (fără embed)</span>
+              <span class="lbl">Simplu (fără embed)</span>
             </label>
-            <label class="style-opt {% if st=='embed' %}on{% endif %}">
-              <input type="radio" name="msg_style" value="embed" {% if st=='embed' %}checked{% endif %}>
+            <label class="style-opt" for="ms_embed">
+              <input type="radio" name="msg_style" id="ms_embed" value="embed" {% if st=='embed' %}checked{% endif %}>
+              <span class="tick"></span>
               <div class="prev"><div class="pv" style="border-left:4px solid #eb459e"><b>ionut26</b><br>bai iDeaL da te n plm<br><small style="opacity:.6">Ticket #14</small></div></div>
-              <span>Embed complet</span>
+              <span class="lbl">Embed complet</span>
             </label>
-            <label class="style-opt {% if st=='citat' %}on{% endif %}">
-              <input type="radio" name="msg_style" value="citat" {% if st=='citat' %}checked{% endif %}>
+            <label class="style-opt" for="ms_citat">
+              <input type="radio" name="msg_style" id="ms_citat" value="citat" {% if st=='citat' %}checked{% endif %}>
+              <span class="tick"></span>
               <div class="prev"><div class="pv"><b>🎮 ionut26</b><br><span style="border-left:3px solid #4e5058;padding-left:8px;display:inline-block">bai iDeaL da te n plm</span></div></div>
-              <span>Citat (quote)</span>
+              <span class="lbl">Citat (quote)</span>
             </label>
-            <label class="style-opt {% if st=='terminal' %}on{% endif %}">
-              <input type="radio" name="msg_style" value="terminal" {% if st=='terminal' %}checked{% endif %}>
+            <label class="style-opt" for="ms_terminal">
+              <input type="radio" name="msg_style" id="ms_terminal" value="terminal" {% if st=='terminal' %}checked{% endif %}>
+              <span class="tick"></span>
               <div class="prev"><div class="pv mono" style="color:#2aa198">ionut26 · #14<br><span style="color:var(--text)">bai iDeaL da te n plm</span></div></div>
-              <span>Terminal / joc</span>
+              <span class="lbl">Terminal / joc</span>
             </label>
           </div>
         </div>
@@ -249,8 +258,10 @@
   <script>
     // dropdown cu checkbox-uri: deschide/inchide, arata rolurile alese pe buton
     document.querySelectorAll('[data-msel]').forEach(ms => {
+      try {
       const btn = ms.querySelector('.msel-btn');
       const label = ms.querySelector('.msel-label');
+      if (!btn || !label) return;
       const ph = label.dataset.ph;
       function upd() {
         const names = [...ms.querySelectorAll('input:checked')].map(i => i.dataset.name);
@@ -264,6 +275,7 @@
       });
       ms.querySelectorAll('input').forEach(i => i.addEventListener('change', upd));
       upd();
+      } catch (e) { /* daca un dropdown are o problema, nu blocam restul paginii */ }
     });
     document.addEventListener('click', e => {
       document.querySelectorAll('[data-msel].open').forEach(o => { if (!o.contains(e.target)) o.classList.remove('open'); });
