@@ -1086,6 +1086,8 @@ def metin2(guild_id):
             style = request.form.get("msg_style", "simplu")
             if style in ("simplu", "embed", "citat", "terminal"):
                 cfg["msg_style"] = style
+            mode = request.form.get("route_mode", "implicit")
+            cfg["route_mode"] = "rute" if mode == "rute" else "implicit"
         elif action == "add_map":
             gc = request.form.get("game_category", "").strip()[:100]
             if gc and len(cfg["cat_map"]) < 25:

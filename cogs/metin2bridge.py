@@ -96,7 +96,16 @@ def _staff_ids(d):
 
 def _route_for(cfg, game_category):
     """Gaseste ruta pentru o categorie din joc: (categoria Discord, rolurile staff).
-    Daca nu exista mapare pentru categoria respectiva -> setarile implicite."""
+
+    Modul e ales din dashboard (cheia "route_mode"):
+      - "implicit"  -> TOT pe setarile implicite (rutele sunt ignorate)
+      - "rute"      -> foloseste ruta categoriei; ce n-are ruta cade pe implicit
+    Implicit (daca nu e setat) = "implicit", ca sa nu se schimbe comportamentul brusc.
+    """
+    if cfg.get("route_mode", "implicit") != "rute":
+        # mod implicit: totul merge pe categoria + rolurile implicite
+        return cfg.get("category_id"), _staff_ids(cfg)
+
     gc = (game_category or "").strip().lower()
     for m in cfg.get("cat_map", []):
         if (m.get("game_category") or "").strip().lower() == gc and gc:
