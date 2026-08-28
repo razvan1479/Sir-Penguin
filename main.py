@@ -97,7 +97,23 @@ class MyBot(commands.Bot):
             return
         self._did_sync = True
 
-        sig = ",".join(sorted(c.qualified_name for c in self.tree.walk_commands()))
+        # Semnatura comenzilor: include NUMELE + toti parametrii (nume+tip+optional)
+        # + descrierile, ca orice modificare (nu doar comenzi noi) sa declanseze
+        # re-sincronizarea. Inainte foloseam doar numele, deci adaugarea unei
+        # optiuni noi la o comanda existenta nu era prinsa.
+        def _cmd_fingerprint(c):
+            parts = [c.qualified_name, getattr(c, "description", "") or ""]
+            for pr in getattr(c, "parameters", []) or []:
+                parts.append(f"{pr.name}:{getattr(pr.type, 'name', pr.type)}:"
+                             f"{'req' if pr.required else 'opt'}")
+                # includem si numele optiunilor din choices, daca exista
+                for ch in getattr(pr, "choices", []) or []:
+                    parts.append(f"ch={ch.name}={ch.value}")
+            return "|".join(str(p) for p in parts)
+
+        sig = ";;".join(sorted(
+            _cmd_fingerprint(c) for c in self.tree.walk_commands()
+            if not hasattr(c, "walk_commands")))
         saved_sig = storage.get("_global", "cmd_sig", None)
         synced = set(storage.get("_global", "synced_guilds", []) or [])
 
