@@ -56,6 +56,41 @@ def _save(gid, data):
     storage.set(gid, "tickets", data)
 
 
+def _ensure_panels(data):
+    """Trece de la structura veche (un singur "panel") la cea noua ("panels" lista).
+    Nu pierde nimic: panoul vechi + toate tipurile devin primul panou "main"."""
+    if "panels" in data and isinstance(data["panels"], list):
+        # tipurile fara panel_id le legam de primul panou (siguranta)
+        first = data["panels"][0]["id"] if data["panels"] else "main"
+        for t in data.get("types", []):
+            if not t.get("panel_id"):
+                t["panel_id"] = first
+        return data
+    old = data.get("panel", {}) or {}
+    data["panels"] = [{
+        "id": "main",
+        "title": old.get("title", ""),
+        "description": old.get("description", ""),
+        "color": old.get("color", "#5865f2"),
+        "image": old.get("image", ""),
+        "thumbnail": old.get("thumbnail", ""),
+    }]
+    for t in data.get("types", []):
+        t.setdefault("panel_id", "main")
+    return data
+
+
+def _panel(data, panel_id):
+    for p in data.get("panels", []):
+        if p.get("id") == panel_id:
+            return p
+    return None
+
+
+def _types_for_panel(data, panel_id):
+    return [t for t in data.get("types", []) if t.get("panel_id") == panel_id]
+
+
 def _type(data, type_id):
     for t in data.get("types", []):
         if t.get("id") == type_id:
@@ -350,16 +385,36 @@ class Tickets(commands.Cog):
         await interaction.response.send_message(f"✅ {target.mention} a fost {verb} ticket.")
 
     # -------- postare panou (comanda admin) --------
-    @app_commands.command(name="ticket_panel", description="Posteaza panoul de tickete in acest canal")
-    async def ticket_panel(self, interaction: discord.Interaction):
+    @app_commands.command(name="ticket_panel", description="Posteaza un panou de tickete in acest canal")
+    @app_commands.describe(panou="Care panou sa-l postezi (daca ai mai multe)")
+    async def ticket_panel(self, interaction: discord.Interaction, panou: str = None):
         if not has_bot_access(interaction):
             return await interaction.response.send_message("Nu ai acces.", ephemeral=True)
-        data = _data(interaction.guild_id)
-        types = data.get("types", [])
+        data = _ensure_panels(_data(interaction.guild_id))
+        panels = data.get("panels", [])
+        if not panels:
+            return await interaction.response.send_message(
+                "Nu ai niciun panou configurat. Mergi pe dashboard.", ephemeral=True)
+
+        # alegem panoul: dupa nume/id dat, altfel primul
+        p = None
+        if panou:
+            for cand in panels:
+                if cand.get("id") == panou or (cand.get("title") or "").lower() == panou.lower():
+                    p = cand
+                    break
+            if not p:
+                return await interaction.response.send_message(
+                    f"Nu am gasit panoul „{panou}”. Vezi `/ticket_panel` fara argument "
+                    f"ca sa-l postezi pe primul, sau alege din lista.", ephemeral=True)
+        else:
+            p = panels[0]
+
+        types = _types_for_panel(data, p["id"])
         if not types:
             return await interaction.response.send_message(
-                "Nu ai configurat niciun tip de ticket. Mergi pe dashboard.", ephemeral=True)
-        p = data.get("panel", {})
+                f"Panoul „{p.get('title') or p['id']}” nu are niciun tip de ticket. "
+                f"Adauga tipuri pe dashboard.", ephemeral=True)
         embed = discord.Embed(
             title=p.get("title") or "🎫 Suport",
             description=p.get("description") or "Apasa un buton mai jos ca sa deschizi un ticket.",
@@ -369,7 +424,18 @@ class Tickets(commands.Cog):
         if p.get("thumbnail"):
             embed.set_thumbnail(url=p["thumbnail"])
         await interaction.channel.send(embed=embed, view=build_panel_view(types))
-        await interaction.response.send_message("✅ Panou postat.", ephemeral=True)
+        await interaction.response.send_message(
+            f"✅ Panoul „{p.get('title') or p['id']}” postat.", ephemeral=True)
+
+    @ticket_panel.autocomplete("panou")
+    async def _panel_ac(self, interaction: discord.Interaction, current: str):
+        data = _ensure_panels(_data(interaction.guild_id))
+        out = []
+        for p in data.get("panels", []):
+            label = p.get("title") or p["id"]
+            if current.lower() in label.lower():
+                out.append(app_commands.Choice(name=label[:100], value=p["id"]))
+        return out[:25]
 
 
 async def setup(bot: commands.Bot):

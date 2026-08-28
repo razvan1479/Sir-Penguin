@@ -26,22 +26,58 @@
     .badges span { display:inline-block; background:var(--card); padding:2px 8px; border-radius:6px; font-size:11px; margin-right:5px; }
     .empty { background:var(--input); border-radius:8px; padding:14px; color:var(--muted); font-size:13px; }
     .divider { border:none; border-top:1px solid var(--input); margin:16px 0; }
+    .panelgroup { margin-bottom:18px; }
+    .pg-head { font-size:13px; font-weight:800; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); padding:8px 0; border-bottom:1px solid var(--input); margin-bottom:10px; }
+    .pg-head span { color:var(--accent); }
 {% endblock %}
 
 {% block content %}
   {% if saved %}<div class="saved">✓ Salvat!</div>{% endif %}
 
-  <!-- ASPECT PANOU -->
-  <form class="panel" method="POST">
-    <input type="hidden" name="action" value="panel">
-    <h3>🎨 Aspectul panoului</h3>
+  <!-- PANOURI -->
+  <div class="panel">
+    <h3>🗂️ Panouri de tickete ({{ panels|length }})</h3>
+    <p class="hint" style="margin-top:-4px">Poți avea mai multe panouri, fiecare cu tipurile lui (ex. „Suport” într-un canal, „Reclamații” în altul). Postezi fiecare panou cu <b>/ticket_panel</b> în canalul dorit (îți alegi panoul din listă).</p>
+    {% for p in panels %}
+    <div class="type">
+      <div>
+        <b style="color:{{ p.color }}">{{ p.title or 'Panou fără titlu' }}</b>
+        <div class="meta">{{ types|selectattr('panel_id','equalto',p.id)|list|length }} tipuri de tickete · <code>/ticket_panel</code> → alegi „{{ p.title or p.id }}”</div>
+      </div>
+      <div style="display:flex; gap:8px; align-items:flex-start">
+        <a class="del" style="background:var(--input); text-decoration:none; display:inline-flex; align-items:center" href="/tickets/{{ guild_id }}?editpanel={{ p.id }}#panelform">✏️ Editează</a>
+        {% if panels|length > 1 %}
+        <form method="POST" onsubmit="return confirm('Ștergi panoul „{{ p.title or p.id }}”? Tipurile lui trec pe primul panou rămas.')">
+          <input type="hidden" name="action" value="del_panel">
+          <input type="hidden" name="panel_id" value="{{ p.id }}">
+          <button class="del" type="submit">Șterge</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- ADAUGA / EDITEAZA PANOU -->
+  <form class="panel" method="POST" id="panelform">
+    {% if editing_panel %}
+    <input type="hidden" name="action" value="edit_panel">
+    <input type="hidden" name="panel_id" value="{{ editing_panel.id }}">
+    <h3>✏️ Editează panoul: {{ editing_panel.title or editing_panel.id }}</h3>
+    <p class="hint" style="margin-top:-6px"><a href="/tickets/{{ guild_id }}" style="color:#9bb7ff">Anulează editarea</a></p>
+    {% set pd = editing_panel %}
+    {% else %}
+    <input type="hidden" name="action" value="add_panel">
+    <h3>➕ Adaugă un panou</h3>
+    {% set pd = {} %}
+    {% endif %}
     <label>Titlu</label>
-    <input type="text" name="title" value="{{ panel.get('title','') }}" placeholder="🎫 Suport">
+    <input type="text" name="title" value="{{ pd.get('title','') }}" placeholder="🎫 Suport">
     <label>Descriere</label>
-    <textarea name="description" placeholder="Apasa un buton mai jos ca sa deschizi un ticket.">{{ panel.get('description','') }}</textarea>
+    <textarea name="description" placeholder="Apasa un buton mai jos ca sa deschizi un ticket.">{{ pd.get('description','') }}</textarea>
     <div class="row2">
-      <div><label>Culoare</label><input type="color" name="color" value="{{ panel.get('color','#5865f2') }}"></div>
-      <div><label>Canal loguri/transcript</label>
+      <div><label>Culoare</label><input type="color" name="color" value="{{ pd.get('color','#5865f2') }}"></div>
+      <div><label>Canal loguri/transcript (comun)</label>
         <select name="log_channel_id">
           <option value="">— niciunul —</option>
           {% for ch in text_channels %}<option value="{{ ch.id }}" {% if data.get('log_channel_id')|string==ch.id %}selected{% endif %}>#{{ ch.name }}</option>{% endfor %}
@@ -49,41 +85,50 @@
       </div>
     </div>
     <label>URL imagine mare (banner, opțional)</label>
-    <input type="text" name="image" value="{{ panel.get('image','') }}" placeholder="https://...">
+    <input type="text" name="image" value="{{ pd.get('image','') }}" placeholder="https://...">
     <label>URL thumbnail (colț, opțional)</label>
-    <input type="text" name="thumbnail" value="{{ panel.get('thumbnail','') }}" placeholder="https://...">
-    <button class="save" type="submit">💾 Salvează panoul</button>
-    <p class="hint">După ce salvezi și adaugi tipuri de tickete, scrie <b>/ticket_panel</b> în canalul unde vrei panoul.</p>
+    <input type="text" name="thumbnail" value="{{ pd.get('thumbnail','') }}" placeholder="https://...">
+    <button class="save" type="submit">{{ '💾 Salvează panoul' if editing_panel else '➕ Adaugă panoul' }}</button>
   </form>
 
-  <!-- TIPURI EXISTENTE -->
+  <!-- TIPURI EXISTENTE (grupate pe panou) -->
   <div class="panel">
     <h3>🎟️ Tipuri de tickete ({{ types|length }})</h3>
     {% if not types %}
       <div class="empty">Niciun tip încă. Adaugă unul mai jos.</div>
     {% else %}
-      {% for t in types %}
-      <div class="type">
-        <div>
-          <b>{{ t.emoji }} {{ t.label }}</b>
-          <div class="meta">{{ t.support_roles|length }} roluri suport · buton {{ t.button_color }}</div>
-          <div class="badges" style="margin-top:6px">
-            {% if t.btn_close %}<span>🔒 Close</span>{% endif %}
-            {% if t.btn_close_reason %}<span>📝 Close cu motiv</span>{% endif %}
-            {% if t.btn_claim %}<span>🙋 Claim</span>{% endif %}
-            {% if t.one_per_user %}<span>1/persoană</span>{% endif %}
-            {% if t.ping_support %}<span>ping suport</span>{% endif %}
+      {% for p in panels %}
+        {% set ptypes = types|selectattr('panel_id','equalto',p.id)|list %}
+        <div class="panelgroup">
+          <div class="pg-head">🗂️ {{ p.title or p.id }} <span>({{ ptypes|length }})</span></div>
+          {% if not ptypes %}
+            <div class="empty" style="margin:8px 0">Acest panou n-are tipuri încă.</div>
+          {% else %}
+          {% for t in ptypes %}
+          <div class="type">
+            <div>
+              <b>{{ t.emoji }} {{ t.label }}</b>
+              <div class="meta">{{ t.support_roles|length }} roluri suport · buton {{ t.button_color }}</div>
+              <div class="badges" style="margin-top:6px">
+                {% if t.btn_close %}<span>🔒 Close</span>{% endif %}
+                {% if t.btn_close_reason %}<span>📝 Close cu motiv</span>{% endif %}
+                {% if t.btn_claim %}<span>🙋 Claim</span>{% endif %}
+                {% if t.one_per_user %}<span>1/persoană</span>{% endif %}
+                {% if t.ping_support %}<span>ping suport</span>{% endif %}
+              </div>
+            </div>
+            <div style="display:flex; gap:8px; align-items:flex-start">
+              <a class="del" style="background:var(--input); text-decoration:none; display:inline-flex; align-items:center" href="/tickets/{{ guild_id }}?edit={{ t.id }}#form">✏️ Editează</a>
+              <form method="POST" onsubmit="return confirm('Ștergi acest tip?')">
+                <input type="hidden" name="action" value="del_type">
+                <input type="hidden" name="type_id" value="{{ t.id }}">
+                <button class="del" type="submit">Șterge</button>
+              </form>
+            </div>
           </div>
+          {% endfor %}
+          {% endif %}
         </div>
-        <div style="display:flex; gap:8px; align-items:flex-start">
-          <a class="del" style="background:var(--input); text-decoration:none; display:inline-flex; align-items:center" href="/tickets/{{ guild_id }}?edit={{ t.id }}#form">✏️ Editează</a>
-          <form method="POST" onsubmit="return confirm('Ștergi acest tip?')">
-            <input type="hidden" name="action" value="del_type">
-            <input type="hidden" name="type_id" value="{{ t.id }}">
-            <button class="del" type="submit">Șterge</button>
-          </form>
-        </div>
-      </div>
       {% endfor %}
     {% endif %}
   </div>
@@ -99,7 +144,11 @@
     <input type="hidden" name="action" value="add_type">
     <h3>➕ Adaugă un tip de ticket</h3>
     {% endif %}
-    <div class="row2">
+    <label>În ce panou apare acest tip (buton)</label>
+    <select name="panel_id">
+      {% for p in panels %}<option value="{{ p.id }}" {% if editing and editing.panel_id==p.id %}selected{% endif %}>{{ p.title or p.id }}</option>{% endfor %}
+    </select>
+    <div class="row2" style="margin-top:12px">
       <div><label>Nume (pe buton)</label><input type="text" name="label" placeholder="Suport" value="{{ editing.label if editing else '' }}" required></div>
       <div><label>Emoji (opțional)</label><input type="text" name="emoji" placeholder="🎫" value="{{ editing.emoji if editing else '' }}"></div>
     </div>

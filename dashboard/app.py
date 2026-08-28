@@ -802,26 +802,80 @@ def massdm(guild_id):
                            meta=storage.get(gid, "meta", {}), section="massdm")
 
 
+def _ensure_ticket_panels(data):
+    """Trece structura de tickete de la un panou unic la lista de panouri.
+    Nu pierde nimic: panoul vechi + toate tipurile devin primul panou 'main'."""
+    if "panels" in data and isinstance(data["panels"], list):
+        first = data["panels"][0]["id"] if data["panels"] else "main"
+        for t in data.get("types", []):
+            if not t.get("panel_id"):
+                t["panel_id"] = first
+        return data
+    old = data.get("panel", {}) or {}
+    data["panels"] = [{
+        "id": "main", "title": old.get("title", ""),
+        "description": old.get("description", ""), "color": old.get("color", "#5865f2"),
+        "image": old.get("image", ""), "thumbnail": old.get("thumbnail", ""),
+    }]
+    for t in data.get("types", []):
+        t.setdefault("panel_id", "main")
+    return data
+
+
 @app.route("/tickets/<guild_id>", methods=["GET", "POST"])
 @guild_required
 def tickets(guild_id):
     gid = int(guild_id)
-    data = storage.get(gid, "tickets", {}) or {}
+    data = _ensure_ticket_panels(storage.get(gid, "tickets", {}) or {})
     if request.method == "POST":
         action = request.form.get("action")
-        if action == "panel":
-            data["panel"] = {
-                "title": request.form.get("title", ""),
+        if action == "add_panel":
+            data.setdefault("panels", []).append({
+                "id": uuid.uuid4().hex[:8],
+                "title": request.form.get("title", "").strip() or "Panou nou",
                 "description": request.form.get("description", ""),
                 "color": request.form.get("color", "#5865f2"),
                 "image": request.form.get("image", ""),
                 "thumbnail": request.form.get("thumbnail", ""),
-            }
+            })
+            storage.set(gid, "tickets", data)
+        elif action == "edit_panel":
+            pid = request.form.get("panel_id")
+            for p in data.get("panels", []):
+                if p.get("id") == pid:
+                    p["title"] = request.form.get("title", "").strip() or p.get("title", "Panou")
+                    p["description"] = request.form.get("description", "")
+                    p["color"] = request.form.get("color", "#5865f2")
+                    p["image"] = request.form.get("image", "")
+                    p["thumbnail"] = request.form.get("thumbnail", "")
+                    break
+            data["log_channel_id"] = _to_int(request.form.get("log_channel_id", ""))
+            storage.set(gid, "tickets", data)
+        elif action == "del_panel":
+            pid = request.form.get("panel_id")
+            # nu lasam serverul fara niciun panou
+            if len([p for p in data.get("panels", [])]) > 1:
+                data["panels"] = [p for p in data["panels"] if p.get("id") != pid]
+                # tipurile care erau pe panoul sters trec pe primul panou ramas
+                fallback = data["panels"][0]["id"]
+                for t in data.get("types", []):
+                    if t.get("panel_id") == pid:
+                        t["panel_id"] = fallback
+            storage.set(gid, "tickets", data)
+        elif action == "panel":  # compat: salvarea vechiului panou unic (primul)
+            first = data["panels"][0] if data.get("panels") else None
+            if first:
+                first.update(title=request.form.get("title", ""),
+                             description=request.form.get("description", ""),
+                             color=request.form.get("color", "#5865f2"),
+                             image=request.form.get("image", ""),
+                             thumbnail=request.form.get("thumbnail", ""))
             data["log_channel_id"] = _to_int(request.form.get("log_channel_id", ""))
             storage.set(gid, "tickets", data)
         elif action == "add_type":
             data.setdefault("types", []).append({
                 "id": uuid.uuid4().hex[:8],
+                "panel_id": request.form.get("panel_id") or (data["panels"][0]["id"] if data.get("panels") else "main"),
                 "label": request.form.get("label", "").strip() or "Ticket",
                 "emoji": request.form.get("emoji", "").strip(),
                 "button_color": request.form.get("button_color", "blurple"),
@@ -843,6 +897,8 @@ def tickets(guild_id):
             tid = request.form.get("type_id")
             for t in data.get("types", []):
                 if t.get("id") == tid:
+                    if request.form.get("panel_id"):
+                        t["panel_id"] = request.form.get("panel_id")
                     t["label"] = request.form.get("label", "").strip() or t.get("label", "Ticket")
                     t["emoji"] = request.form.get("emoji", "").strip()
                     t["button_color"] = request.form.get("button_color", "blurple")
@@ -855,19 +911,19 @@ def tickets(guild_id):
                     t["btn_close_reason"] = request.form.get("btn_close_reason") == "on"
                     t["btn_claim"] = request.form.get("btn_claim") == "on"
                     break
-            # cerem botului sa reaplice permisiunile pe ticketele DESCHISE de acest tip,
-            # ca rolurile de suport nou adaugate sa vada si ticketele existente
             data["perm_sync"] = {"status": "pending"}
             storage.set(gid, "tickets", data)
         return redirect(url_for("tickets", guild_id=guild_id, saved=1))
 
     edit_id = request.args.get("edit", "")
     editing = next((t for t in data.get("types", []) if t.get("id") == edit_id), None)
+    edit_panel_id = request.args.get("editpanel", "")
+    editing_panel = next((p for p in data.get("panels", []) if p.get("id") == edit_panel_id), None)
     roles = storage.get(gid, "roles", {}) or {}
     channels = storage.get(gid, "channels", {}) or {}
     return render_template("tickets.html", guild_id=guild_id, data=data,
-                           panel=data.get("panel", {}), types=data.get("types", []),
-                           editing=editing,
+                           panels=data.get("panels", []), types=data.get("types", []),
+                           editing=editing, editing_panel=editing_panel,
                            roles=roles.get("list", []),
                            categories=channels.get("categories", []),
                            text_channels=channels.get("texts", []),
