@@ -12,6 +12,9 @@ Ruleaza separat de bot:  python dashboard/app.py  -> http://localhost:5000
 """
 
 import os
+import re
+import discord
+from discord import app_commands
 import sys
 import ssl
 import time
@@ -822,6 +825,130 @@ def _ensure_ticket_panels(data):
     return data
 
 
+DEFAULT_HELPER_QUESTIONS = [
+    {"id": "q1", "label": "Nume caracter", "emoji": "🎮", "style": "short", "required": True},
+    {"id": "q2", "label": "Nivel", "emoji": "⭐", "style": "short", "required": True},
+    {"id": "q3", "label": "Cat timp poti sta zilnic", "emoji": "⏱️", "style": "short", "required": True},
+    {"id": "q4", "label": "Varsta", "emoji": "🎂", "style": "short", "required": True},
+]
+
+
+@app.route("/automod/<guild_id>", methods=["GET", "POST"])
+@guild_required
+def automod_page(guild_id):
+    gid = int(guild_id)
+    cfg = storage.get(gid, "automod", {}) or {}
+    if request.method == "POST":
+        action = request.form.get("action", "settings")
+        if action == "settings":
+            cfg["enabled"] = request.form.get("enabled") == "on"
+            cfg["channel_id"] = _to_int(request.form.get("channel_id", "")) or None
+            tm = _to_int(request.form.get("timeout_minutes", ""))
+            cfg["timeout_minutes"] = max(1, min(tm or 2, 40320))  # Discord: max 28 zile
+            cfg.pop("warning_message", None)  # nu mai trimitem niciun avertisment
+            cfg.pop("autodelete_seconds", None)
+            storage.set(gid, "automod", cfg)
+        elif action == "add_word":
+            w = request.form.get("word", "").strip().lower()
+            words = cfg.get("banned_words") or []
+            if w and w not in words:
+                words.append(w)
+                cfg["banned_words"] = words
+                storage.set(gid, "automod", cfg)
+        elif action == "del_word":
+            w = request.form.get("word", "")
+            words = [x for x in (cfg.get("banned_words") or []) if x != w]
+            cfg["banned_words"] = words
+            storage.set(gid, "automod", cfg)
+        return redirect(url_for("automod_page", guild_id=guild_id, saved=1))
+
+    channels = storage.get(gid, "channels", {}) or {}
+    return render_template("automod.html", guild_id=guild_id, cfg=cfg,
+                           text_channels=channels.get("texts", []),
+                           words=cfg.get("banned_words") or [],
+                           meta=storage.get(gid, "meta", {}),
+                           section="automod", saved=request.args.get("saved"))
+
+
+@app.route("/helperapp/<guild_id>", methods=["GET", "POST"])
+@guild_required
+def helperapp_page(guild_id):
+    gid = int(guild_id)
+    cfg = storage.get(gid, "helper_app", {}) or {}
+    if request.method == "POST":
+        action = request.form.get("action", "settings")
+        if action == "add_question":
+            qs = (cfg["questions"] if cfg.get("questions") is not None else [dict(q) for q in DEFAULT_HELPER_QUESTIONS])
+            if len(qs) < 5:
+                qs.append({
+                    "id": uuid.uuid4().hex[:8],
+                    "label": request.form.get("label", "").strip() or "Întrebare",
+                    "emoji": request.form.get("emoji", "").strip(),
+                    "style": "paragraph" if request.form.get("style") == "paragraph" else "short",
+                    "required": request.form.get("required") == "on",
+                })
+                cfg["questions"] = qs
+                storage.set(gid, "helper_app", cfg)
+            return redirect(url_for("helperapp_page", guild_id=guild_id, saved=1))
+        elif action == "edit_question":
+            qid = request.form.get("q_id")
+            qs = (cfg["questions"] if cfg.get("questions") is not None else [dict(q) for q in DEFAULT_HELPER_QUESTIONS])
+            for q in qs:
+                if q.get("id") == qid:
+                    q["label"] = request.form.get("label", "").strip() or q.get("label", "Întrebare")
+                    q["emoji"] = request.form.get("emoji", "").strip()
+                    q["style"] = "paragraph" if request.form.get("style") == "paragraph" else "short"
+                    q["required"] = request.form.get("required") == "on"
+                    break
+            cfg["questions"] = qs
+            storage.set(gid, "helper_app", cfg)
+            return redirect(url_for("helperapp_page", guild_id=guild_id, saved=1))
+        elif action == "del_question":
+            qid = request.form.get("q_id")
+            qs = (cfg["questions"] if cfg.get("questions") is not None else [dict(q) for q in DEFAULT_HELPER_QUESTIONS])
+            qs = [q for q in qs if q.get("id") != qid]
+            cfg["questions"] = qs
+            storage.set(gid, "helper_app", cfg)
+            return redirect(url_for("helperapp_page", guild_id=guild_id, saved=1))
+        elif action == "move_question":
+            qid = request.form.get("q_id")
+            direction = request.form.get("dir")
+            qs = (cfg["questions"] if cfg.get("questions") is not None else [dict(q) for q in DEFAULT_HELPER_QUESTIONS])
+            idx = next((i for i, q in enumerate(qs) if q.get("id") == qid), None)
+            if idx is not None:
+                swap = idx - 1 if direction == "up" else idx + 1
+                if 0 <= swap < len(qs):
+                    qs[idx], qs[swap] = qs[swap], qs[idx]
+            cfg["questions"] = qs
+            storage.set(gid, "helper_app", cfg)
+            return redirect(url_for("helperapp_page", guild_id=guild_id, saved=1))
+
+        cfg["enabled"] = request.form.get("enabled") == "on"
+        cfg["receive_channel_id"] = _to_int(request.form.get("receive_channel_id", "")) or None
+        cfg["staff_role_id"] = _to_int(request.form.get("staff_role_id", "")) or None
+        cfg["helper_role_id"] = _to_int(request.form.get("helper_role_id", "")) or None
+        cfg["panel_title"] = request.form.get("panel_title", "").strip()
+        cfg["panel_text"] = request.form.get("panel_text", "").strip()
+        cfg["panel_color"] = request.form.get("panel_color", "#5865f2")
+        storage.set(gid, "helper_app", cfg)
+        return redirect(url_for("helperapp_page", guild_id=guild_id, saved=1))
+
+    roles = storage.get(gid, "roles", {}) or {}
+    channels = storage.get(gid, "channels", {}) or {}
+    pending = storage.get(gid, "helper_requests", {}) or {}
+    questions = (cfg["questions"] if cfg.get("questions") is not None else [dict(q) for q in DEFAULT_HELPER_QUESTIONS])
+    edit_qid = request.args.get("editq", "")
+    editing_q = next((q for q in questions if q.get("id") == edit_qid), None)
+    return render_template("helperapp.html", guild_id=guild_id, cfg=cfg,
+                           roles=roles.get("list", []),
+                           text_channels=channels.get("texts", []),
+                           pending_count=len(pending),
+                           questions=questions, editing_q=editing_q,
+                           max_questions=5,
+                           meta=storage.get(gid, "meta", {}),
+                           section="helperapp", saved=request.args.get("saved"))
+
+
 @app.route("/tickets/<guild_id>", methods=["GET", "POST"])
 @guild_required
 def tickets(guild_id):
@@ -1011,7 +1138,9 @@ def invite_sources_page(guild_id):
                            section="surse")
 
 
-
+@app.route("/invitelog/<guild_id>")
+@guild_required
+def invitelog(guild_id):
     gid = int(guild_id)
 
     data = storage.get(gid, "invites", {}) or {}
@@ -1083,43 +1212,15 @@ def test_page(guild_id):
                            section="test")
 
 
-@app.route("/appearance/<guild_id>", methods=["GET", "POST"])
-@guild_required
-def appearance(guild_id):
-    gid = int(guild_id)
-    if request.method == "POST":
-        theme = {
-            "accent": request.form.get("accent", "#8b5cf6"),
-            "accent2": request.form.get("accent2", "#22d3ee"),
-            "bg": request.form.get("bg", "#07070c"),
-            "text": request.form.get("text", "#ecedff"),
-            "no_anim": request.form.get("no_anim") == "on",
-            "glass": request.form.get("glass", "16"),
-        }
-        storage.set(gid, "theme", theme)
-        return redirect(url_for("appearance", guild_id=guild_id, saved=1))
-
-    theme = storage.get(gid, "theme", {})
-    meta = storage.get(gid, "meta", {})
-    return render_template("appearance.html", guild_id=guild_id, theme=theme,
-                           meta=meta, section="appearance",
-                           saved=request.args.get("saved"))
-
-
 @app.context_processor
 def inject_theme():
-    """Face tema disponibila automat in toate paginile (pentru base.html)."""
-    gid = None
-    if request.view_args:
-        gid = request.view_args.get("guild_id")
-    theme = {}
-    if gid and str(gid).isdigit():
-        theme = storage.get(int(gid), "theme", {}) or {}
-    # esti owner-ul botului? (pentru a arata/ascunde actiunile globale in UI)
+    """Owner-ul botului e disponibil global (pentru a arata/ascunde actiunile
+    globale in UI). Tema custom per-server a fost eliminata — dashboard-ul
+    foloseste acum un singur design implicit, definit in base.html."""
     owner_id = storage.get(0, "bot_owner_id", None)
     is_owner = bool(owner_id and "user" in session
                     and str(session["user"]["id"]) == str(owner_id))
-    return {"theme": theme, "is_owner": is_owner}
+    return {"is_owner": is_owner}
 
 
 @app.route("/metin2/<guild_id>", methods=["GET", "POST"])
@@ -1251,99 +1352,100 @@ def kingdoms(guild_id):
                            section="kingdoms", saved=request.args.get("saved"))
 
 
+# Nume "prietenoase" + iconita pentru cog-urile cunoscute. E DOAR o imbunatatire
+# vizuala — daca adaugi un cog nou care nu e in lista, tot apare automat in
+# dashboard (vezi _humanize_cog_name), doar cu iconita generica 🧩.
+_COG_LABELS = {
+    "Welcome": ("👋", "Bun venit"),
+    "Goodbye": ("🚪", "Rămas bun"),
+    "Invites": ("📨", "Invitații & concurs"),
+    "InviteSources": ("🔗", "Surse invite"),
+    "Colors": ("🎨", "Culori"),
+    "Kingdoms": ("🏰", "Regate"),
+    "Tickets": ("🎫", "Tickete"),
+    "HelperApp": ("🛡️", "Cereri Helper"),
+    "AutoMod": ("🚫", "Automod"),
+    "Giveaway": ("🎁", "Giveaway"),
+    "Notifications": ("🔔", "Notificări"),
+    "NewAccounts": ("🆕", "Conturi noi"),
+    "Cleanup": ("🧹", "Curățare mesaje"),
+    "MassRole": ("🎭", "Roluri în masă"),
+    "MassDM": ("✉️", "Mesaje DM"),
+    "RankUp": ("🏆", "Ranguri"),
+    "Embeds": ("💬", "Embed-uri"),
+    "AvatarCog": ("🖼️", "Avatar & imagini"),
+    "Game": ("🎲", "Joc numere"),
+    "Rps": ("✂️", "Piatră-Foarfece-Hârtie"),
+    "Backup": ("💾", "Backup server"),
+    "Metin2Bridge": ("🎮", "Punte Metin2"),
+    "Admin": ("👑", "Owner bot"),
+    "DashboardSync": ("🔄", "Sincronizare dashboard"),
+}
+
+
+def _humanize_cog_name(name: str) -> str:
+    """Transforma numele clasei unui cog (ex. 'InviteSources') intr-un titlu
+    citibil ('Invite Sources'), pentru cog-urile care NU sunt in _COG_LABELS
+    (adica cele adaugate in viitor). In doi pasi, ca sa prinda si acronime
+    urmate de un cuvant nou (ex. 'XPLeveling' -> 'XP Leveling'), nu doar
+    trecerile simple minuscula->majuscula ('MassDM' -> 'Mass DM')."""
+    s = re.sub(r"(.)([A-Z][a-z]+)", r"\1 \2", name)
+    s = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", s)
+    return s
+
+
+def _cog_category(cog_name: str):
+    icon, label = _COG_LABELS.get(cog_name, ("🧩", _humanize_cog_name(cog_name)))
+    return icon, label
+
+
+def _build_command_categories():
+    """Citeste comenzile DIRECT din botul care ruleaza (vezi utils/botref.py),
+    grupate automat pe cog — nu mai exista nicio lista tinuta separat de mana.
+    Orice comanda noua sau cog nou apare aici automat, fara nicio modificare.
+    Intoarce None daca botul inca nu e disponibil (pornire foarte timpurie)."""
+    from utils import botref
+    bot = botref.bot
+    if bot is None:
+        return None
+
+    categories = []
+    for cog_name, cog in bot.cogs.items():
+        cmds = []
+        for c in cog.get_app_commands():
+            targets = c.walk_commands() if isinstance(c, app_commands.Group) else [c]
+            for sub in targets:
+                cmds.append({
+                    "name": "/" + sub.qualified_name,
+                    "desc": sub.description or "",
+                    # o comanda are "checks" cand e protejata de bot_access() —
+                    # aceeasi logica de permisiuni care exista deja in pagina
+                    # Permisiuni, nu o regula noua inventata aici.
+                    "restricted": bool(getattr(sub, "checks", None)),
+                })
+        if not cmds:  # cog fara nicio comanda slash (ex. un modul doar-listener) -> nu apare
+            continue
+        icon, label = _cog_category(cog_name)
+        cmds.sort(key=lambda x: x["name"])
+        categories.append({
+            "id": re.sub(r"[^a-z0-9]+", "-", cog_name.lower()).strip("-"),
+            "icon": icon, "label": label, "commands": cmds,
+        })
+    categories.sort(key=lambda c: c["label"])
+    return categories
+
+
 @app.route("/comenzi/<guild_id>")
 @guild_required
 def commands_list(guild_id):
     gid = int(guild_id)
-    # lista comenzilor, grupate pe categorii (descrieri scurte, prietenoase)
-    groups = [
-        ("👋 Bun venit & plecări", [
-            ("/welcome channel", "Setează canalul de bun venit"),
-            ("/welcome test", "Trimite un mesaj de test de bun venit"),
-        ]),
-        ("📨 Invitații & concurs", [
-            ("/invites", "Vezi câte invitații ai (tu sau alt membru)"),
-            ("/inviter", "Cine a invitat un membru"),
-            ("/invitedlist", "Lista celor invitați de cineva"),
-            ("/invitecodes", "Codurile de invitație ale cuiva"),
-            ("/findlink", "Unul dintre linkurile tale de invitație"),
-            ("/leaderboard", "Clasamentul invitatorilor"),
-            ("/concurs start", "Pornește un concurs de invitații"),
-            ("/concurs stop", "Oprește concursul și anunță câștigătorul"),
-            ("/concurs status", "Vezi starea concursului"),
-            ("/concurs clasament", "Clasamentul concursului curent"),
-            ("/addinvites", "Adaugă invitații bonus unui membru (admin)"),
-            ("/removeinvites", "Scade invitații bonus unui membru (admin)"),
-            ("/resetinvites", "Resetează invitațiile (admin)"),
-            ("/recalcinvite", "Recalculează invitațiile după cine e pe server (admin)"),
-            ("/inviteaudit", "Detaliu pe cine a adus cineva, cu status (admin)"),
-        ]),
-        ("🎨 Culori", [
-            ("/culori panou", "Postează panoul cu butoane de culoare (admin)"),
-        ]),
-        ("🎫 Tickete", [
-            ("/ticket_panel", "Postează panoul de tickete în canal (admin)"),
-            ("/add", "Adaugă un membru/rol în ticketul curent"),
-            ("/remove", "Scoate un membru/rol din ticketul curent"),
-        ]),
-        ("🎁 Giveaway", [
-            ("/giveaway", "Deschide formularul și pornește un giveaway"),
-            ("/giveaway_start", "Postează un giveaway configurat în dashboard"),
-            ("/giveaway_end", "Încheie acum un giveaway"),
-            ("/giveaway_reroll", "Alege alt câștigător"),
-        ]),
-        ("🔔 Notificări", [
-            ("/notify list", "Creatorii urmăriți (YouTube/TikTok)"),
-            ("/notify test", "Trimite o notificare de test"),
-        ]),
-        ("🆕 Conturi noi", [
-            ("/conturinoi lista", "Membrii cu cont creat sub pragul setat (admin)"),
-            ("/conturinoi verifica", "Verifică vechimea contului unui membru (admin)"),
-        ]),
-        ("🧹 Curățare mesaje", [
-            ("/clean", "Șterge mesajele unui membru de pe un canal (admin)"),
-            ("/clean_all", "Șterge mesajele unui membru de pe tot serverul (admin)"),
-            ("/autodelete", "Șterge automat tot ce scrie cineva (admin)"),
-        ]),
-        ("🎭 Roluri în masă", [
-            ("/massrole give_all", "Dă un rol tuturor membrilor (admin)"),
-            ("/massrole give_to", "Dă un rol celor care au deja un rol (admin)"),
-            ("/massrole remove_all", "Scoate un rol de la toți (admin)"),
-            ("/massrole remove_from", "Scoate un rol de la cei cu un rol (admin)"),
-        ]),
-        ("🏆 Ranguri", [
-            ("/rankup run", "Aplică rangurile pe tot serverul (admin)"),
-            ("/rankup status", "Vezi configurația rangurilor (admin)"),
-        ]),
-        ("💬 Embed-uri & DM", [
-            ("/embed send", "Postează un embed salvat (admin)"),
-            ("/embed preview", "Vezi un embed fără să-l postezi (admin)"),
-            ("/embed list", "Lista embed-urilor salvate (admin)"),
-            ("/embed delete", "Șterge un embed salvat (admin)"),
-            ("/dm_masa", "Pornește o campanie de DM (admin)"),
-            ("/dm_stop", "Oprește campania de DM (admin)"),
-        ]),
-        ("🖼️ Avatar & imagini", [
-            ("/avatar", "Arată avatarul unui user"),
-            ("/banner", "Arată bannerul unui user"),
-            ("/serveravatar", "Arată iconița serverului"),
-            ("/serverbanner", "Arată bannerul serverului"),
-        ]),
-        ("🎮 Distracție", [
-            ("/rps", "Piatră / Foarfece / Hârtie"),
-            ("/randome", "Pregătește o rundă nouă de joc"),
-            ("/alege", "Alege un număr (privat)"),
-        ]),
-        ("💾 Backup", [
-            ("/backup", "Salvează structura serverului ca backup (admin)"),
-        ]),
-        ("👑 Owner bot", [
-            ("/serverlist", "Lista serverelor pe care e botul (owner)"),
-            ("/leaveserver", "Scoate botul de pe un server (owner)"),
-        ]),
-    ]
-    total = sum(len(cmds) for _, cmds in groups)
-    return render_template("commands.html", guild_id=guild_id, groups=groups,
+    categories = _build_command_categories()
+    if categories is None:
+        # botul inca nu s-a conectat (fereastra foarte scurta la pornire) —
+        # afisam elegant, fara eroare, in loc sa crape pagina
+        categories = []
+    total = sum(len(c["commands"]) for c in categories)
+    return render_template("commands.html", guild_id=guild_id, categories=categories,
                            total=total, meta=storage.get(gid, "meta", {}),
                            section="comenzi")
 

@@ -5,39 +5,48 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}Dashboard{% endblock %}</title>
   <style>
-    :root { --bg:#1a1b1e; --card:#2b2d31; --input:#1e1f22; --accent:#5865f2; --gold:#f0b232; --text:#dbdee1; --muted:#949ba4; }
+    /* ===== Tema "Bento" — teal + albastru pe fundal inchis, structura bento =====
+       --accent2 si --glass-border NU erau definite implicit inainte (doar daca
+       userul seta o tema custom (functie eliminata) — acum au valori sigure
+       mereu, ca toate paginile care le folosesc sa arate corect din start. */
+    :root {
+      --bg:#10141a; --card:#161c22; --input:#10151b;
+      --accent:#4fd1c5; --accent2:#3b82f6; --gold:#eab86a;
+      --text:#eef2f5; --muted:#7f8994;
+      --glass-border:#232a31;
+    }
     * { box-sizing:border-box; margin:0; padding:0; }
     body { font-family:system-ui,sans-serif; background:var(--bg); color:var(--text); padding:36px 24px; }
     .wrap { max-width:1360px; margin:0 auto; }
     a.back { color:var(--accent); text-decoration:none; font-size:14px; }
     .server-header { display:flex; align-items:center; gap:14px; margin:14px 0 22px; }
-    .server-header .icon, .server-header .icon-fallback { width:56px; height:56px; border-radius:50%; flex-shrink:0; }
+    .server-header .icon, .server-header .icon-fallback { width:56px; height:56px; border-radius:16px; flex-shrink:0; }
     .server-header .icon { object-fit:cover; }
-    .server-header .icon-fallback { background:var(--accent); display:flex; align-items:center; justify-content:center; font-size:22px; font-weight:700; color:#fff; }
+    .server-header .icon-fallback { background:linear-gradient(135deg,var(--accent),var(--accent2)); display:flex; align-items:center; justify-content:center; font-size:22px; font-weight:700; color:#0d1013; }
     .server-header h1 { font-size:24px; margin:0; }
     .server-header .sub { color:var(--muted); font-size:14px; margin-top:3px; }
 
     .layout { display:grid; grid-template-columns:230px 1fr 300px; gap:24px; align-items:start; }
     .layout.no-help { grid-template-columns:230px 1fr; }
 
-    .help { background:var(--card); border-radius:14px; padding:16px; position:sticky; top:24px; max-height:calc(100vh - 48px); overflow-y:auto; }
+    .help { background:var(--card); border:1px solid var(--glass-border); border-radius:16px; padding:16px; position:sticky; top:24px; max-height:calc(100vh - 48px); overflow-y:auto; }
     .help h2 { font-size:14px; margin:0 0 4px; display:flex; align-items:center; gap:8px; }
     .help .hsub { color:var(--muted); font-size:11.5px; margin:0 0 12px; line-height:1.5; }
-    .help .hgroup { font-size:11px; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); margin:14px 0 6px; padding-bottom:4px; border-bottom:1px solid var(--input); }
+    .help .hgroup { font-size:11px; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); margin:14px 0 6px; padding-bottom:4px; border-bottom:1px solid var(--glass-border); }
     .help .cmd { margin-bottom:8px; }
-    .help .cmd code { background:var(--input); color:#a9c7ff; padding:2px 6px; border-radius:5px; font-size:12px; font-family:ui-monospace,monospace; }
+    .help .cmd code { background:var(--input); color:var(--accent); padding:2px 6px; border-radius:5px; font-size:12px; font-family:ui-monospace,monospace; }
     .help .cmd .d { color:var(--muted); font-size:11.5px; margin-top:2px; line-height:1.45; }
     .help::-webkit-scrollbar { width:8px; } .help::-webkit-scrollbar-thumb { background:var(--input); border-radius:4px; }
 
-    .sidebar { background:var(--card); border-radius:14px; padding:12px; position:sticky; top:24px; }
+    .sidebar { background:var(--card); border:1px solid var(--glass-border); border-radius:16px; padding:12px; position:sticky; top:24px; }
     .side-title { font-size:12px; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); padding:6px 10px 8px; margin-top:14px; }
     .side-title:first-child { margin-top:0; }
-    .nav { display:flex; align-items:center; gap:11px; padding:11px 12px; border-radius:8px; text-decoration:none; color:var(--text); font-size:15px; font-weight:500; margin-bottom:2px; }
+    .nav { display:flex; align-items:center; gap:11px; padding:11px 12px; border-radius:10px; text-decoration:none; color:var(--text); font-size:15px; font-weight:500; margin-bottom:2px; }
     .nav:hover { background:var(--input); }
-    .nav.active { background:var(--accent); color:#fff; }
+    .nav.active { background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#0d1013; font-weight:700; }
     .nav .ic { font-size:18px; width:22px; text-align:center; }
 
-    .saved { background:#248046; color:#fff; padding:8px 14px; border-radius:8px; display:inline-block; margin-bottom:16px; font-size:14px; }
+    .saved { background:#123626; color:#7ee2ae; padding:8px 14px; border-radius:10px; display:inline-block; margin-bottom:16px; font-size:14px; border:1px solid #1d4a35; }
 
     /* TELEFON: o singura coloana, meniul curge normal cu pagina (nu lipit),
        ca sa nu mai intre continutul sub el cand derulezi. */
@@ -53,25 +62,6 @@
     input[type=checkbox] { width:15px !important; height:15px !important; accent-color:var(--accent); cursor:pointer; }
     {% block extra_style %}{% endblock %}
   </style>
-  {% if theme %}
-  <style id="theme-overrides">
-    :root {
-      {% if theme.get('accent') %}--accent:{{ theme.get('accent') }};{% endif %}
-      {% if theme.get('accent2') %}--accent2:{{ theme.get('accent2') }};{% endif %}
-      {% if theme.get('bg') %}--bg:{{ theme.get('bg') }};{% endif %}
-      {% if theme.get('text') %}--text:{{ theme.get('text') }};{% endif %}
-    }
-    {% if theme.get('glass') %}
-    .sidebar, .help, .server-header, main > div, main > form, main > section {
-      backdrop-filter:blur({{ theme.get('glass') }}px); -webkit-backdrop-filter:blur({{ theme.get('glass') }}px);
-    }
-    {% endif %}
-    {% if theme.get('no_anim') %}
-    *, *::before, *::after { animation:none !important; transition:none !important; }
-    body::before { animation:none !important; }
-    {% endif %}
-  </style>
-  {% endif %}
 </head>
 <body>
 <div class="wrap">
@@ -109,6 +99,8 @@
 
       <p class="side-title">🛠️ Management</p>
       <a class="nav {% if section=='tickets' %}active{% endif %}" href="/tickets/{{ guild_id }}"><span class="ic">🎫</span> Tickete</a>
+      <a class="nav {% if section=='helperapp' %}active{% endif %}" href="/helperapp/{{ guild_id }}"><span class="ic">🛡️</span> Cereri Helper</a>
+      <a class="nav {% if section=='automod' %}active{% endif %}" href="/automod/{{ guild_id }}"><span class="ic">🚫</span> Automod</a>
       <a class="nav {% if section=='metin2' %}active{% endif %}" href="/metin2/{{ guild_id }}"><span class="ic">🎮</span> Metin2 tickete</a>
       <a class="nav {% if section=='massrole' %}active{% endif %}" href="/massrole/{{ guild_id }}"><span class="ic">🎭</span> Roluri in masa</a>
       <a class="nav {% if section=='cleanup' %}active{% endif %}" href="/cleanup/{{ guild_id }}"><span class="ic">🧹</span> Curatare mesaje</a>
@@ -124,7 +116,6 @@
       <a class="nav {% if section=='colors' %}active{% endif %}" href="/culori/{{ guild_id }}"><span class="ic">🎨</span> Culori la nume</a>
 
       <p class="side-title">🧪 Unelte</p>
-      <a class="nav {% if section=='appearance' %}active{% endif %}" href="/appearance/{{ guild_id }}"><span class="ic">🎨</span> Aspect</a>
       <a class="nav {% if section=='test' %}active{% endif %}" href="/test/{{ guild_id }}"><span class="ic">🧪</span> Test deploy</a>
     </aside>
 

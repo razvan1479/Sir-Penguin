@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+{% block title %}Cereri Helper · {{ meta.get('name','Server') }}{% endblock %}
+
+{% block extra_style %}
+  .panel { padding:0; margin-bottom:22px; overflow:hidden; }
+  .panel-head { padding:20px 24px; border-bottom:1px solid var(--glass-border); background:rgba(255,255,255,.02); }
+  .panel-head h3 { margin:0 0 4px; font-size:18px; }
+  .panel-body { padding:22px 24px; }
+  .sub { color:var(--muted); font-size:13px; margin:0; line-height:1.6; }
+  .field { background:var(--input); border:1px solid var(--glass-border); border-radius:12px; padding:14px 16px; margin-bottom:12px; }
+  .field > label { display:block; font-size:12.5px; color:var(--muted); margin:0 0 9px; font-weight:700; text-transform:uppercase; letter-spacing:.3px; }
+  input[type=text], select, textarea { width:100%; padding:11px; border-radius:8px; border:1px solid var(--glass-border); background:var(--bg); color:var(--text); font-size:14px; box-sizing:border-box; font-family:inherit; }
+  textarea { min-height:80px; resize:vertical; }
+  .save { margin-top:6px; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; border:none; padding:12px 26px; border-radius:11px; font-weight:700; font-size:14px; cursor:pointer; }
+  .saved { background:rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.3); color:#4ade80; border-radius:10px; padding:11px 15px; margin-bottom:16px; font-size:14px; }
+  .divider { height:1px; background:var(--glass-border); margin:22px 0; border:0; }
+  .steps { list-style:none; padding:0; margin:0; }
+  .steps li { padding:10px 0 10px 30px; position:relative; font-size:14px; color:var(--text); border-bottom:1px solid var(--glass-border); }
+  .steps li:last-child { border-bottom:none; }
+  .steps li b { position:absolute; left:0; top:9px; width:20px; height:20px; border-radius:50%; background:var(--accent); color:#fff; font-size:11px; display:flex; align-items:center; justify-content:center; }
+  .badge { display:inline-block; padding:3px 12px; border-radius:20px; font-size:12px; font-weight:700; background:var(--input); color:var(--muted); margin-left:8px; }
+  .preview { background:var(--card); border:1px solid var(--glass-border); border-left:3px solid #5865f2; border-radius:10px; padding:14px 16px; font-size:13px; line-height:1.7; }
+  code { background:var(--input); padding:2px 7px; border-radius:5px; font-size:12.5px; }
+  .toggle { display:flex; align-items:center; gap:12px; background:linear-gradient(135deg,rgba(79,209,197,.12),rgba(79,209,197,.04)); border:1px solid var(--glass-border); border-radius:12px; padding:16px 18px; margin-bottom:16px; }
+  .toggle input { width:20px; height:20px; accent-color:var(--accent); flex:none; }
+  .toggle b { font-size:15px; }
+  .qrow { display:flex; align-items:center; gap:14px; background:var(--input); border:1px solid var(--glass-border); border-radius:10px; padding:12px 14px; margin-bottom:9px; }
+  .qrow .meta { color:var(--muted); font-size:12px; margin-top:3px; }
+  .qmove { display:flex; flex-direction:column; gap:3px; }
+  .mv { width:26px; height:22px; background:var(--card); border:1px solid var(--glass-border); color:var(--text); border-radius:5px; cursor:pointer; font-size:10px; padding:0; }
+  .mv:disabled { opacity:.25; cursor:default; }
+  .del { background:var(--card); border:1px solid var(--glass-border); color:#fb7185; border-radius:8px; padding:6px 12px; cursor:pointer; font-size:13px; }
+{% endblock %}
+
+{% block content %}
+  {% if saved %}<div class="saved">✅ Salvat!</div>{% endif %}
+
+  <div class="panel">
+    <div class="panel-head">
+      <h3>🛡️ Cereri Helper
+        {% if pending_count %}<span class="badge">{{ pending_count }} în așteptare</span>{% endif %}
+        {% if cfg.get('enabled', True) %}<span class="badge" style="background:rgba(34,197,94,.15);color:#4ade80">PORNIT</span>
+        {% else %}<span class="badge" style="background:rgba(237,66,69,.15);color:#ed4245">OPRIT</span>{% endif %}
+      </h3>
+      <p class="sub">Membrii depun cerere printr-un formular; cererile apar într-un canal separat, doar pentru staff, cu butoane Acceptă/Respinge.</p>
+    </div>
+    <div class="panel-body">
+      <ol class="steps">
+        <li><b>1</b>Postezi panoul cu <code>/helper_panel</code> în canalul unde vrei butonul „Depune cerere”.</li>
+        <li><b>2</b>Membrul apasă butonul → completează 4 câmpuri (nume caracter, nivel, timp zilnic, vârstă).</li>
+        <li><b>3</b>Cererea apare în canalul configurat mai jos, cu butoane ✅ Acceptă / ❌ Respinge.</li>
+        <li><b>4</b>Doar rolul de staff configurat poate apăsa butoanele.</li>
+        <li><b>5</b>La Acceptă: DM automat + rolul de Helper acordat. La Respinge: DM automat, fără rol. Mesajul se șterge.</li>
+      </ol>
+    </div>
+  </div>
+
+  <form class="panel" method="POST">
+    <div class="panel-head">
+      <h3>⚙️ Configurare</h3>
+      <p class="sub">Toate setările astea se aplică instant — nu trebuie să repostezi panoul (doar la schimbarea textului panoului).</p>
+    </div>
+    <div class="panel-body">
+      <div class="toggle">
+        <input type="checkbox" name="enabled" id="en" {% if cfg.get('enabled', True) %}checked{% endif %}>
+        <div><b>Activează cererile Helper</b><br><span class="sub">Cât e oprit, butonul „DEPUNE CERERE” de pe panou răspunde cu „cererile sunt închise” — nu trebuie să ascunzi canalul sau să postezi alt panou.</span></div>
+      </div>
+
+      <div class="field">
+        <label>📋 Canalul unde apar cererile (doar staff le vede)</label>
+        <select name="receive_channel_id">
+          <option value="">— alege canalul —</option>
+          {% for ch in text_channels %}
+          <option value="{{ ch.id }}" {% if cfg.get('receive_channel_id')|string==ch.id|string %}selected{% endif %}>#{{ ch.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="field">
+        <label>👮 Rolul de staff care poate Accepta/Respinge</label>
+        <select name="staff_role_id">
+          <option value="">— alege rolul —</option>
+          {% for r in roles %}
+          <option value="{{ r.id }}" {% if cfg.get('staff_role_id')|string==r.id|string %}selected{% endif %}>{{ r.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="field">
+        <label>🎖️ Rolul de Helper acordat automat la acceptare</label>
+        <select name="helper_role_id">
+          <option value="">— alege rolul —</option>
+          {% for r in roles %}
+          <option value="{{ r.id }}" {% if cfg.get('helper_role_id')|string==r.id|string %}selected{% endif %}>{{ r.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <hr class="divider">
+
+      <div class="field">
+        <label>📝 Titlul panoului</label>
+        <input type="text" name="panel_title" value="{{ cfg.get('panel_title','') }}" placeholder="📝 Cereri Helper">
+      </div>
+      <div class="field">
+        <label>Textul panoului</label>
+        <textarea name="panel_text" placeholder="Apasă butonul de mai jos ca să depui o cerere pentru funcția de Helper.">{{ cfg.get('panel_text','') }}</textarea>
+      </div>
+      <div class="field">
+        <label>Culoare</label>
+        <input type="color" name="panel_color" value="{{ cfg.get('panel_color','#5865f2') }}" style="max-width:80px">
+      </div>
+
+      <button class="save" type="submit">💾 Salvează</button>
+    </div>
+  </form>
+
+  <div class="panel">
+    <div class="panel-head">
+      <h3>❓ Întrebările din formular ({{ questions|length }}/{{ max_questions }})</h3>
+      <p class="sub">Ordinea de mai jos e ordinea din formular și din cerere. Discord permite <b>maxim 5 întrebări</b> într-un formular — e o limită tehnică a platformei, nu o poți depăși.</p>
+    </div>
+    <div class="panel-body">
+      {% for q in questions %}
+      <div class="qrow">
+        <div class="qmove">
+          <form method="POST"><input type="hidden" name="action" value="move_question"><input type="hidden" name="q_id" value="{{ q.id }}"><input type="hidden" name="dir" value="up">
+            <button class="mv" type="submit" {% if loop.first %}disabled{% endif %}>▲</button></form>
+          <form method="POST"><input type="hidden" name="action" value="move_question"><input type="hidden" name="q_id" value="{{ q.id }}"><input type="hidden" name="dir" value="down">
+            <button class="mv" type="submit" {% if loop.last %}disabled{% endif %}>▼</button></form>
+        </div>
+        <div style="flex:1">
+          <b>{{ q.emoji }} {{ q.label }}</b>
+          <div class="meta">{{ 'text lung (paragraf)' if q.style=='paragraph' else 'text scurt' }} · {{ 'obligatoriu' if q.required else 'opțional' }}</div>
+        </div>
+        <div style="display:flex; gap:8px">
+          <a class="del" style="background:var(--input); text-decoration:none; display:inline-flex; align-items:center" href="/helperapp/{{ guild_id }}?editq={{ q.id }}#qform">✏️ Editează</a>
+          <form method="POST" onsubmit="return confirm('Ștergi întrebarea „{{ q.label }}”?')">
+            <input type="hidden" name="action" value="del_question">
+            <input type="hidden" name="q_id" value="{{ q.id }}">
+            <button class="del" type="submit">Șterge</button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+
+      {% if questions|length < max_questions %}
+      <form method="POST" id="qform" style="margin-top:16px; padding-top:16px; border-top:1px solid var(--glass-border)">
+        {% if editing_q %}
+        <input type="hidden" name="action" value="edit_question">
+        <input type="hidden" name="q_id" value="{{ editing_q.id }}">
+        <p class="sub" style="margin-bottom:10px">✏️ Editezi: {{ editing_q.label }} — <a href="/helperapp/{{ guild_id }}" style="color:#9bb7ff">anulează</a></p>
+        {% set qd = editing_q %}
+        {% else %}
+        <input type="hidden" name="action" value="add_question">
+        <p class="sub" style="margin-bottom:10px">➕ Adaugă o întrebare nouă</p>
+        {% set qd = {} %}
+        {% endif %}
+        <div class="field" style="display:grid; grid-template-columns:1fr 60px; gap:10px">
+          <div><label>Întrebare</label><input type="text" name="label" value="{{ qd.get('label','') }}" placeholder="Nume caracter" maxlength="45" required></div>
+          <div><label>Emoji</label><input type="text" name="emoji" value="{{ qd.get('emoji','') }}" placeholder="🎮"></div>
+        </div>
+        <div class="field" style="display:flex; gap:20px; align-items:center">
+          <label style="margin:0; display:flex; align-items:center; gap:6px; font-size:13px; text-transform:none; font-weight:500; color:var(--text)">
+            <input type="checkbox" name="style" value="paragraph" {% if qd.get('style')=='paragraph' %}checked{% endif %} style="width:16px;height:16px"> Răspuns lung (paragraf)
+          </label>
+          <label style="margin:0; display:flex; align-items:center; gap:6px; font-size:13px; text-transform:none; font-weight:500; color:var(--text)">
+            <input type="checkbox" name="required" {% if qd.get('required', True) %}checked{% endif %} style="width:16px;height:16px"> Obligatoriu
+          </label>
+        </div>
+        <button class="save" type="submit">{{ '💾 Salvează întrebarea' if editing_q else '➕ Adaugă întrebarea' }}</button>
+      </form>
+      {% else %}
+      <p class="sub" style="margin-top:16px; padding-top:16px; border-top:1px solid var(--glass-border)">Ai atins limita de {{ max_questions }} întrebări — șterge una ca să poți adăuga alta.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <h3>👁️ Cum arată cererea pe Discord</h3>
+    </div>
+    <div class="panel-body">
+      <div class="preview">
+        🛡️ <b>CERERE HELPER</b><br><br>
+        👤 Utilizator: @NumeDiscord<br>
+        {% for q in questions %}{{ q.emoji }} {{ q.label }}: <i>...</i><br>{% endfor %}<br>
+        [ ✅ ACCEPTĂ ] &nbsp; [ ❌ RESPINGE ]
+      </div>
+    </div>
+  </div>
+{% endblock %}

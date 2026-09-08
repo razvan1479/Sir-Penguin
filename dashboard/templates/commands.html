@@ -5,50 +5,128 @@
   .head h2 { margin:0 0 4px; font-size:24px; }
   .head p { color:var(--muted); margin:0; }
   .search { width:100%; padding:13px 16px; border-radius:12px; border:1px solid var(--glass-border); background:var(--card); color:var(--text); font-size:15px; box-sizing:border-box; margin-bottom:22px; }
-  .grp { margin-bottom:26px; }
-  .grp h3 { font-size:16px; margin:0 0 12px; padding-bottom:8px; border-bottom:1px solid var(--glass-border); }
-  .cmd { display:flex; align-items:baseline; gap:14px; padding:10px 14px; border-radius:10px; background:var(--card); border:1px solid var(--glass-border); margin-bottom:7px; }
+
+  /* ===== grid de categorii ===== */
+  .catgrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:14px; }
+  .catcard { display:flex; align-items:center; gap:14px; text-align:left; cursor:pointer;
+    background:var(--card); border:1px solid var(--glass-border); border-radius:16px; padding:18px;
+    color:var(--text); font:inherit; transition:transform .2s, border-color .2s; }
+  .catcard:hover { transform:translateY(-3px); border-color:var(--accent); }
+  .catcard .cic { font-size:24px; flex:none; }
+  .catcard .cbody { flex:1; min-width:0; }
+  .catcard .cname { font-weight:700; font-size:15px; }
+  .catcard .ccount { color:var(--muted); font-size:12.5px; margin-top:2px; }
+  .catcard .chev { color:var(--muted); font-size:18px; flex:none; }
+
+  /* ===== panoul unei categorii deschise ===== */
+  .catpanel { display:none; }
+  .catpanel.open { display:block; }
+  .backbar { display:flex; align-items:center; gap:10px; margin-bottom:18px; }
+  .backbtn { display:inline-flex; align-items:center; gap:6px; background:var(--card); border:1px solid var(--glass-border);
+    color:var(--text); padding:9px 16px; border-radius:10px; cursor:pointer; font-size:14px; font:inherit; }
+  .backbtn:hover { border-color:var(--accent); }
+  .backbar h3 { font-size:18px; margin:0; display:flex; align-items:center; gap:8px; }
+
+  .cmd { display:flex; align-items:baseline; gap:14px; padding:10px 14px; border-radius:10px; background:var(--card); border:1px solid var(--glass-border); margin-bottom:7px; flex-wrap:wrap; }
   .cmd code { color:var(--accent); font-weight:700; font-size:14px; white-space:nowrap; font-family:ui-monospace,monospace; }
   .cmd span { color:var(--muted); font-size:13.5px; }
-  .none { display:none; text-align:center; color:var(--muted); padding:30px; }
+  .cmd .lock { font-size:11.5px; color:var(--gold); background:rgba(234,184,106,.12); padding:2px 8px; border-radius:20px; margin-left:auto; white-space:nowrap; }
+  .none { text-align:center; color:var(--muted); padding:30px; }
+
+  /* ===== rezultate cautare (flat, peste toate categoriile) ===== */
+  #searchResults { display:none; }
+  #searchResults.open { display:block; }
+  .cmd .catlbl { font-size:11px; color:var(--muted); background:var(--input); padding:2px 8px; border-radius:20px; }
 {% endblock %}
 {% block content %}
   <div class="head">
     <h2>📖 Toate comenzile</h2>
-    <p>{{ total }} comenzi. Scrie-le în Discord cu <b>/</b>. Cele marcate „(admin)” cer acces la bot.</p>
+    <p>{{ total }} comenzi, în {{ categories|length }} categorii. Scrie-le în Discord cu <b>/</b>.</p>
   </div>
 
-  <input class="search" id="q" type="text" placeholder="🔍 Caută o comandă (ex: invitații, culori, ban)..." oninput="filt()">
+  <input class="search" id="q" type="text" placeholder="🔍 Caută o comandă (ex: invitații, culori, ban)..." oninput="onSearch()">
 
-  <div id="list">
-    {% for title, cmds in groups %}
-    <div class="grp" data-grp>
-      <h3>{{ title }}</h3>
-      {% for name, desc in cmds %}
-      <div class="cmd" data-txt="{{ (name ~ ' ' ~ desc)|lower }}">
-        <code>{{ name }}</code><span>{{ desc }}</span>
+  {% if not categories %}
+  <div class="none">Botul se conectează încă — reîncarcă pagina în câteva secunde.</div>
+  {% else %}
+
+  <!-- rezultate cautare: flat, peste toate categoriile -->
+  <div id="searchResults">
+    {% for c in categories %}
+      {% for cmd in c.commands %}
+      <div class="cmd" data-search-item data-txt="{{ (cmd.name ~ ' ' ~ cmd.desc)|lower }}">
+        <code>{{ cmd.name }}</code><span>{{ cmd.desc }}</span>
+        <span class="catlbl">{{ c.icon }} {{ c.label }}</span>
+        {% if cmd.restricted %}<span class="lock">🔒 necesită acces</span>{% endif %}
       </div>
       {% endfor %}
+    {% endfor %}
+    <div class="none" id="noResults" style="display:none">Nicio comandă găsită. Încearcă alt cuvânt.</div>
+  </div>
+
+  <!-- grid de categorii (vizibil implicit, cat timp nu se cauta nimic) -->
+  <div class="catgrid" id="catgrid">
+    {% for c in categories %}
+    <button type="button" class="catcard" onclick="openCat('{{ c.id }}')">
+      <span class="cic">{{ c.icon }}</span>
+      <span class="cbody">
+        <span class="cname">{{ c.label }}</span>
+        <span class="ccount">{{ c.commands|length }} {{ 'comandă' if c.commands|length==1 else 'comenzi' }}</span>
+      </span>
+      <span class="chev">›</span>
+    </button>
+    {% endfor %}
+  </div>
+
+  <!-- cate un panou per categorie, ascuns pana e deschis -->
+  {% for c in categories %}
+  <div class="catpanel" id="cat-{{ c.id }}">
+    <div class="backbar">
+      <button type="button" class="backbtn" onclick="backToCats()">← Înapoi</button>
+      <h3>{{ c.icon }} {{ c.label }}</h3>
+    </div>
+    {% for cmd in c.commands %}
+    <div class="cmd">
+      <code>{{ cmd.name }}</code><span>{{ cmd.desc }}</span>
+      {% if cmd.restricted %}<span class="lock">🔒 necesită acces</span>{% endif %}
     </div>
     {% endfor %}
   </div>
-  <div class="none" id="none">Nicio comandă găsită. Încearcă alt cuvânt.</div>
+  {% endfor %}
+
+  {% endif %}
 
   <script>
-    function filt() {
+    function openCat(id) {
+      document.getElementById('catgrid').style.display = 'none';
+      document.querySelectorAll('.catpanel').forEach(p => p.classList.remove('open'));
+      const p = document.getElementById('cat-' + id);
+      if (p) p.classList.add('open');
+      window.scrollTo({top: 0, behavior: 'instant'});
+    }
+    function backToCats() {
+      document.querySelectorAll('.catpanel').forEach(p => p.classList.remove('open'));
+      document.getElementById('catgrid').style.display = '';
+    }
+    function onSearch() {
       const q = document.getElementById('q').value.toLowerCase().trim();
+      const results = document.getElementById('searchResults');
+      const grid = document.getElementById('catgrid');
+      if (!q) {
+        results.classList.remove('open');
+        grid.style.display = '';
+        return;
+      }
+      document.querySelectorAll('.catpanel').forEach(p => p.classList.remove('open'));
+      grid.style.display = 'none';
+      results.classList.add('open');
       let any = false;
-      document.querySelectorAll('[data-grp]').forEach(g => {
-        let vis = 0;
-        g.querySelectorAll('.cmd').forEach(c => {
-          const show = !q || c.dataset.txt.includes(q);
-          c.style.display = show ? '' : 'none';
-          if (show) vis++;
-        });
-        g.style.display = vis ? '' : 'none';
-        if (vis) any = true;
+      results.querySelectorAll('[data-search-item]').forEach(el => {
+        const show = el.dataset.txt.includes(q);
+        el.style.display = show ? '' : 'none';
+        if (show) any = true;
       });
-      document.getElementById('none').style.display = any ? 'none' : 'block';
+      document.getElementById('noResults').style.display = any ? 'none' : 'block';
     }
   </script>
 {% endblock %}

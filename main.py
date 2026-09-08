@@ -171,6 +171,12 @@ async def main():
 
     bot = MyBot(connector=connector)
 
+    # dashboard-ul (acelasi proces, vezi run.py) citeste comenzile direct de aici
+    # pentru pagina "Toate comenzile" — ca sa nu mai tina o lista separata,
+    # scrisa de mana, care ramane in urma cand adaugi un modul nou.
+    from utils import botref
+    botref.bot = bot
+
     # hot reload: modifici un cog si il reincarci fara sa repornesti botul
     @bot.command(name="reload")
     @commands.is_owner()
