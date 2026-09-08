@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}Remindere · {{ meta.get('name','Server') }}{% endblock %}
+
+{% block extra_style %}
+  .panel { padding:0; margin-bottom:22px; overflow:hidden; }
+  .panel-head { padding:20px 24px; border-bottom:1px solid var(--glass-border); background:rgba(255,255,255,.02); }
+  .panel-head h3 { margin:0 0 4px; font-size:18px; }
+  .panel-body { padding:22px 24px; }
+  .sub { color:var(--muted); font-size:13px; margin:0; line-height:1.6; }
+  .field { background:var(--input); border:1px solid var(--glass-border); border-radius:12px; padding:14px 16px; margin-bottom:12px; }
+  .field > label { display:block; font-size:12.5px; color:var(--muted); margin:0 0 9px; font-weight:700; text-transform:uppercase; letter-spacing:.3px; }
+  input[type=text], input[type=number], input[type=date], input[type=time], select, textarea { width:100%; padding:11px; border-radius:8px; border:1px solid var(--glass-border); background:var(--bg); color:var(--text); font-size:14px; box-sizing:border-box; font-family:inherit; }
+  textarea { min-height:80px; resize:vertical; }
+  .save { margin-top:6px; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#0d1013; border:none; padding:12px 26px; border-radius:11px; font-weight:700; font-size:14px; cursor:pointer; }
+  .saved { background:rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.3); color:#4ade80; border-radius:10px; padding:11px 15px; margin-bottom:16px; font-size:14px; }
+  .err { background:rgba(251,113,133,.12); border:1px solid rgba(251,113,133,.3); color:#fb7185; border-radius:10px; padding:11px 15px; margin-bottom:16px; font-size:14px; }
+  .modes { display:flex; gap:10px; margin-bottom:14px; }
+  .mode-opt { position:relative; flex:1; display:block; background:var(--input); border:2px solid var(--glass-border); border-radius:10px; padding:12px 14px; cursor:pointer; text-align:center; font-weight:700; font-size:13.5px; transition:border-color .15s; }
+  .mode-opt input { position:absolute; opacity:0; }
+  .mode-opt:has(input:checked) { border-color:var(--accent); color:var(--accent); }
+  .mode-opt.on { border-color:var(--accent); color:var(--accent); }
+  .grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  @media (max-width:640px){ .grid3, .grid2 { grid-template-columns:1fr; } }
+  .relmode, .exactmode { display:none; }
+  .relmode.on, .exactmode.on { display:block; }
+
+  .rem { display:flex; align-items:flex-start; gap:14px; background:var(--card); border:1px solid var(--glass-border); border-left:3px solid var(--gold); border-radius:12px; padding:14px 16px; margin-bottom:10px; }
+  .rem .when { flex:none; min-width:120px; text-align:center; background:var(--input); border-radius:8px; padding:8px 10px; }
+  .rem .when b { display:block; font-size:15px; }
+  .rem .when small { color:var(--muted); font-size:11px; }
+  .rem .body { flex:1; min-width:0; }
+  .rem .msg { font-size:14px; margin-bottom:4px; word-break:break-word; }
+  .rem .meta { color:var(--muted); font-size:12px; }
+  .rem .del { background:var(--input); border:1px solid var(--glass-border); color:#fb7185; border-radius:8px; padding:7px 12px; cursor:pointer; font-size:13px; flex:none; }
+  .empty { text-align:center; color:var(--muted); padding:30px; }
+{% endblock %}
+
+{% block content %}
+  {% if saved %}<div class="saved">✅ Reminder adăugat!</div>{% endif %}
+  {% if error %}<div class="err">⚠️ {{ error }}</div>{% endif %}
+
+  <div class="panel">
+    <div class="panel-head">
+      <h3>⏰ Remindere ({{ reminders|length }} active)</h3>
+      <p class="sub">Poți avea oricâte remindere vrei. Fiecare se trimite o singură dată, la momentul ales, apoi dispare din listă.</p>
+    </div>
+    <div class="panel-body">
+      {% if not reminders %}
+      <div class="empty">Niciun reminder activ încă. Adaugă unul mai jos.</div>
+      {% else %}
+        {% for r in reminders %}
+        <div class="rem">
+          <div class="when">
+            <b>{{ r.when_str }}</b>
+            <small>{{ r.in_str }}</small>
+          </div>
+          <div class="body">
+            <div class="msg">{{ r.message }}</div>
+            <div class="meta">
+              📍 #{{ ch_by_id.get(r.channel_id|string, '?') }}
+              {% if r.role_id %} · 🔔 @{{ role_by_id.get(r.role_id|string, '?') }}{% endif %}
+            </div>
+          </div>
+          <form method="POST" onsubmit="return confirm('Ștergi acest reminder?')">
+            <input type="hidden" name="action" value="delete">
+            <input type="hidden" name="id" value="{{ r.id }}">
+            <button class="del" type="submit">✕ Șterge</button>
+          </form>
+        </div>
+        {% endfor %}
+      {% endif %}
+    </div>
+  </div>
+
+  <form class="panel" method="POST">
+    <div class="panel-head">
+      <h3>➕ Adaugă un reminder</h3>
+    </div>
+    <div class="panel-body">
+      <input type="hidden" name="action" value="add">
+
+      <div class="field">
+        <label>📍 Canal</label>
+        <select name="channel_id" required>
+          <option value="">— alege canalul —</option>
+          {% for ch in text_channels %}
+          <option value="{{ ch.id }}">#{{ ch.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="field">
+        <label>💬 Detalii (textul reminder-ului)</label>
+        <textarea name="message" placeholder="Ex: Nu uitați de evenimentul de duminică!" required></textarea>
+      </div>
+
+      <div class="field">
+        <label>🔔 Rol suplimentar de menționat (opțional — @everyone se dă mereu)</label>
+        <select name="role_id">
+          <option value="">— fără —</option>
+          {% for r in roles %}
+          <option value="{{ r.id }}">{{ r.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="field">
+        <label>🕐 Când se trimite</label>
+        <div class="modes">
+          <label class="mode-opt" id="modeRelBtn"><input type="radio" name="mode" value="relative" checked onchange="setMode('relative')">⏱️ Peste un timp</label>
+          <label class="mode-opt" id="modeExactBtn"><input type="radio" name="mode" value="exact" onchange="setMode('exact')">📅 Dată și oră exactă</label>
+        </div>
+
+        <div class="relmode on" id="relBlock">
+          <div class="grid3">
+            <div><label style="display:block;font-size:12px;color:var(--muted);margin-bottom:6px">Zile</label><input type="number" name="days" min="0" value="0"></div>
+            <div><label style="display:block;font-size:12px;color:var(--muted);margin-bottom:6px">Ore</label><input type="number" name="hours" min="0" value="0"></div>
+            <div><label style="display:block;font-size:12px;color:var(--muted);margin-bottom:6px">Minute</label><input type="number" name="minutes" min="0" value="10"></div>
+          </div>
+        </div>
+
+        <div class="exactmode" id="exactBlock">
+          <div class="grid2">
+            <div><label style="display:block;font-size:12px;color:var(--muted);margin-bottom:6px">Data</label><input type="date" name="date"></div>
+            <div><label style="display:block;font-size:12px;color:var(--muted);margin-bottom:6px">Ora</label><input type="time" name="time"></div>
+          </div>
+          <p class="sub" style="margin-top:8px">Fus orar: România (Europe/Bucharest).</p>
+        </div>
+      </div>
+
+      <button class="save" type="submit">➕ Adaugă reminder-ul</button>
+    </div>
+  </form>
+
+  <script>
+    function setMode(mode) {
+      document.getElementById('relBlock').classList.toggle('on', mode === 'relative');
+      document.getElementById('exactBlock').classList.toggle('on', mode === 'exact');
+      document.getElementById('modeRelBtn').classList.toggle('on', mode === 'relative');
+      document.getElementById('modeExactBtn').classList.toggle('on', mode === 'exact');
+    }
+  </script>
+{% endblock %}

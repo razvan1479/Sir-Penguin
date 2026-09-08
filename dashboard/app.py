@@ -949,6 +949,98 @@ def helperapp_page(guild_id):
                            section="helperapp", saved=request.args.get("saved"))
 
 
+@app.route("/reminders/<guild_id>", methods=["GET", "POST"])
+@guild_required
+def reminders_page(guild_id):
+    gid = int(guild_id)
+    reminders = storage.get(gid, "reminders", []) or []
+
+    if request.method == "POST":
+        action = request.form.get("action", "add")
+        if action == "add":
+            channel_id = _to_int(request.form.get("channel_id", ""))
+            message = request.form.get("message", "").strip()
+            mode = request.form.get("mode", "relative")
+            trigger_ts = None
+            error = None
+
+            if not channel_id:
+                error = "Alege un canal."
+            elif not message:
+                error = "Scrie un text pentru reminder."
+            elif mode == "relative":
+                days = _to_int(request.form.get("days", "")) or 0
+                hours = _to_int(request.form.get("hours", "")) or 0
+                minutes = _to_int(request.form.get("minutes", "")) or 0
+                total_seconds = days * 86400 + hours * 3600 + minutes * 60
+                if total_seconds <= 0:
+                    error = "Alege cel puțin o durată (zile/ore/minute) mai mare ca 0."
+                else:
+                    trigger_ts = _time.time() + total_seconds
+            else:  # mode == "exact"
+                date_str = request.form.get("date", "")
+                time_str = request.form.get("time", "") or "00:00"
+                try:
+                    import datetime
+                    from zoneinfo import ZoneInfo
+                    dt = datetime.datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
+                    dt = dt.replace(tzinfo=ZoneInfo("Europe/Bucharest"))
+                    trigger_ts = dt.timestamp()
+                    if trigger_ts <= _time.time():
+                        error = "Data și ora alese sunt deja în trecut."
+                except ValueError:
+                    error = "Data sau ora nu sunt valide."
+
+            if not error:
+                reminders.append({
+                    "id": uuid.uuid4().hex[:10],
+                    "channel_id": channel_id,
+                    "message": message,
+                    "trigger_ts": trigger_ts,
+                    "role_id": _to_int(request.form.get("role_id", "")) or None,
+                    "created_ts": _time.time(),
+                })
+                storage.set(gid, "reminders", reminders)
+                return redirect(url_for("reminders_page", guild_id=guild_id, saved=1))
+            return redirect(url_for("reminders_page", guild_id=guild_id, error=error))
+
+        elif action == "delete":
+            rid = request.form.get("id")
+            reminders = [r for r in reminders if r.get("id") != rid]
+            storage.set(gid, "reminders", reminders)
+            return redirect(url_for("reminders_page", guild_id=guild_id))
+
+    channels = storage.get(gid, "channels", {}) or {}
+    roles = storage.get(gid, "roles", {}) or {}
+    reminders_sorted = sorted(reminders, key=lambda r: r.get("trigger_ts", 0))
+
+    import datetime
+    from zoneinfo import ZoneInfo
+    tz = ZoneInfo("Europe/Bucharest")
+    now = _time.time()
+    for r in reminders_sorted:
+        ts = r.get("trigger_ts", 0)
+        dt = datetime.datetime.fromtimestamp(ts, tz)
+        r["when_str"] = dt.strftime("%d.%m %H:%M")
+        remaining = ts - now
+        if remaining <= 0:
+            r["in_str"] = "acum"
+        elif remaining < 3600:
+            r["in_str"] = f"peste {int(remaining // 60)} min"
+        elif remaining < 86400:
+            r["in_str"] = f"peste {int(remaining // 3600)} h"
+        else:
+            r["in_str"] = f"peste {int(remaining // 86400)} zile"
+
+    ch_by_id = {str(c["id"]): c["name"] for c in channels.get("texts", [])}
+    role_by_id = {str(r["id"]): r["name"] for r in roles.get("list", [])}
+    return render_template("reminders.html", guild_id=guild_id, reminders=reminders_sorted,
+                           text_channels=channels.get("texts", []), roles=roles.get("list", []),
+                           ch_by_id=ch_by_id, role_by_id=role_by_id,
+                           meta=storage.get(gid, "meta", {}), section="reminders",
+                           saved=request.args.get("saved"), error=request.args.get("error"))
+
+
 @app.route("/tickets/<guild_id>", methods=["GET", "POST"])
 @guild_required
 def tickets(guild_id):
