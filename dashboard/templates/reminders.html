@@ -60,6 +60,7 @@
             <div class="meta">
               📍 #{{ ch_by_id.get(r.channel_id|string, '?') }}
               {% if r.role_id %} · 🔔 @{{ role_by_id.get(r.role_id|string, '?') }}{% endif %}
+              {% if r.repeat_hours %} · 🔁 la fiecare {{ r.repeat_hours }}h{% endif %}
             </div>
           </div>
           <form method="POST" onsubmit="return confirm('Ștergi acest reminder?')">
@@ -109,7 +110,8 @@
         <label>🕐 Când se trimite</label>
         <div class="modes">
           <label class="mode-opt" id="modeRelBtn"><input type="radio" name="mode" value="relative" checked onchange="setMode('relative')">⏱️ Peste un timp</label>
-          <label class="mode-opt" id="modeExactBtn"><input type="radio" name="mode" value="exact" onchange="setMode('exact')">📅 Dată și oră exactă</label>
+          <label class="mode-opt" id="modeExactBtn"><input type="radio" name="mode" value="exact" onchange="setMode('exact')">📅 Dată exactă</label>
+          <label class="mode-opt" id="modeRepeatBtn"><input type="radio" name="mode" value="repeat" onchange="setMode('repeat')">🔁 Repetă</label>
         </div>
 
         <div class="relmode on" id="relBlock">
@@ -127,6 +129,14 @@
           </div>
           <p class="sub" style="margin-top:8px">Fus orar: România (Europe/Bucharest).</p>
         </div>
+
+        <div class="exactmode" id="repeatBlock">
+          <div class="grid2">
+            <div><label style="display:block;font-size:12px;color:var(--muted);margin-bottom:6px">La fiecare (ore)</label><input type="number" name="repeat_hours" min="1" value="6"></div>
+            <div><label style="display:block;font-size:12px;color:var(--muted);margin-bottom:6px">Ora fixă de start</label><input type="time" name="anchor_time" value="06:00"></div>
+          </div>
+          <p class="sub" style="margin-top:8px">Ex: la fiecare 6 ore, start 06:00 → se trimite la 06:00, 12:00, 18:00, 00:00... Nu se oprește niciodată — îl ștergi manual când nu-l mai vrei.</p>
+        </div>
       </div>
 
       <button class="save" type="submit">➕ Adaugă reminder-ul</button>
@@ -137,8 +147,10 @@
     function setMode(mode) {
       document.getElementById('relBlock').classList.toggle('on', mode === 'relative');
       document.getElementById('exactBlock').classList.toggle('on', mode === 'exact');
+      document.getElementById('repeatBlock').classList.toggle('on', mode === 'repeat');
       document.getElementById('modeRelBtn').classList.toggle('on', mode === 'relative');
       document.getElementById('modeExactBtn').classList.toggle('on', mode === 'exact');
+      document.getElementById('modeRepeatBtn').classList.toggle('on', mode === 'repeat');
     }
   </script>
 {% endblock %}

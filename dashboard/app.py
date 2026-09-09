@@ -977,7 +977,7 @@ def reminders_page(guild_id):
                     error = "Alege cel puțin o durată (zile/ore/minute) mai mare ca 0."
                 else:
                     trigger_ts = _time.time() + total_seconds
-            else:  # mode == "exact"
+            elif mode == "exact":
                 date_str = request.form.get("date", "")
                 time_str = request.form.get("time", "") or "00:00"
                 try:
@@ -990,6 +990,28 @@ def reminders_page(guild_id):
                         error = "Data și ora alese sunt deja în trecut."
                 except ValueError:
                     error = "Data sau ora nu sunt valide."
+            else:  # mode == "repeat" — la fiecare X ore, cu o ora fixa de start
+                repeat_hours = _to_int(request.form.get("repeat_hours", "")) or 0
+                anchor_str = request.form.get("anchor_time", "")
+                if repeat_hours <= 0:
+                    error = "Alege un interval de repetare (ore) mai mare ca 0."
+                else:
+                    try:
+                        import datetime
+                        from zoneinfo import ZoneInfo
+                        tz = ZoneInfo("Europe/Bucharest")
+                        now_dt = datetime.datetime.now(tz)
+                        hh, mm = (anchor_str or "00:00").split(":")
+                        base = now_dt.replace(hour=int(hh), minute=int(mm),
+                                              second=0, microsecond=0)
+                        # daca ora de start a trecut deja azi, sarim inainte
+                        # in pasi de repeat_hours pana ajungem in viitor —
+                        # asa ramane "ancorat" la ora aleasa (ex. 06:00, 12:00...)
+                        while base <= now_dt:
+                            base += datetime.timedelta(hours=repeat_hours)
+                        trigger_ts = base.timestamp()
+                    except (ValueError, IndexError):
+                        error = "Ora de start nu e validă."
 
             if not error:
                 reminders.append({
@@ -998,6 +1020,7 @@ def reminders_page(guild_id):
                     "message": message,
                     "trigger_ts": trigger_ts,
                     "role_id": _to_int(request.form.get("role_id", "")) or None,
+                    "repeat_hours": _to_int(request.form.get("repeat_hours", "")) if mode == "repeat" else None,
                     "created_ts": _time.time(),
                 })
                 storage.set(gid, "reminders", reminders)

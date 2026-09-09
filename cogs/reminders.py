@@ -5,17 +5,21 @@ Nu are nicio comanda Discord — totul se face din dashboard: alegi canalul,
 scrii detaliile, si alegi CAND sa se trimita:
   - relativ: peste X zile / ore / minute de acum
   - exact: la o data si ora anume (fus Europe/Bucharest)
+  - repetitiv: la fiecare X ore, cu o ora fixa de start (ex. din 6 in 6 ore,
+    incepand de la 06:00 — deci 06:00, 12:00, 18:00, 00:00...)
 
 Poti avea oricate remindere active deodata. Un ceas in fundal (tasks.loop)
-verifica la fiecare 20s daca a venit vremea vreunuia si il trimite; odata
-trimis, e scos din lista (nu se repeta, nu ramane "istoric" in aceasta
-versiune — daca vrei un reminder recurent, il re-adaugi din dashboard).
+verifica la fiecare 20s daca a venit vremea vreunuia si il trimite. Cele
+relative/exacte se sterg dupa ce sunt trimise (o singura data). Cele
+repetitive NU se sterg — isi avanseaza ora de declansare cu exact intervalul
+ales, ca sa nu se acumuleze intarziere in timp.
 
 Storage (cheia "reminders", per guild): lista de
-  {id, channel_id, message, trigger_ts, role_id, created_ts}
+  {id, channel_id, message, trigger_ts, role_id, repeat_hours, created_ts}
 trigger_ts e mereu un timestamp UTC (unix), indiferent cum a fost introdus
-(relativ sau data exacta) — conversia se face o singura data, la creare,
-in dashboard/app.py.
+(relativ, data exacta sau repetitiv) — conversia se face in dashboard/app.py.
+repeat_hours e None pentru remindere normale (o singura data), sau un numar
+de ore pentru cele recurente.
 """
 import discord
 from discord.ext import commands, tasks
@@ -50,7 +54,13 @@ class Reminders(commands.Cog):
             remaining = [r for r in reminders if r.get("trigger_ts", 0) > now]
             for r in due:
                 await self._send(guild, r)
-            # scoatem reminderele trimise DUPA ce am incercat sa le trimitem pe
+                repeat_hours = r.get("repeat_hours")
+                if repeat_hours:
+                    # recurent: NU se sterge — avansam ora de declansare cu exact
+                    # intervalul, ca sa nu se acumuleze intarziere (drift) in timp
+                    r["trigger_ts"] = r.get("trigger_ts", now) + repeat_hours * 3600
+                    remaining.append(r)
+            # scoatem/pastram reminderele DUPA ce am incercat sa le trimitem pe
             # toate — daca botul repornise chiar in acest interval, mai bine
             # sa trimitem un reminder o data in plus decat sa-l pierdem
             storage.set(guild.id, "reminders", remaining)
