@@ -343,18 +343,23 @@ class Giveaway(commands.Cog):
             for mid in expired:
                 await self._finalize(guild, mid)
 
-            # 2. postare recurenta (la interval)
+            # 2. postare recurenta (ancorata la ora aleasa in dashboard)
             data = storage.get(guild.id, "giveaways", {})
             cfg = data.get("config", {})
             if cfg.get("recurring") and cfg.get("channel_id"):
                 nxt = data.get("next_post_ts")
                 if nxt is None:
+                    # plasa de siguranta (in mod normal dashboard-ul o calculeaza
+                    # deja ancorat la salvare) — nu ar trebui sa se intample,
+                    # dar nu lasam giveaway-ul blocat daca lipseste totusi
                     data["next_post_ts"] = now + cfg.get("interval_hours", 24) * 3600
                     storage.set(guild.id, "giveaways", data)
                 elif now >= nxt:
                     await self._post_giveaway(guild, cfg)
                     data = storage.get(guild.id, "giveaways", {})
-                    data["next_post_ts"] = now + cfg.get("interval_hours", 24) * 3600
+                    # avansam de la ORA PROGRAMATA anterior (nu de la "acum"),
+                    # ca sa nu se acumuleze intarziere in timp — ramane ancorat
+                    data["next_post_ts"] = nxt + cfg.get("interval_hours", 24) * 3600
                     storage.set(guild.id, "giveaways", data)
 
     @ticker.before_loop

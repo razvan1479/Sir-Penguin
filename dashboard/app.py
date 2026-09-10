@@ -386,7 +386,8 @@ def _to_int(v):
 @app.route("/giveaway/<guild_id>", methods=["GET", "POST"])
 @guild_required
 def giveaway(guild_id):
-    data = storage.get(int(guild_id), "giveaways", {})
+    gid = int(guild_id)
+    data = storage.get(gid, "giveaways", {})
 
     if request.method == "POST":
         cfg = {
@@ -399,6 +400,7 @@ def giveaway(guild_id):
             "color": request.form.get("color", "#5865f2"),
             "recurring": request.form.get("recurring") == "on",
             "interval_hours": _to_int(request.form.get("interval_hours", "24")) or 24,
+            "anchor_time": request.form.get("anchor_time", "") or "12:00",
             "ping_everyone": request.form.get("ping_everyone") == "on",
             "required_role_id": _to_int(request.form.get("required_role_id", "")),
         }
@@ -406,22 +408,44 @@ def giveaway(guild_id):
         if not cfg["recurring"]:
             data["next_post_ts"] = None
         else:
-            data.pop("next_post_ts", None)
-        storage.set(int(guild_id), "giveaways", data)
+            # calculam AICI (o singura data, la salvare) urmatoarea postare
+            # ancorata la ora aleasa — nu la "peste interval_hours de acum",
+            # ca sa porneasca chiar la ora ceruta (ex. 20:00 in fiecare zi)
+            import datetime
+            from zoneinfo import ZoneInfo
+            tz = ZoneInfo("Europe/Bucharest")
+            now_dt = datetime.datetime.now(tz)
+            try:
+                hh, mm = cfg["anchor_time"].split(":")
+                base = now_dt.replace(hour=int(hh), minute=int(mm), second=0, microsecond=0)
+            except (ValueError, IndexError):
+                base = now_dt
+            while base <= now_dt:
+                base += datetime.timedelta(hours=cfg["interval_hours"])
+            data["next_post_ts"] = base.timestamp()
+        storage.set(gid, "giveaways", data)
         return redirect(url_for("giveaway", guild_id=guild_id, saved=1))
 
     # modul preferat: dashboard sau discord (salvat, schimbabil din query)
     mode = request.args.get("mode")
     if mode in ("dashboard", "discord"):
         data["mode"] = mode
-        storage.set(int(guild_id), "giveaways", data)
+        storage.set(gid, "giveaways", data)
     mode = data.get("mode", "dashboard")
+
+    next_post_str = None
+    if data.get("next_post_ts"):
+        import datetime
+        from zoneinfo import ZoneInfo
+        next_post_str = datetime.datetime.fromtimestamp(
+            data["next_post_ts"], ZoneInfo("Europe/Bucharest")).strftime("%d.%m %H:%M")
 
     return render_template("giveaway.html", guild_id=guild_id,
                            cfg=data.get("config", {}),
                            active_count=len(data.get("active", {})),
+                           next_post_str=next_post_str,
                            mode=mode,
-                           meta=storage.get(int(guild_id), "meta", {}),
+                           meta=storage.get(gid, "meta", {}),
                            section="giveaway", saved=request.args.get("saved"))
 
 

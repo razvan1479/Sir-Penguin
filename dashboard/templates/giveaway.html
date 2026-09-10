@@ -128,7 +128,10 @@
       <div id="interval-wrap">
         <label>Interval intre postari (ore)</label>
         <input type="number" name="interval_hours" id="interval_hours" min="1" value="{{ cfg.get('interval_hours', 24) }}">
-        <p class="hint">Botul posteaza singur un giveaway nou la fiecare atatea ore.</p>
+        <label style="margin-top:10px">Ora fixa de start</label>
+        <input type="time" name="anchor_time" id="anchor_time" value="{{ cfg.get('anchor_time', '12:00') }}">
+        <p class="hint">Ex: interval 24h, ora 20:00 → postat in fiecare zi la 20:00. Interval 6h, ora 06:00 → la 06:00, 12:00, 18:00, 00:00.</p>
+        {% if next_post_str %}<p class="hint">🕐 Urmatoarea postare: <b>{{ next_post_str }}</b> (ora României)</p>{% endif %}
       </div>
 
       <button class="save" type="submit">💾 Salveaza</button>
@@ -172,7 +175,7 @@
     $('pv-everyone').style.display = $('ping_everyone').checked ? 'block' : 'none';
     $('pv-everyone').textContent = role ? '@rolul setat' : '@everyone';
   }
-  ['title','prize','winners','duration_minutes','button_label','color','recurring','ping_everyone','required_role_id'].forEach(id => {
+  ['title','prize','winners','duration_minutes','button_label','color','recurring','interval_hours','anchor_time','ping_everyone','required_role_id'].forEach(id => {
     $(id).addEventListener('input', render); $(id).addEventListener('change', render);
   });
   render();
