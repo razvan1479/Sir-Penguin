@@ -13,11 +13,11 @@ Ruleaza separat de bot:  python dashboard/app.py  -> http://localhost:5000
 
 import os
 import re
-import discord
-from discord import app_commands
 import sys
 import ssl
 import time
+import secrets
+from discord import app_commands
 from functools import wraps
 from urllib.parse import urlencode
 
@@ -43,7 +43,16 @@ API = "https://discord.com/api"
 OAUTH_OK = bool(CLIENT_ID and CLIENT_SECRET)
 
 app = Flask(__name__)
-app.secret_key = os.getenv("FLASK_SECRET", "schimba-acest-secret")
+# Cheia de semnare a sesiunilor. Daca lipseste din .env, generam una random la
+# pornire (sesiunile se reseteaza la restart, dar NU cadem pe un secret cunoscut
+# public — altfel oricine ar putea falsifica cookie-uri de login).
+_flask_secret = os.getenv("FLASK_SECRET")
+if not _flask_secret:
+    _flask_secret = secrets.token_urlsafe(48)
+    print("[dashboard] ATENTIE: FLASK_SECRET lipseste din .env — am generat una "
+          "temporara. Adaug-o in .env ca sa ramai logat intre reporniri.",
+          file=sys.stderr)
+app.secret_key = _flask_secret
 
 
 # --- sesiune HTTP cu fix SSL (acelasi ca la bot, pt retele corporate) ---
@@ -123,13 +132,23 @@ def resolve_name(guild_id, user_id):
 def login():
     if not OAUTH_OK:
         return redirect(url_for("index"))
+    # state random, tinut in sesiune -> verificat la /callback (anti-CSRF)
+    state = secrets.token_urlsafe(32)
+    session["oauth_state"] = state
     q = urlencode({"client_id": CLIENT_ID, "response_type": "code",
-                   "scope": "identify guilds", "redirect_uri": REDIRECT_URI})
+                   "scope": "identify guilds", "redirect_uri": REDIRECT_URI,
+                   "state": state})
     return redirect(f"https://discord.com/oauth2/authorize?{q}")
 
 
 @app.route("/callback")
 def callback():
+    # verificam state-ul pus la /login (anti-CSRF): trebuie sa fie prezent,
+    # sa existe in sesiune si sa fie identic (comparare in timp constant)
+    state = request.args.get("state")
+    expected = session.pop("oauth_state", None)
+    if not state or not expected or not secrets.compare_digest(state, expected):
+        return redirect(url_for("index"))
     code = request.args.get("code")
     if not code:
         return redirect(url_for("index"))
@@ -985,6 +1004,9 @@ def helperapp_page(guild_id):
         cfg["panel_title"] = request.form.get("panel_title", "").strip()
         cfg["panel_text"] = request.form.get("panel_text", "").strip()
         cfg["panel_color"] = request.form.get("panel_color", "#5865f2")
+        # prefix pus in fata poreclei la acceptare. Il pastram EXACT cum e scris
+        # (spatiul din "[H] " conteaza). Gol = nu schimbam porecla deloc.
+        cfg["nick_prefix"] = request.form.get("nick_prefix", "")
         storage.set(gid, "helper_app", cfg)
         return redirect(url_for("helperapp_page", guild_id=guild_id, saved=1))
 
@@ -1671,4 +1693,4 @@ def servers():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    app.run(debug=False, port=5000)

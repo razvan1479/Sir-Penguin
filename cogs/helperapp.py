@@ -278,14 +278,17 @@ class HelperApp(commands.Cog):
             else:
                 role_ok = False
 
-        # 2b) porecla cu [H] in fata (doar la acceptare). Discord NU permite
-        # niciunui bot sa schimbe porecla proprietarului serverului, si nici
-        # a cuiva cu un rol mai sus decat al botului -> tratam ambele fara sa cadem.
+        # 2b) porecla cu prefix in fata (doar la acceptare). Prefixul se seteaza
+        # din dashboard (implicit "[H] "); daca il lasi GOL, nu schimbam porecla.
+        # Discord NU permite niciunui bot sa schimbe porecla proprietarului
+        # serverului, nici a cuiva cu un rol mai sus decat al botului -> tratam
+        # ambele fara sa cadem.
         nick_ok = True
-        if accept and member:
+        prefix = cfg.get("nick_prefix", "[H] ")
+        if accept and member and prefix:
             current = member.display_name
-            if not current.startswith("[H] "):
-                new_nick = f"[H] {current}"[:32]  # Discord limiteaza porecla la 32 caractere
+            if not current.startswith(prefix):
+                new_nick = f"{prefix}{current}"[:32]  # Discord limiteaza porecla la 32 caractere
                 try:
                     await member.edit(nick=new_nick, reason=f"Cerere Helper acceptata ({req_id})")
                 except discord.Forbidden:
@@ -313,7 +316,7 @@ class HelperApp(commands.Cog):
             extra.append("nu am putut acorda rolul de Helper (verifică rolul configurat "
                         "și poziția rolului botului)")
         if accept and not nick_ok:
-            extra.append("nu am putut schimba porecla cu [H] (probabil e proprietarul "
+            extra.append("nu am putut schimba porecla (probabil e proprietarul "
                         "serverului sau are un rol mai sus decât al botului)")
         note = f" ({'; '.join(extra)})" if extra else ""
         await interaction.followup.send(

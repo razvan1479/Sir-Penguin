@@ -96,6 +96,12 @@
         </select>
       </div>
 
+      <div class="field">
+        <label>🏷️ Prefix pus în fața poreclei la acceptare</label>
+        <input type="text" name="nick_prefix" maxlength="20" value="{{ cfg.get('nick_prefix', '[H] ') }}" placeholder="[H] ">
+        <p class="hint">Ce se adaugă în fața numelui când accepți pe cineva. Implicit <code>[H]&nbsp;</code> (cu spațiu). Pune ce vrei tu (ex. <code>🛠️&nbsp;</code> sau <code>Helper&nbsp;|&nbsp;</code>) — sau <b>lasă gol</b> ca botul să nu mai schimbe deloc porecla.</p>
+      </div>
+
       <hr class="divider">
 
       <div class="field">
