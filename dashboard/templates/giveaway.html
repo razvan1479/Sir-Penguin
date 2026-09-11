@@ -7,8 +7,9 @@
     .panel { background:var(--card); border-radius:14px; padding:22px; }
     label { display:block; font-weight:600; margin:18px 0 8px; font-size:12px; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); }
     label:first-of-type { margin-top:0; }
-    input[type=text], input[type=number], input[type=color] { width:100%; padding:11px; border-radius:8px; border:none; background:var(--input); color:var(--text); font-size:14px; font-family:inherit; }
+    input[type=text], input[type=number], input[type=color], input[type=date], input[type=time], select { width:100%; padding:11px; border-radius:8px; border:none; background:var(--input); color:var(--text); font-size:14px; font-family:inherit; }
     input[type=color]{ height:44px; padding:4px; cursor:pointer; }
+    .sfield { display:none; }
     .two { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
     .toggle { display:flex; align-items:center; gap:10px; margin:16px 0 6px; cursor:pointer; }
     .toggle input { width:18px; height:18px; accent-color:var(--accent); }
@@ -22,7 +23,6 @@
     .e-btn { margin-top:14px; display:inline-block; background:#248046; color:#fff; font-weight:600; font-size:14px; padding:9px 16px; border-radius:8px; }
     .cmd { color:var(--muted); font-size:13px; margin-top:14px; }
     .cmd code { background:var(--input); padding:2px 6px; border-radius:4px; color:#dbdee1; }
-    #interval-wrap { display:none; }
 
     .modewrap { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
     @media (max-width:700px){ .modewrap{ grid-template-columns:1fr; } }
@@ -96,16 +96,76 @@
       <input type="text" name="required_role_id" id="required_role_id" placeholder="gol = poate participa toata lumea" value="{{ cfg.get('required_role_id','') }}">
       <p class="hint">Doar membrii cu acest rol pot intra. Setari server → Roluri → click dreapta pe rol → Copiaza ID. Daca e setat, anuntul da ping pe rol in loc de @everyone.</p>
 
-      <div class="two">
-        <div>
-          <label>Durata (minute)</label>
-          <input type="number" name="duration_minutes" id="duration_minutes" min="1" value="{{ cfg.get('duration_minutes', 60) }}">
-        </div>
-        <div>
-          <label>Castigatori</label>
-          <input type="number" name="winners" id="winners" min="1" value="{{ cfg.get('winners', 1) }}">
-        </div>
+      {% set mode_sel = cfg.get('sched_mode') or ('interval' if cfg.get('recurring') else 'duration') %}
+
+      <label>Castigatori</label>
+      <input type="number" name="winners" id="winners" min="1" value="{{ cfg.get('winners', 1) }}">
+
+      <label>Tip de programare</label>
+      <select name="sched_mode" id="sched_mode">
+        <option value="duration" {% if mode_sel == 'duration' %}selected{% endif %}>⏱️ Durată fixă (minute)</option>
+        <option value="exact"    {% if mode_sel == 'exact' %}selected{% endif %}>📅 Dată &amp; oră exactă</option>
+        <option value="interval" {% if mode_sel == 'interval' %}selected{% endif %}>🔁 Recurent la interval (ore)</option>
+        <option value="weekly"   {% if mode_sel == 'weekly' %}selected{% endif %}>🗓️ Recurent săptămânal (zi → zi)</option>
+      </select>
+
+      <!-- Durată (modurile: durată fixă + recurent la interval) -->
+      <div class="sfield" data-modes="duration interval">
+        <label>Durată giveaway (minute)</label>
+        <input type="number" name="duration_minutes" id="duration_minutes" min="1" value="{{ cfg.get('duration_minutes', 60) }}">
+        <p class="hint">Cât ține fiecare giveaway din momentul postării. 60 = o oră, 1440 = o zi.</p>
       </div>
+
+      <!-- Dată & oră exactă -->
+      <div class="sfield" data-modes="exact">
+        <label>Data de final</label>
+        <input type="date" name="end_date" id="end_date" value="{{ cfg.get('end_date','') }}">
+        <p class="hint">Postezi cu <code>/giveaway_start</code> → se termină exact la data + ora aleasă (ora României).</p>
+      </div>
+
+      <!-- Recurent la interval -->
+      <div class="sfield" data-modes="interval">
+        <label>Interval între postări (ore)</label>
+        <input type="number" name="interval_hours" id="interval_hours" min="1" value="{{ cfg.get('interval_hours', 24) }}">
+        <label style="margin-top:12px">Oră fixă de start</label>
+        <input type="time" name="anchor_time" id="anchor_time" value="{{ cfg.get('anchor_time', '12:00') }}">
+        <p class="hint">Ex: interval 24h, ora 20:00 → postat în fiecare zi la 20:00.</p>
+      </div>
+
+      <!-- Recurent săptămânal -->
+      <div class="sfield" data-modes="weekly">
+        <div class="two">
+          <div>
+            <label>Ziua de start</label>
+            <select name="start_weekday" id="start_weekday">
+              {% for i in range(7) %}
+              <option value="{{ i }}" {% if (cfg.get('start_weekday', 3)|int) == i %}selected{% endif %}>{{ ['Luni','Marți','Miercuri','Joi','Vineri','Sâmbătă','Duminică'][i] }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label>Ora de start</label>
+            <input type="time" name="start_time" id="start_time" value="{{ cfg.get('start_time', '20:00') }}">
+          </div>
+        </div>
+        <div class="two" style="margin-top:12px">
+          <div>
+            <label>Ziua de final</label>
+            <select name="end_weekday" id="end_weekday">
+              {% for i in range(7) %}
+              <option value="{{ i }}" {% if (cfg.get('end_weekday', 6)|int) == i %}selected{% endif %}>{{ ['Luni','Marți','Miercuri','Joi','Vineri','Sâmbătă','Duminică'][i] }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label>Ora de final</label>
+            <input type="time" name="end_time" id="end_time" value="{{ cfg.get('end_time', '22:00') }}">
+          </div>
+        </div>
+        <p class="hint">Ex: start <b>Joi 20:00</b> → final <b>Duminică 22:00</b>, apoi se repetă în fiecare săptămână.</p>
+      </div>
+
+      {% if next_post_str %}<p class="hint">🕐 Următoarea postare automată: <b>{{ next_post_str }}</b> (ora României)</p>{% endif %}
 
       <label>Titlu</label>
       <input type="text" name="title" id="title" value="{{ cfg.get('title','🎉 GIVEAWAY 🎉') }}">
@@ -120,19 +180,6 @@
         <input type="checkbox" name="ping_everyone" id="ping_everyone" {% if cfg.get('ping_everyone', True) %}checked{% endif %}>
         <span>Anunta la postare (@everyone, sau rolul setat)</span>
       </label>
-
-      <label class="toggle">
-        <input type="checkbox" name="recurring" id="recurring" {% if cfg.get('recurring') %}checked{% endif %}>
-        <span>Postare automata la interval (giveaway recurent)</span>
-      </label>
-      <div id="interval-wrap">
-        <label>Interval intre postari (ore)</label>
-        <input type="number" name="interval_hours" id="interval_hours" min="1" value="{{ cfg.get('interval_hours', 24) }}">
-        <label style="margin-top:10px">Ora fixa de start</label>
-        <input type="time" name="anchor_time" id="anchor_time" value="{{ cfg.get('anchor_time', '12:00') }}">
-        <p class="hint">Ex: interval 24h, ora 20:00 → postat in fiecare zi la 20:00. Interval 6h, ora 06:00 → la 06:00, 12:00, 18:00, 00:00.</p>
-        {% if next_post_str %}<p class="hint">🕐 Urmatoarea postare: <b>{{ next_post_str }}</b> (ora României)</p>{% endif %}
-      </div>
 
       <button class="save" type="submit">💾 Salveaza</button>
     </form>
@@ -157,28 +204,51 @@
 {% if mode != 'discord' %}
 <script>
   const $ = id => document.getElementById(id);
+  const ZILE = ['Luni','Marți','Miercuri','Joi','Vineri','Sâmbătă','Duminică'];
+
+  // arata doar campurile relevante pentru modul de programare ales
+  function syncSched(){
+    const mode = $('sched_mode').value;
+    document.querySelectorAll('.sfield').forEach(el => {
+      const modes = (el.dataset.modes || '').split(' ');
+      el.style.display = modes.includes(mode) ? 'block' : 'none';
+    });
+  }
+
   function render(){
     $('embed').style.borderLeftColor = $('color').value;
     $('pv-title').textContent = $('title').value || '🎉 GIVEAWAY 🎉';
     const prize = $('prize').value || 'Premiu';
     const win = $('winners').value || 1;
-    const dur = $('duration_minutes').value || 60;
     const role = $('required_role_id').value.trim();
+    const mode = $('sched_mode').value;
+
+    let ends;
+    if (mode === 'duration')       ends = 'peste ' + ($('duration_minutes').value || 60) + ' minute';
+    else if (mode === 'interval')  ends = 'peste ' + ($('duration_minutes').value || 60) + ' minute (recurent)';
+    else if (mode === 'exact')     ends = 'la ' + ($('end_date').value || 'data aleasă') + ' ' + ($('end_time').value || '');
+    else                           ends = ZILE[$('start_weekday').value] + ' ' + ($('start_time').value || '') +
+                                          ' → ' + ZILE[$('end_weekday').value] + ' ' + ($('end_time').value || '');
+
     let desc = '<strong>Premiu:</strong> ' + prize +
       '<br><strong>Castigatori:</strong> ' + win +
-      '<br><strong>Se termina:</strong> in ' + dur + ' minute';
+      '<br><strong>Se termina:</strong> ' + ends;
     if (role) desc += '<br><strong>Doar pentru:</strong> <span style="color:#c9cdfb">@rolul setat</span>';
     desc += '<br><br>Apasa butonul de mai jos ca sa participi!';
     $('pv-desc').innerHTML = desc;
     $('pv-btn').textContent = $('button_label').value || '🎉 Particip';
-    $('interval-wrap').style.display = $('recurring').checked ? 'block' : 'none';
     $('pv-everyone').style.display = $('ping_everyone').checked ? 'block' : 'none';
     $('pv-everyone').textContent = role ? '@rolul setat' : '@everyone';
   }
-  ['title','prize','winners','duration_minutes','button_label','color','recurring','interval_hours','anchor_time','ping_everyone','required_role_id'].forEach(id => {
-    $(id).addEventListener('input', render); $(id).addEventListener('change', render);
+
+  ['title','prize','winners','duration_minutes','button_label','color','sched_mode',
+   'interval_hours','anchor_time','end_date','end_time','start_weekday','start_time',
+   'end_weekday','ping_everyone','required_role_id'].forEach(id => {
+    const el = $(id); if (!el) return;
+    el.addEventListener('input', render); el.addEventListener('change', render);
   });
-  render();
+  $('sched_mode').addEventListener('change', syncSched);
+  syncSched(); render();
 </script>
 {% endif %}
 {% endblock %}

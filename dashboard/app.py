@@ -390,6 +390,9 @@ def giveaway(guild_id):
     data = storage.get(gid, "giveaways", {})
 
     if request.method == "POST":
+        sched_mode = request.form.get("sched_mode", "duration")
+        if sched_mode not in ("duration", "exact", "interval", "weekly"):
+            sched_mode = "duration"
         cfg = {
             "channel_id": _to_int(request.form.get("channel_id", "")),
             "prize": request.form.get("prize", "").strip(),
@@ -398,23 +401,33 @@ def giveaway(guild_id):
             "button_label": request.form.get("button_label", "").strip() or "🎉 Particip",
             "title": request.form.get("title", "").strip() or "🎉 GIVEAWAY 🎉",
             "color": request.form.get("color", "#5865f2"),
-            "recurring": request.form.get("recurring") == "on",
+            "sched_mode": sched_mode,
+            # recurent la interval
             "interval_hours": _to_int(request.form.get("interval_hours", "24")) or 24,
             "anchor_time": request.form.get("anchor_time", "") or "12:00",
+            # dată & oră exactă
+            "end_date": request.form.get("end_date", "").strip(),
+            "end_time": request.form.get("end_time", "").strip() or "22:00",
+            # recurent săptămânal
+            "start_weekday": _to_int(request.form.get("start_weekday", "3")) if _to_int(request.form.get("start_weekday", "3")) is not None else 3,
+            "start_time": request.form.get("start_time", "").strip() or "20:00",
+            "end_weekday": _to_int(request.form.get("end_weekday", "6")) if _to_int(request.form.get("end_weekday", "6")) is not None else 6,
             "ping_everyone": request.form.get("ping_everyone") == "on",
             "required_role_id": _to_int(request.form.get("required_role_id", "")),
+            # păstrat pentru retrocompatibilitate cu botul
+            "recurring": sched_mode in ("interval", "weekly"),
         }
         data["config"] = cfg
-        if not cfg["recurring"]:
-            data["next_post_ts"] = None
-        else:
+
+        import datetime
+        from zoneinfo import ZoneInfo
+        tz = ZoneInfo("Europe/Bucharest")
+        now_dt = datetime.datetime.now(tz)
+
+        if sched_mode == "interval":
             # calculam AICI (o singura data, la salvare) urmatoarea postare
             # ancorata la ora aleasa — nu la "peste interval_hours de acum",
             # ca sa porneasca chiar la ora ceruta (ex. 20:00 in fiecare zi)
-            import datetime
-            from zoneinfo import ZoneInfo
-            tz = ZoneInfo("Europe/Bucharest")
-            now_dt = datetime.datetime.now(tz)
             try:
                 hh, mm = cfg["anchor_time"].split(":")
                 base = now_dt.replace(hour=int(hh), minute=int(mm), second=0, microsecond=0)
@@ -423,6 +436,24 @@ def giveaway(guild_id):
             while base <= now_dt:
                 base += datetime.timedelta(hours=cfg["interval_hours"])
             data["next_post_ts"] = base.timestamp()
+        elif sched_mode == "weekly":
+            # urmatorul START: ziua+ora aleasa, prima aparitie dupa acum
+            try:
+                hh, mm = cfg["start_time"].split(":")
+                hh, mm = int(hh), int(mm)
+            except (ValueError, IndexError):
+                hh, mm = 20, 0
+            sw = int(cfg["start_weekday"])
+            days_ahead = (sw - now_dt.weekday()) % 7
+            base = (now_dt + datetime.timedelta(days=days_ahead)).replace(
+                hour=hh, minute=mm, second=0, microsecond=0)
+            while base <= now_dt:
+                base += datetime.timedelta(days=7)
+            data["next_post_ts"] = base.timestamp()
+        else:
+            # duration / exact -> nu e recurent, nu programam postare automata
+            data["next_post_ts"] = None
+
         storage.set(gid, "giveaways", data)
         return redirect(url_for("giveaway", guild_id=guild_id, saved=1))
 

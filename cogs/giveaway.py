@@ -2,9 +2,18 @@
 cogs/giveaway.py — GIVEAWAY cu buton de inscriere.
 
 Posteaza un embed cu un buton; cine apasa intra in tragere. La final, botul
-alege castigatorii automat. Totul e configurabil din dashboard:
-  - canal, premiu, durata (timp), nr. castigatori, textul butonului, titlu, culoare
-  - postare AUTOMATA la interval (giveaway recurent) — la fiecare X ore
+alege castigatorii automat. Totul e configurabil din dashboard.
+
+TIPURI DE PROGRAMARE (cfg["sched_mode"]):
+  - "duration" : postezi acum (/giveaway_start sau /giveaway) -> tine X minute.
+  - "exact"    : postezi acum -> se termina la DATA + ORA exacta aleasa.
+  - "interval" : RECURENT la fiecare N ore, ancorat la o ora; fiecare tine X minute.
+  - "weekly"   : RECURENT saptamanal -> incepe [zi] la [ora] si se termina
+                 [zi] la [ora], apoi se repeta in fiecare saptamana
+                 (ex: Joi 20:00 -> Duminica 22:00).
+
+Retrocompatibil: daca lipseste "sched_mode" dar exista vechiul cfg["recurring"]=True,
+se comporta ca "interval".
 
 CUM functioneaza tehnic:
   - butonul e "persistent" (custom_id fix) -> merge si dupa restart
@@ -13,22 +22,27 @@ CUM functioneaza tehnic:
 
 Date salvate (cheia "giveaways"):
 {
-  "config": {channel_id, prize, duration_minutes, winners, button_label,
-             title, color, recurring, interval_hours},
+  "config": {channel_id, prize, winners, button_label, title, color,
+             sched_mode, duration_minutes, interval_hours, anchor_time,
+             end_date, end_time, start_weekday, start_time, end_weekday,
+             ping_everyone, required_role_id},
   "active": { "<message_id>": {channel_id, prize, end_ts, winners, participants:[], ...} },
   "ended":  { "<message_id>": {..., participants:[]} },   # pentru reroll
   "next_post_ts": <unix>                                   # urmatoarea postare recurenta
 }
 
 Comenzi (admin):
-  /giveaway start              - posteaza acum un giveaway (foloseste config din dashboard)
-  /giveaway end <message_id>   - incheie acum un giveaway
-  /giveaway reroll <message_id>- alege alt castigator pentru un giveaway incheiat
+  /giveaway                    - deschide panoul (modal) ca sa faci unul rapid din Discord
+  /giveaway_start              - posteaza acum un giveaway (foloseste config din dashboard)
+  /giveaway_end <message_id>   - incheie acum un giveaway
+  /giveaway_reroll <message_id>- alege alt castigator pentru un giveaway incheiat
 """
 
 import time
 import random
 import asyncio
+import datetime
+from zoneinfo import ZoneInfo
 
 import discord
 from discord import app_commands
@@ -38,11 +52,54 @@ from utils import storage
 from utils.perms import bot_access
 
 
+TZ = ZoneInfo("Europe/Bucharest")
+WEEKDAYS_RO = ["Luni", "Marți", "Miercuri", "Joi", "Vineri", "Sâmbătă", "Duminică"]
+
+
 def _color_from_hex(value: str) -> discord.Color:
     try:
         return discord.Color(int(str(value).lstrip("#"), 16))
     except (ValueError, TypeError):
         return discord.Color.blurple()
+
+
+def _parse_hhmm(value, default=(12, 0)):
+    """'20:30' -> (20, 30). Pe eroare -> default."""
+    try:
+        hh, mm = str(value).split(":")
+        return int(hh), int(mm)
+    except (ValueError, AttributeError):
+        return default
+
+
+def _next_weekday_time(now_dt, weekday, hh, mm):
+    """Urmatorul moment (strict dupa now_dt) care cade pe `weekday` la hh:mm."""
+    days_ahead = (weekday - now_dt.weekday()) % 7
+    cand = (now_dt + datetime.timedelta(days=days_ahead)).replace(
+        hour=hh, minute=mm, second=0, microsecond=0)
+    while cand <= now_dt:
+        cand += datetime.timedelta(days=7)
+    return cand
+
+
+def _end_after(start_dt, weekday, hh, mm):
+    """Primul moment pe `weekday` la hh:mm care e strict DUPA start_dt.
+    Ex: start Joi 20:00, end Duminica 22:00 -> aceeasi saptamana.
+    Daca ziua/ora de final ar cadea inainte de start -> saptamana urmatoare."""
+    days_ahead = (weekday - start_dt.weekday()) % 7
+    cand = (start_dt + datetime.timedelta(days=days_ahead)).replace(
+        hour=hh, minute=mm, second=0, microsecond=0)
+    if cand <= start_dt:
+        cand += datetime.timedelta(days=7)
+    return cand
+
+
+def _sched_mode(cfg):
+    """Modul de programare, cu retrocompatibilitate pt. vechiul flag 'recurring'."""
+    mode = cfg.get("sched_mode")
+    if mode:
+        return mode
+    return "interval" if cfg.get("recurring") else "duration"
 
 
 class GiveawayView(discord.ui.View):
@@ -112,7 +169,10 @@ def _fmt_duration(minutes):
 
 
 class GiveawayModal(discord.ui.Modal, title="🎉 Creează un giveaway"):
-    """Un singur formular cu tot ce trebuie: titlu, premiu, castigatori, durata, canal."""
+    """Un singur formular cu tot ce trebuie: titlu, premiu, castigatori, durata, canal.
+
+    NOTA: Discord limiteaza modalul la 5 campuri, asa ca panoul rapid din Discord
+    ramane pe durata (minute). Programarile exacte/saptamanale se fac din dashboard."""
 
     def __init__(self, cog, default_channel_id):
         super().__init__()
@@ -172,6 +232,7 @@ class GiveawayModal(discord.ui.Modal, title="🎉 Creează un giveaway"):
             "title": str(self.titlu.value).strip() or "🎉 GIVEAWAY 🎉",
             "prize": str(self.premiu.value).strip(),
             "winners": winners,
+            "sched_mode": "duration",
             "duration_minutes": minutes,
             "button_label": "🎉 Particip",
             "color": "#8b5cf6",
@@ -201,6 +262,42 @@ class Giveaway(commands.Cog):
     async def cog_unload(self):
         self.ticker.cancel()
 
+    # ------------------------------------------------------------- programare
+    def _compute_end_ts(self, cfg, start_ts):
+        """Calculeaza momentul de INCHEIERE (unix) in functie de modul de programare."""
+        mode = _sched_mode(cfg)
+
+        if mode == "exact":
+            date_s = str(cfg.get("end_date", "")).strip()
+            hh, mm = _parse_hhmm(cfg.get("end_time"), (23, 59))
+            if date_s:
+                try:
+                    y, mo, d = (int(x) for x in date_s.split("-"))
+                    end_dt = datetime.datetime(y, mo, d, hh, mm, tzinfo=TZ)
+                    ts = int(end_dt.timestamp())
+                    if ts > start_ts:
+                        return ts
+                except (ValueError, TypeError):
+                    pass
+            # data lipseste sau e in trecut -> cadem pe durata
+            return start_ts + int(cfg.get("duration_minutes", 60)) * 60
+
+        if mode == "weekly":
+            start_dt = datetime.datetime.fromtimestamp(start_ts, TZ)
+            ew = int(cfg.get("end_weekday", 6))
+            hh, mm = _parse_hhmm(cfg.get("end_time"), (22, 0))
+            return int(_end_after(start_dt, ew, hh, mm).timestamp())
+
+        # "duration" si "interval" -> fereastra fixa in minute de la postare
+        return start_ts + int(cfg.get("duration_minutes", 60)) * 60
+
+    def _next_weekly_start(self, cfg, from_ts):
+        """Urmatorul moment de START (unix) pt. programarea saptamanala."""
+        now_dt = datetime.datetime.fromtimestamp(from_ts, TZ)
+        sw = int(cfg.get("start_weekday", 3))       # implicit Joi
+        hh, mm = _parse_hhmm(cfg.get("start_time"), (20, 0))
+        return _next_weekday_time(now_dt, sw, hh, mm).timestamp()
+
     # ------------------------------------------------------------- embed
     def _build_embed(self, cfg, prize, winners, end_ts, count=0, host_id=None) -> discord.Embed:
         desc = (f"**Premiu:** {prize}\n"
@@ -227,7 +324,8 @@ class Giveaway(commands.Cog):
             return None
         prize = cfg.get("prize") or "Premiu"
         winners = cfg.get("winners", 1)
-        end_ts = int(time.time()) + cfg.get("duration_minutes", 60) * 60
+        start_ts = int(time.time())
+        end_ts = self._compute_end_ts(cfg, start_ts)
         if host_id is None:
             host_id = cfg.get("host_id")
 
@@ -343,23 +441,39 @@ class Giveaway(commands.Cog):
             for mid in expired:
                 await self._finalize(guild, mid)
 
-            # 2. postare recurenta (ancorata la ora aleasa in dashboard)
+            # 2. postare recurenta (interval sau saptamanal)
             data = storage.get(guild.id, "giveaways", {})
             cfg = data.get("config", {})
-            if cfg.get("recurring") and cfg.get("channel_id"):
+            if not cfg.get("channel_id"):
+                continue
+            mode = _sched_mode(cfg)
+
+            if mode == "interval":
                 nxt = data.get("next_post_ts")
                 if nxt is None:
-                    # plasa de siguranta (in mod normal dashboard-ul o calculeaza
-                    # deja ancorat la salvare) — nu ar trebui sa se intample,
-                    # dar nu lasam giveaway-ul blocat daca lipseste totusi
+                    # plasa de siguranta (dashboard-ul o calculeaza ancorat la salvare)
                     data["next_post_ts"] = now + cfg.get("interval_hours", 24) * 3600
                     storage.set(guild.id, "giveaways", data)
                 elif now >= nxt:
                     await self._post_giveaway(guild, cfg)
                     data = storage.get(guild.id, "giveaways", {})
                     # avansam de la ORA PROGRAMATA anterior (nu de la "acum"),
-                    # ca sa nu se acumuleze intarziere in timp — ramane ancorat
+                    # ca sa ramana ancorat si sa nu se acumuleze intarziere
                     data["next_post_ts"] = nxt + cfg.get("interval_hours", 24) * 3600
+                    storage.set(guild.id, "giveaways", data)
+
+            elif mode == "weekly":
+                nxt = data.get("next_post_ts")
+                if nxt is None:
+                    data["next_post_ts"] = self._next_weekly_start(cfg, now)
+                    storage.set(guild.id, "giveaways", data)
+                elif now >= nxt:
+                    await self._post_giveaway(guild, cfg)
+                    data = storage.get(guild.id, "giveaways", {})
+                    # urmatorul start dupa "acum" -> daca botul a fost oprit
+                    # mai multe saptamani, nu posteaza in rafala, sare direct
+                    # la urmatoarea aparitie viitoare
+                    data["next_post_ts"] = self._next_weekly_start(cfg, time.time())
                     storage.set(guild.id, "giveaways", data)
 
     @ticker.before_loop
