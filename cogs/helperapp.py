@@ -57,6 +57,24 @@ DEFAULT_QUESTIONS = [
 ]
 MAX_QUESTIONS = 5  # limita HARD impusa de Discord pentru orice modal/formular
 
+# Mesajele DM implicite (se pot suprascrie din dashboard: cfg["dm_accept"]/["dm_reject"]).
+# Variabile disponibile: {user} = mentiune, {name} = numele afisat, {server} = numele serverului.
+DEFAULT_DM_ACCEPT = (
+    "🎉 **CERERE HELPER ACCEPTATĂ**\n\n"
+    "Cererea ta pentru funcția de Helper a fost acceptată!\n\n"
+    "Bine ai venit în echipa Staff! 🛡️")
+DEFAULT_DM_REJECT = (
+    "❌ **CERERE HELPER RESPINSĂ**\n\n"
+    "Din păcate, cererea ta pentru funcția de Helper nu a fost acceptată.\n\n"
+    "Îți mulțumim pentru interes și îți dorim succes!")
+
+
+def _fill_dm(text, member, guild):
+    """Inlocuieste variabilele din mesajul DM cu valorile reale."""
+    return (text.replace("{user}", member.mention)
+                .replace("{name}", member.display_name)
+                .replace("{server}", guild.name))
+
 
 def _questions(cfg):
     """Intrebarile configurate din dashboard, sau cele 4 implicite daca
@@ -254,35 +272,34 @@ class HelperApp(commands.Cog):
         member = interaction.guild.get_member(int(info["user_id"]))
         await interaction.response.defer(ephemeral=True)
 
-        # 1) DM catre aplicant
+        # 1) DM catre aplicant (text configurabil din dashboard, cu variabile)
         dm_ok = True
         if member:
             try:
                 if accept:
-                    await member.send(
-                        "🎉 **CERERE HELPER ACCEPTATĂ**\n\n"
-                        "Cererea ta pentru funcția de Helper a fost acceptată!\n\n"
-                        "Bine ai venit în echipa Staff! 🛡️")
+                    text = cfg.get("dm_accept") or DEFAULT_DM_ACCEPT
                 else:
-                    await member.send(
-                        "❌ **CERERE HELPER RESPINSĂ**\n\n"
-                        "Din păcate, cererea ta pentru funcția de Helper nu a fost acceptată.\n\n"
-                        "Îți mulțumim pentru interes și îți dorim succes!")
+                    text = cfg.get("dm_reject") or DEFAULT_DM_REJECT
+                await member.send(_fill_dm(text, member, interaction.guild))
             except discord.Forbidden:
                 dm_ok = False
 
-        # 2) rolul de Helper (doar la acceptare)
+        # 2) rolul de Helper (doar la acceptare, si doar daca ai setat unul).
+        # role_ok ramane True cand n-ai configurat niciun rol (e alegere, nu eroare);
+        # devine False DOAR daca aveai un rol setat si chiar n-am reusit sa-l acord.
         role_ok = True
         if accept and member:
             role_id = cfg.get("helper_role_id")
-            role = interaction.guild.get_role(int(role_id)) if role_id else None
-            if role:
-                try:
-                    await member.add_roles(role, reason=f"Cerere Helper acceptata ({req_id})")
-                except discord.HTTPException:
+            if role_id:
+                role = interaction.guild.get_role(int(role_id))
+                if role:
+                    try:
+                        await member.add_roles(role, reason=f"Cerere Helper acceptata ({req_id})")
+                    except discord.HTTPException:
+                        role_ok = False
+                else:
+                    # rolul a fost setat candva dar a fost sters intre timp
                     role_ok = False
-            else:
-                role_ok = False
 
         # 2b) porecla cu prefix in fata (doar la acceptare). Prefixul se seteaza
         # din dashboard (implicit "[H] "); daca il lasi GOL, nu schimbam porecla.

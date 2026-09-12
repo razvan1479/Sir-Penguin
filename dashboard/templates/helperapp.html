@@ -102,6 +102,18 @@
         <p class="hint">Ce se adaugă în fața numelui când accepți pe cineva. Implicit <code>[H]&nbsp;</code> (cu spațiu). Pune ce vrei tu (ex. <code>🛠️&nbsp;</code> sau <code>Helper&nbsp;|&nbsp;</code>) — sau <b>lasă gol</b> ca botul să nu mai schimbe deloc porecla.</p>
       </div>
 
+      <div class="field">
+        <label>✅ Mesaj DM la ACCEPTARE</label>
+        <textarea name="dm_accept" maxlength="1800" placeholder="🎉 CERERE HELPER ACCEPTATĂ&#10;&#10;Cererea ta pentru funcția de Helper a fost acceptată!&#10;&#10;Bine ai venit în echipa Staff! 🛡️">{{ cfg.get('dm_accept','') }}</textarea>
+        <p class="hint">Mesajul primit în privat de cel acceptat. Lasă gol pentru textul implicit. Variabile: <code>{user}</code> = mențiune, <code>{name}</code> = numele lui, <code>{server}</code> = numele serverului. Poți folosi <b>**îngroșat**</b> ca pe Discord.</p>
+      </div>
+
+      <div class="field">
+        <label>❌ Mesaj DM la RESPINGERE</label>
+        <textarea name="dm_reject" maxlength="1800" placeholder="❌ CERERE HELPER RESPINSĂ&#10;&#10;Din păcate, cererea ta pentru funcția de Helper nu a fost acceptată.&#10;&#10;Îți mulțumim pentru interes și îți dorim succes!">{{ cfg.get('dm_reject','') }}</textarea>
+        <p class="hint">Mesajul primit în privat de cel respins. Lasă gol pentru textul implicit. Aceleași variabile: <code>{user}</code>, <code>{name}</code>, <code>{server}</code>.</p>
+      </div>
+
       <hr class="divider">
 
       <div class="field">

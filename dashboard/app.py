@@ -1044,6 +1044,9 @@ def helperapp_page(guild_id):
         # prefix pus in fata poreclei la acceptare. Il pastram EXACT cum e scris
         # (spatiul din "[H] " conteaza). Gol = nu schimbam porecla deloc.
         cfg["nick_prefix"] = request.form.get("nick_prefix", "")
+        # mesajele DM la acceptare/respingere (gol -> se foloseste textul implicit)
+        cfg["dm_accept"] = request.form.get("dm_accept", "").strip()
+        cfg["dm_reject"] = request.form.get("dm_reject", "").strip()
         storage.set(gid, "helper_app", cfg)
         return redirect(url_for("helperapp_page", guild_id=guild_id, saved=1))
 
