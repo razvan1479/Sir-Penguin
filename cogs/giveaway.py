@@ -476,6 +476,18 @@ class Giveaway(commands.Cog):
                     data["next_post_ts"] = self._next_weekly_start(cfg, time.time())
                     storage.set(guild.id, "giveaways", data)
 
+            elif mode == "exact":
+                # programat O SINGURA DATA: daca ai setat o data de START (viitoare),
+                # dashboard-ul pune next_post_ts la acel moment. Cand vine timpul,
+                # postam o data si golim next_post_ts (nu se repeta). Daca n-ai pus
+                # start, next_post_ts e None -> il postezi manual cu /giveaway_start.
+                nxt = data.get("next_post_ts")
+                if nxt is not None and now >= nxt:
+                    await self._post_giveaway(guild, cfg)
+                    data = storage.get(guild.id, "giveaways", {})
+                    data["next_post_ts"] = None
+                    storage.set(guild.id, "giveaways", data)
+
     @ticker.before_loop
     async def _before(self):
         await self.bot.wait_until_ready()

@@ -412,6 +412,26 @@ def giveaway(guild_id):
         sched_mode = request.form.get("sched_mode", "duration")
         if sched_mode not in ("duration", "exact", "interval", "weekly"):
             sched_mode = "duration"
+
+        # Momentul de final se ia diferit in functie de mod:
+        #  - exact:   doua campuri datetime-local: START (optional) + FINAL
+        #  - weekly:  ora de final e camp separat (ziua vine din end_weekday)
+        _start_raw = ""   # doar pt. modul exact — data/ora de start (auto-post)
+        _end_raw = ""     # doar pt. modul exact — data/ora de final
+        if sched_mode == "exact":
+            _start_raw = request.form.get("start_datetime", "").strip()
+            _end_raw = request.form.get("end_datetime", "").strip()
+            if "T" in _end_raw:
+                _end_date, _end_time = _end_raw.split("T", 1)
+                _end_time = _end_time[:5]  # pastram doar HH:MM
+            else:
+                _end_date, _end_time = "", "22:00"
+        elif sched_mode == "weekly":
+            _end_date = ""
+            _end_time = request.form.get("end_time", "").strip() or "22:00"
+        else:
+            _end_date, _end_time = "", "22:00"
+
         cfg = {
             "channel_id": _to_int(request.form.get("channel_id", "")),
             "prize": request.form.get("prize", "").strip(),
@@ -424,9 +444,11 @@ def giveaway(guild_id):
             # recurent la interval
             "interval_hours": _to_int(request.form.get("interval_hours", "24")) or 24,
             "anchor_time": request.form.get("anchor_time", "") or "12:00",
-            # dată & oră exactă
-            "end_date": request.form.get("end_date", "").strip(),
-            "end_time": request.form.get("end_time", "").strip() or "22:00",
+            # dată & oră exactă / ora de final (săptămânal)
+            "end_date": _end_date,
+            "end_time": _end_time,
+            "start_datetime": _start_raw,   # pt. prefill + auto-post (mod exact)
+            "end_datetime": _end_raw,       # pt. prefill (mod exact)
             # recurent săptămânal
             "start_weekday": _to_int(request.form.get("start_weekday", "3")) if _to_int(request.form.get("start_weekday", "3")) is not None else 3,
             "start_time": request.form.get("start_time", "").strip() or "20:00",
@@ -469,8 +491,23 @@ def giveaway(guild_id):
             while base <= now_dt:
                 base += datetime.timedelta(days=7)
             data["next_post_ts"] = base.timestamp()
+        elif sched_mode == "exact":
+            # daca ai pus o data/ora de START in viitor -> se posteaza AUTOMAT
+            # atunci, o singura data. Daca n-ai pus start (sau e in trecut) ->
+            # next_post_ts None, adica il pornesti manual cu /giveaway_start.
+            data["next_post_ts"] = None
+            if "T" in _start_raw:
+                try:
+                    _sd, _st = _start_raw.split("T", 1)
+                    _y, _mo, _d = (int(x) for x in _sd.split("-"))
+                    _hh, _mm = (int(x) for x in _st[:5].split(":"))
+                    start_dt = datetime.datetime(_y, _mo, _d, _hh, _mm, tzinfo=tz)
+                    if start_dt > now_dt:
+                        data["next_post_ts"] = start_dt.timestamp()
+                except (ValueError, TypeError):
+                    pass
         else:
-            # duration / exact -> nu e recurent, nu programam postare automata
+            # duration -> nu e recurent, nu programam postare automata
             data["next_post_ts"] = None
 
         storage.set(gid, "giveaways", data)

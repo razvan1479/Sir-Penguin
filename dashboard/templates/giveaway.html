@@ -7,7 +7,7 @@
     .panel { background:var(--card); border-radius:14px; padding:22px; }
     label { display:block; font-weight:600; margin:18px 0 8px; font-size:12px; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); }
     label:first-of-type { margin-top:0; }
-    input[type=text], input[type=number], input[type=color], input[type=date], input[type=time], select { width:100%; padding:11px; border-radius:8px; border:none; background:var(--input); color:var(--text); font-size:14px; font-family:inherit; }
+    input[type=text], input[type=number], input[type=color], input[type=date], input[type=time], input[type=datetime-local], select { width:100%; padding:11px; border-radius:8px; border:none; background:var(--input); color:var(--text); font-size:14px; font-family:inherit; }
     input[type=color]{ height:44px; padding:4px; cursor:pointer; }
     .sfield { display:none; }
     .two { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
@@ -104,7 +104,7 @@
       <label>Tip de programare</label>
       <select name="sched_mode" id="sched_mode">
         <option value="duration" {% if mode_sel == 'duration' %}selected{% endif %}>⏱️ Durată fixă (minute)</option>
-        <option value="exact"    {% if mode_sel == 'exact' %}selected{% endif %}>📅 Dată &amp; oră exactă</option>
+        <option value="exact"    {% if mode_sel == 'exact' %}selected{% endif %}>📅 Programat o singură dată (start → final)</option>
         <option value="interval" {% if mode_sel == 'interval' %}selected{% endif %}>🔁 Recurent la interval (ore)</option>
         <option value="weekly"   {% if mode_sel == 'weekly' %}selected{% endif %}>🗓️ Recurent săptămânal (zi → zi)</option>
       </select>
@@ -116,10 +116,15 @@
         <p class="hint">Cât ține fiecare giveaway din momentul postării. 60 = o oră, 1440 = o zi.</p>
       </div>
 
-      <!-- Dată & oră exactă -->
+      <!-- Programat: START (opțional → auto-post) + FINAL -->
       <div class="sfield" data-modes="exact">
-        <label>Data de final</label>
-        <input type="date" name="end_date" id="end_date" value="{{ cfg.get('end_date','') }}">
+        <label>Data și ora de START <span style="color:var(--muted);font-weight:400">(opțional)</span></label>
+        <input type="datetime-local" name="start_datetime" id="start_datetime"
+               value="{{ cfg.get('start_datetime','') }}">
+        <label style="margin-top:12px">Data și ora de FINAL</label>
+        <input type="datetime-local" name="end_datetime" id="end_datetime"
+               value="{% if cfg.get('end_datetime') %}{{ cfg.get('end_datetime') }}{% elif cfg.get('end_date') %}{{ cfg.get('end_date') }}T{{ cfg.get('end_time','00:00') }}{% endif %}">
+        <p class="hint">Dacă pui data de <b>START</b> (din viitor), giveaway-ul se postează <b>automat</b> atunci și se termină la <b>FINAL</b> — nu mai faci nimic după Save. Dacă lași START gol, îl pornești manual cu <code>/giveaway_start</code> și se termină la FINAL. (ora României)</p>
       </div>
 
       <!-- Recurent la interval -->
@@ -131,7 +136,7 @@
         <p class="hint">Ex: interval 24h, ora 20:00 → postat în fiecare zi la 20:00.</p>
       </div>
 
-      <!-- Recurent săptămânal: zilele + ora de start -->
+      <!-- Recurent săptămânal -->
       <div class="sfield" data-modes="weekly">
         <div class="two">
           <div>
@@ -147,25 +152,20 @@
             <input type="time" name="start_time" id="start_time" value="{{ cfg.get('start_time', '20:00') }}">
           </div>
         </div>
-        <label style="margin-top:12px">Ziua de final</label>
-        <select name="end_weekday" id="end_weekday">
-          {% for i in range(7) %}
-          <option value="{{ i }}" {% if (cfg.get('end_weekday', 6)|int) == i %}selected{% endif %}>{{ ['Luni','Marți','Miercuri','Joi','Vineri','Sâmbătă','Duminică'][i] }}</option>
-          {% endfor %}
-        </select>
-      </div>
-
-      <!-- Ora de final: COMUNĂ pentru „dată exactă" și „săptămânal" -->
-      <div class="sfield" data-modes="exact weekly">
-        <label>Ora de final</label>
-        <input type="time" name="end_time" id="end_time" value="{{ cfg.get('end_time', '22:00') }}">
-      </div>
-
-      <!-- explicații, per mod -->
-      <div class="sfield" data-modes="exact">
-        <p class="hint">Postezi cu <code>/giveaway_start</code> → se termină exact la data + ora de mai sus (ora României). Alege o dată/oră din viitor.</p>
-      </div>
-      <div class="sfield" data-modes="weekly">
+        <div class="two" style="margin-top:12px">
+          <div>
+            <label>Ziua de final</label>
+            <select name="end_weekday" id="end_weekday">
+              {% for i in range(7) %}
+              <option value="{{ i }}" {% if (cfg.get('end_weekday', 6)|int) == i %}selected{% endif %}>{{ ['Luni','Marți','Miercuri','Joi','Vineri','Sâmbătă','Duminică'][i] }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label>Ora de final</label>
+            <input type="time" name="end_time" id="end_time" value="{{ cfg.get('end_time', '22:00') }}">
+          </div>
+        </div>
         <p class="hint">Ex: start <b>Joi 20:00</b> → final <b>Duminică 22:00</b>, apoi se repetă în fiecare săptămână.</p>
       </div>
 
@@ -230,7 +230,7 @@
     let ends;
     if (mode === 'duration')       ends = 'peste ' + ($('duration_minutes').value || 60) + ' minute';
     else if (mode === 'interval')  ends = 'peste ' + ($('duration_minutes').value || 60) + ' minute (recurent)';
-    else if (mode === 'exact')     ends = 'la ' + ($('end_date').value || 'data aleasă') + ' ' + ($('end_time').value || '');
+    else if (mode === 'exact')     ends = ($('start_datetime').value ? ($('start_datetime').value.replace('T',' ') + ' → ') : 'la ') + (($('end_datetime').value || 'data aleasă').replace('T',' '));
     else                           ends = ZILE[$('start_weekday').value] + ' ' + ($('start_time').value || '') +
                                           ' → ' + ZILE[$('end_weekday').value] + ' ' + ($('end_time').value || '');
 
@@ -246,7 +246,7 @@
   }
 
   ['title','prize','winners','duration_minutes','button_label','color','sched_mode',
-   'interval_hours','anchor_time','end_date','end_time','start_weekday','start_time',
+   'interval_hours','anchor_time','start_datetime','end_datetime','end_time','start_weekday','start_time',
    'end_weekday','ping_everyone','required_role_id'].forEach(id => {
     const el = $(id); if (!el) return;
     el.addEventListener('input', render); el.addEventListener('change', render);
