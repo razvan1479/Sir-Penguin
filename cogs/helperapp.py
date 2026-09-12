@@ -113,12 +113,18 @@ class HelperApp(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    # -------- verificare rol de staff pentru butoanele Accepta/Respinge --------
+    # -------- verificare acces pentru butoanele Accepta/Respinge --------
     @staticmethod
-    def _is_authorized(member, cfg):
+    def _is_authorized(interaction, cfg):
+        # adminii / cei cu Manage Server / owner-ul serverului pot MEREU procesa
+        # cereri, chiar daca nu au exact rolul de staff configurat in dashboard.
+        # In plus, oricine are rolul de staff setat e la fel autorizat.
+        if has_bot_access(interaction):
+            return True
         role_id = cfg.get("staff_role_id")
         if not role_id:
             return False
+        member = interaction.user
         return any(str(r.id) == str(role_id) for r in getattr(member, "roles", []))
 
     # -------- comanda: posteaza panoul in canalul curent --------
@@ -221,7 +227,7 @@ class HelperApp(commands.Cog):
     async def _decide(self, interaction, req_id, accept: bool):
         cfg = _cfg(interaction.guild_id)
 
-        if not self._is_authorized(interaction.user, cfg):
+        if not self._is_authorized(interaction, cfg):
             return await interaction.response.send_message(
                 "❌ Nu ai permisiunea de a procesa cereri Helper.", ephemeral=True)
 

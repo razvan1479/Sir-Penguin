@@ -120,7 +120,6 @@
       <div class="sfield" data-modes="exact">
         <label>Data de final</label>
         <input type="date" name="end_date" id="end_date" value="{{ cfg.get('end_date','') }}">
-        <p class="hint">Postezi cu <code>/giveaway_start</code> → se termină exact la data + ora aleasă (ora României).</p>
       </div>
 
       <!-- Recurent la interval -->
@@ -132,7 +131,7 @@
         <p class="hint">Ex: interval 24h, ora 20:00 → postat în fiecare zi la 20:00.</p>
       </div>
 
-      <!-- Recurent săptămânal -->
+      <!-- Recurent săptămânal: zilele + ora de start -->
       <div class="sfield" data-modes="weekly">
         <div class="two">
           <div>
@@ -148,20 +147,25 @@
             <input type="time" name="start_time" id="start_time" value="{{ cfg.get('start_time', '20:00') }}">
           </div>
         </div>
-        <div class="two" style="margin-top:12px">
-          <div>
-            <label>Ziua de final</label>
-            <select name="end_weekday" id="end_weekday">
-              {% for i in range(7) %}
-              <option value="{{ i }}" {% if (cfg.get('end_weekday', 6)|int) == i %}selected{% endif %}>{{ ['Luni','Marți','Miercuri','Joi','Vineri','Sâmbătă','Duminică'][i] }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div>
-            <label>Ora de final</label>
-            <input type="time" name="end_time" id="end_time" value="{{ cfg.get('end_time', '22:00') }}">
-          </div>
-        </div>
+        <label style="margin-top:12px">Ziua de final</label>
+        <select name="end_weekday" id="end_weekday">
+          {% for i in range(7) %}
+          <option value="{{ i }}" {% if (cfg.get('end_weekday', 6)|int) == i %}selected{% endif %}>{{ ['Luni','Marți','Miercuri','Joi','Vineri','Sâmbătă','Duminică'][i] }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Ora de final: COMUNĂ pentru „dată exactă" și „săptămânal" -->
+      <div class="sfield" data-modes="exact weekly">
+        <label>Ora de final</label>
+        <input type="time" name="end_time" id="end_time" value="{{ cfg.get('end_time', '22:00') }}">
+      </div>
+
+      <!-- explicații, per mod -->
+      <div class="sfield" data-modes="exact">
+        <p class="hint">Postezi cu <code>/giveaway_start</code> → se termină exact la data + ora de mai sus (ora României). Alege o dată/oră din viitor.</p>
+      </div>
+      <div class="sfield" data-modes="weekly">
         <p class="hint">Ex: start <b>Joi 20:00</b> → final <b>Duminică 22:00</b>, apoi se repetă în fiecare săptămână.</p>
       </div>
 
