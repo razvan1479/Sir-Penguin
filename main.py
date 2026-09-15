@@ -146,6 +146,19 @@ class MyBot(commands.Bot):
         storage.set("_global", "synced_guilds", sorted(synced))
         log.info("Auto-sincronizat %d comenzi pe %d servere.", total, len(to_sync))
 
+    async def _notify_owner(self, text):
+        """Trimite un DM owner-ului botului (silentios daca nu se poate)."""
+        try:
+            from utils import storage
+            owner_id = storage.get(0, "bot_owner_id", None)
+            if not owner_id:
+                return
+            u = self.get_user(int(owner_id)) or await self.fetch_user(int(owner_id))
+            if u:
+                await u.send(text)
+        except Exception:
+            pass
+
     async def on_guild_join(self, guild):
         # server nou (cat botul e pornit) -> ii sincronizam comenzile instant
         try:
@@ -157,6 +170,37 @@ class MyBot(commands.Bot):
             log.info("Server nou %s — comenzi sincronizate instant.", guild.id)
         except discord.HTTPException as e:
             log.warning("Sync esuat la intrare pe %s: %s", guild.id, e)
+
+        # anuntam owner-ul botului DOAR daca l-a adaugat ALTCINEVA (nu owner-ul).
+        # Aflam cine l-a adaugat din audit log (necesita permisiunea View Audit Log).
+        try:
+            owner_id = storage.get(0, "bot_owner_id", None)
+            adder = None
+            try:
+                async for entry in guild.audit_logs(
+                        limit=5, action=discord.AuditLogAction.bot_add):
+                    if entry.target and entry.target.id == self.user.id:
+                        adder = entry.user
+                        break
+            except Exception:
+                adder = None  # fara permisiune de audit log -> nu stim cine
+
+            # daca stim ca l-a adaugat chiar owner-ul -> nu trimitem DM
+            if owner_id and adder and str(adder.id) == str(owner_id):
+                return
+
+            owner_name = str(guild.owner) if guild.owner else f"`{guild.owner_id}`"
+            added_by = str(adder) if adder else "necunoscut"
+            ts = int(discord.utils.utcnow().timestamp())
+            await self._notify_owner(
+                f"➕ **Bot adăugat pe un server nou**\n"
+                f"Server: **{guild.name}** (`{guild.id}`)\n"
+                f"👥 Membri: {guild.member_count}\n"
+                f"👑 Owner server: {owner_name}\n"
+                f"🙋 Adăugat de: {added_by}\n"
+                f"🕐 <t:{ts}:F>")
+        except Exception as e:
+            log.warning("Nu am putut anunta owner-ul de intrarea pe %s: %s", guild.id, e)
 
 
 async def main():

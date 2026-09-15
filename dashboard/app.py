@@ -79,6 +79,37 @@ def _bot_guilds():
             if not gid.startswith("_") and gid != "0" and d.get("meta")}
 
 
+def _notify_owner_login(user_id, user_name):
+    """La logare pe dashboard, trimite un DM owner-ului botului.
+    Nu notifica logarile owner-ului insusi (ca sa nu se auto-spam-uiasca).
+    Ruleaza in thread-ul Flask, deci programam coroutina pe loop-ul botului."""
+    try:
+        owner_id = storage.get(0, "bot_owner_id", None)
+        if not owner_id or str(user_id) == str(owner_id):
+            return
+        from utils import botref
+        bot = botref.bot
+        loop = getattr(bot, "loop", None) if bot else None
+        if bot is None or loop is None:
+            return
+        text = (f"🔐 **Logare pe dashboard**\n"
+                f"S-a conectat: **{user_name}** (`{user_id}`)\n"
+                f"🕐 <t:{int(time.time())}:F>")
+
+        async def _send():
+            try:
+                u = bot.get_user(int(owner_id)) or await bot.fetch_user(int(owner_id))
+                if u:
+                    await u.send(text)
+            except Exception:
+                pass
+
+        import asyncio
+        asyncio.run_coroutine_threadsafe(_send(), loop)
+    except Exception:
+        pass
+
+
 def login_required(f):
     @wraps(f)
     def w(*a, **k):
@@ -188,6 +219,7 @@ def callback():
     }
     session["guilds"] = managed
     session.permanent = True
+    _notify_owner_login(session["user"]["id"], session["user"]["name"])
     return redirect(url_for("index"))
 
 
