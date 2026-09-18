@@ -33,6 +33,7 @@ Comenzi admin:
 
 import asyncio
 import datetime
+import time
 
 import discord
 from discord import app_commands
@@ -61,9 +62,26 @@ class Invites(commands.Cog):
         self.bot = bot
         self.invite_cache: dict[int, dict[str, int]] = {}
         self.vanity_cache: dict[int, int] = {}
+        # cine detine fiecare cod + cate folosiri maxime are (pt. detectia
+        # link-urilor de o singura folosinta / limitate, folosita DOAR in concurs)
+        self.invite_owners: dict[int, dict[str, dict]] = {}
+        # link-uri disparute recent (consumate/sterse) cu owner + timestamp,
+        # ca sa le putem atribui chiar daca evenimentul de stergere vine primul
+        self.recent_consumed: dict[int, list] = {}
         self._join_locks: dict[int, asyncio.Lock] = {}
         self.contest_loop.start()
         self.resync_loop.start()
+
+    def _snapshot_owners(self, guild_id, invite_list):
+        """Retine, pt. fiecare cod, cine l-a facut si cate folosiri maxime are."""
+        self.invite_owners[guild_id] = {
+            inv.code: {
+                "inviter_id": inv.inviter.id if inv.inviter else None,
+                "inviter_name": str(inv.inviter) if inv.inviter else None,
+                "max_uses": inv.max_uses or 0,   # 0 = nelimitat
+            }
+            for inv in invite_list
+        }
 
     def _lock_for(self, gid: int) -> "asyncio.Lock":
         lock = self._join_locks.get(gid)
@@ -89,6 +107,7 @@ class Invites(commands.Cog):
             except (discord.Forbidden, discord.HTTPException):
                 continue
             live = {inv.code: (inv.uses or 0) for inv in invites}
+            self._snapshot_owners(guild.id, invites)
             async with self._lock_for(guild.id):
                 cache = self.invite_cache.setdefault(guild.id, {})
                 for code, uses in live.items():
@@ -119,6 +138,7 @@ class Invites(commands.Cog):
         try:
             invites = await guild.invites()
             self.invite_cache[guild.id] = {inv.code: inv.uses or 0 for inv in invites}
+            self._snapshot_owners(guild.id, invites)
         except (discord.Forbidden, discord.HTTPException):
             self.invite_cache[guild.id] = {}
         if "VANITY_URL" in guild.features:
@@ -140,10 +160,26 @@ class Invites(commands.Cog):
     @commands.Cog.listener()
     async def on_invite_create(self, invite):
         self.invite_cache.setdefault(invite.guild.id, {})[invite.code] = invite.uses or 0
+        # retinem si owner-ul + limita, pt. detectia link-urilor de o folosinta
+        self.invite_owners.setdefault(invite.guild.id, {})[invite.code] = {
+            "inviter_id": invite.inviter.id if invite.inviter else None,
+            "inviter_name": str(invite.inviter) if invite.inviter else None,
+            "max_uses": invite.max_uses or 0,
+        }
 
     @commands.Cog.listener()
     async def on_invite_delete(self, invite):
         self.invite_cache.get(invite.guild.id, {}).pop(invite.code, None)
+        # daca link-ul avea owner cunoscut si era limitat, il notam ca "disparut
+        # recent" (poate a fost consumat de o intrare) — folosit doar in concurs
+        owner = self.invite_owners.get(invite.guild.id, {}).get(invite.code)
+        if owner and owner.get("max_uses", 0) > 0 and owner.get("inviter_id"):
+            self.recent_consumed.setdefault(invite.guild.id, []).append({
+                "code": invite.code,
+                "inviter_id": owner["inviter_id"],
+                "inviter_name": owner["inviter_name"],
+                "ts": time.time(),
+            })
 
     # ------------------------------------------------------------- detectare
     @commands.Cog.listener()
@@ -155,6 +191,7 @@ class Invites(commands.Cog):
         async with self._lock_for(guild.id):
             try:
                 before = self.invite_cache.get(guild.id, {})
+                owners_before = self.invite_owners.get(guild.id, {})  # snapshot dinainte
                 after_list = await guild.invites()
                 after = {inv.code: inv for inv in after_list}
                 used = None
@@ -163,6 +200,7 @@ class Invites(commands.Cog):
                         used = inv
                         break
                 self.invite_cache[guild.id] = {inv.code: inv.uses or 0 for inv in after_list}
+                self._snapshot_owners(guild.id, after_list)  # snapshot proaspat
 
                 if used and used.inviter:
                     # cineva NU poate fi creditat ca s-a invitat pe el insusi
@@ -181,6 +219,37 @@ class Invites(commands.Cog):
                                     "inviter_name": None, "code": guild.vanity_url_code}
                     except discord.HTTPException:
                         pass
+
+                # --- FALLBACK, DOAR CAND E CONCURS PORNIT ---
+                # Un link de o singura folosinta (sau limitat) e consumat si sters
+                # instant de Discord la intrare, deci nu apare ca "folosiri +1", ci
+                # ca link DISPARUT. Il atribuim owner-ului, dar numai daca ramane un
+                # singur candidat clar (altfel lasam necunoscut, ca sa nu ghicim gresit).
+                # Nu atinge deloc numaratoarea existenta a concursului — doar
+                # completeaza sursa cand altfel ar fi iesit "necunoscut".
+                if (info["type"] == "unknown"
+                        and self._contest(guild.id).get("status") == "running"):
+                    candidates = {}  # inviter_id -> inviter_name
+                    # a) coduri care erau in snapshot dar au disparut din lista live
+                    for code, meta in owners_before.items():
+                        if (code not in after and meta.get("max_uses", 0) > 0
+                                and meta.get("inviter_id")):
+                            candidates[meta["inviter_id"]] = meta.get("inviter_name")
+                    # b) coduri notate ca disparute recent (ultimele 15s), pt. cazul
+                    #    in care evenimentul de stergere a ajuns inaintea intrarii
+                    now_ts = time.time()
+                    fresh = [e for e in self.recent_consumed.get(guild.id, [])
+                             if now_ts - e["ts"] <= 15]
+                    for e in fresh:
+                        if e.get("inviter_id"):
+                            candidates[e["inviter_id"]] = e.get("inviter_name")
+                    self.recent_consumed[guild.id] = []  # golim dupa ce le-am folosit
+
+                    if len(candidates) == 1:
+                        inv_id, inv_name = next(iter(candidates.items()))
+                        if inv_id != member.id:  # nu se poate invita singur
+                            info = {"type": "personal", "inviter_id": inv_id,
+                                    "inviter_name": inv_name, "code": None}
             except (discord.Forbidden, discord.HTTPException):
                 pass
         inviter_key, is_fake, rejoin = self._record_join(guild, member, info)
