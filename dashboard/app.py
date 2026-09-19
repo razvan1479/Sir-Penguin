@@ -110,6 +110,84 @@ def _notify_owner_login(user_id, user_name):
         pass
 
 
+# ---------------------------------------------------------------------------
+# Resurse server (RAM/CPU/disk) — citite direct din /proc (Linux), fara nicio
+# dependenta noua. Dashboard-ul ruleaza CHIAR pe serverul Oracle, deci vede
+# resursele reale ale masinii.
+# ---------------------------------------------------------------------------
+_last_cpu = {"total": 0.0, "idle": 0.0}
+
+
+def _cpu_percent_delta():
+    """Procent CPU calculat din diferenta a doua citiri /proc/stat.
+    Pagina interogheaza la cateva secunde, deci apelurile consecutive dau delta."""
+    try:
+        with open("/proc/stat") as f:
+            parts = [float(x) for x in f.readline().split()[1:]]
+        idle = parts[3] + (parts[4] if len(parts) > 4 else 0.0)  # idle + iowait
+        total = sum(parts)
+        prev_total, prev_idle = _last_cpu["total"], _last_cpu["idle"]
+        _last_cpu["total"], _last_cpu["idle"] = total, idle
+        dt, di = total - prev_total, idle - prev_idle
+        if prev_total == 0 or dt <= 0:
+            return 0.0
+        return round(max(0.0, min(100.0, (1 - di / dt) * 100)), 1)
+    except Exception:
+        return 0.0
+
+
+def _read_system_stats():
+    s = {}
+    try:
+        mem = {}
+        with open("/proc/meminfo") as f:
+            for line in f:
+                k, _, rest = line.partition(":")
+                if rest:
+                    mem[k.strip()] = int(rest.strip().split()[0]) * 1024  # kB -> bytes
+        total = mem.get("MemTotal", 0)
+        avail = mem.get("MemAvailable", mem.get("MemFree", 0))
+        s["mem_total"], s["mem_available"] = total, avail
+        s["mem_used"] = total - avail
+        s["mem_percent"] = round((total - avail) / total * 100, 1) if total else 0
+        swt, swf = mem.get("SwapTotal", 0), mem.get("SwapFree", 0)
+        s["swap_total"], s["swap_used"] = swt, swt - swf
+        s["swap_percent"] = round((swt - swf) / swt * 100, 1) if swt else 0
+    except Exception:
+        pass
+    try:
+        st = os.statvfs("/")
+        dtot = st.f_blocks * st.f_frsize
+        dfree = st.f_bavail * st.f_frsize
+        s["disk_total"], s["disk_free"] = dtot, dfree
+        s["disk_used"] = dtot - dfree
+        s["disk_percent"] = round((dtot - dfree) / dtot * 100, 1) if dtot else 0
+    except Exception:
+        pass
+    try:
+        s["cpu_count"] = os.cpu_count() or 1
+        with open("/proc/loadavg") as f:
+            la = f.read().split()
+        s["load1"], s["load5"], s["load15"] = float(la[0]), float(la[1]), float(la[2])
+    except Exception:
+        s.setdefault("cpu_count", 1)
+    s["cpu_percent"] = _cpu_percent_delta()
+    try:
+        with open("/proc/uptime") as f:
+            s["uptime"] = float(f.read().split()[0])
+    except Exception:
+        s["uptime"] = 0
+    try:
+        with open("/proc/self/status") as f:
+            for line in f:
+                if line.startswith("VmRSS:"):
+                    s["proc_mem"] = int(line.split()[1]) * 1024
+                    break
+    except Exception:
+        s["proc_mem"] = 0
+    return s
+
+
 def login_required(f):
     @wraps(f)
     def w(*a, **k):
@@ -1734,6 +1812,29 @@ def restart_bot():
 
     threading.Thread(target=_bye, daemon=True).start()
     return render_template("restart.html", section=None)
+
+
+def _is_owner_session():
+    owner_id = storage.get(0, "bot_owner_id", None)
+    return bool(owner_id and "user" in session
+                and str(session["user"]["id"]) == str(owner_id))
+
+
+@app.route("/system")
+def system_page():
+    if "user" not in session:
+        return redirect(url_for("index"))
+    if not _is_owner_session():
+        return render_template("system.html", denied=True)
+    return render_template("system.html", denied=False)
+
+
+@app.route("/api/system")
+def system_api():
+    # date live pentru pagina /system — doar owner-ul botului
+    if not _is_owner_session():
+        return jsonify({"error": "forbidden"}), 403
+    return jsonify(_read_system_stats())
 
 
 @app.route("/servers", methods=["GET", "POST"])
