@@ -52,7 +52,13 @@ def get(guild_id, key, default=None):
 def set(guild_id, key, value):
     with _lock:
         data = _ensure_loaded()
-        data.setdefault(str(guild_id), {})[key] = copy.deepcopy(value)
+        bucket = data.setdefault(str(guild_id), {})
+        # daca valoarea e IDENTICA cu cea deja salvata, nu rescriem fisierul degeaba
+        # (multe bucle salveaza periodic aceleasi date — ex. lista de servere la 20s).
+        # Cache-ul ramane oricum corect; economisim scrieri inutile pe disc.
+        if key in bucket and bucket[key] == value:
+            return
+        bucket[key] = copy.deepcopy(value)
         _save_locked()
 
 

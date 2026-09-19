@@ -85,6 +85,57 @@ class MassRole(commands.Cog):
             return f"Rolul **{role.name}** e mai sus sau egal cu rolul tau cel mai inalt."
         return None
 
+    # ----------------------------------------------- autocomplete roluri
+    async def _role_ac_assign(self, interaction: discord.Interaction, current: str):
+        """Rolurile pe care botul le poate DA/SCOATE (fara @everyone si fara roluri
+        gestionate). Le arata pe TOATE — inclusiv SIDRA — spre deosebire de selectorul
+        nativ Discord care mai ascunde din ele. Cele prea sus in ierarhie sunt marcate."""
+        guild = interaction.guild
+        if not guild:
+            return []
+        cur = (current or "").lower()
+        me_top = guild.me.top_role.position if guild.me else 0
+        out = []
+        for r in sorted(guild.roles, key=lambda x: -x.position):
+            if r.is_default() or r.managed:
+                continue
+            if cur and cur not in r.name.lower():
+                continue
+            label = r.name if r.position < me_top else f"{r.name}  ⚠️ prea sus"
+            out.append(app_commands.Choice(name=label[:100], value=str(r.id)))
+            if len(out) >= 25:
+                break
+        return out
+
+    async def _role_ac_any(self, interaction: discord.Interaction, current: str):
+        """Toate rolurile (pentru 'conditie') — fara @everyone."""
+        guild = interaction.guild
+        if not guild:
+            return []
+        cur = (current or "").lower()
+        out = []
+        for r in sorted(guild.roles, key=lambda x: -x.position):
+            if r.is_default():
+                continue
+            if cur and cur not in r.name.lower():
+                continue
+            out.append(app_commands.Choice(name=r.name[:100], value=str(r.id)))
+            if len(out) >= 25:
+                break
+        return out
+
+    def _resolve_role(self, guild, value):
+        """Transforma valoarea din autocomplete (id) — sau un nume — intr-un rol."""
+        if not guild or not value:
+            return None
+        value = str(value).strip()
+        if value.isdigit():
+            return guild.get_role(int(value))
+        for r in guild.roles:
+            if r.name.lower() == value.lower():
+                return r
+        return None
+
     # ----------------------------------------------- motorul
     async def apply_roles(self, guild, action, role, condition=None, include_bots=False):
         changed = errors = 0
@@ -158,24 +209,46 @@ class MassRole(commands.Cog):
             ephemeral=True)
 
     @massrole.command(name="give_all", description="Da un rol TUTUROR membrilor")
-    @app_commands.describe(rol="Rolul de dat", include_bots="Include si botii? (implicit nu)")
-    async def give_all(self, interaction, rol: discord.Role, include_bots: bool = False):
-        await self._run(interaction, "give_all", rol, None, include_bots)
+    @app_commands.describe(rol="Rolul de dat (scrie ca sa cauti)", include_bots="Include si botii? (implicit nu)")
+    @app_commands.autocomplete(rol=_role_ac_assign)
+    async def give_all(self, interaction, rol: str, include_bots: bool = False):
+        role = self._resolve_role(interaction.guild, rol)
+        if role is None:
+            return await interaction.response.send_message(
+                "⚠️ Rol invalid — alege unul din listă.", ephemeral=True)
+        await self._run(interaction, "give_all", role, None, include_bots)
 
     @massrole.command(name="remove_all", description="Scoate un rol de la TOTI membrii")
-    @app_commands.describe(rol="Rolul de scos", include_bots="Include si botii? (implicit nu)")
-    async def remove_all(self, interaction, rol: discord.Role, include_bots: bool = False):
-        await self._run(interaction, "remove_all", rol, None, include_bots)
+    @app_commands.describe(rol="Rolul de scos (scrie ca sa cauti)", include_bots="Include si botii? (implicit nu)")
+    @app_commands.autocomplete(rol=_role_ac_assign)
+    async def remove_all(self, interaction, rol: str, include_bots: bool = False):
+        role = self._resolve_role(interaction.guild, rol)
+        if role is None:
+            return await interaction.response.send_message(
+                "⚠️ Rol invalid — alege unul din listă.", ephemeral=True)
+        await self._run(interaction, "remove_all", role, None, include_bots)
 
     @massrole.command(name="give_to", description="Da un rol celor care au deja un anumit rol")
     @app_commands.describe(rol="Rolul de dat", conditie="Doar cei care au acest rol")
-    async def give_to(self, interaction, rol: discord.Role, conditie: discord.Role):
-        await self._run(interaction, "give_to", rol, conditie, True)
+    @app_commands.autocomplete(rol=_role_ac_assign, conditie=_role_ac_any)
+    async def give_to(self, interaction, rol: str, conditie: str):
+        role = self._resolve_role(interaction.guild, rol)
+        cond = self._resolve_role(interaction.guild, conditie)
+        if role is None or cond is None:
+            return await interaction.response.send_message(
+                "⚠️ Rol invalid — alege din liste.", ephemeral=True)
+        await self._run(interaction, "give_to", role, cond, True)
 
     @massrole.command(name="remove_from", description="Scoate un rol de la cei care au un anumit rol")
     @app_commands.describe(rol="Rolul de scos", conditie="Doar cei care au acest rol")
-    async def remove_from(self, interaction, rol: discord.Role, conditie: discord.Role):
-        await self._run(interaction, "remove_from", rol, conditie, True)
+    @app_commands.autocomplete(rol=_role_ac_assign, conditie=_role_ac_any)
+    async def remove_from(self, interaction, rol: str, conditie: str):
+        role = self._resolve_role(interaction.guild, rol)
+        cond = self._resolve_role(interaction.guild, conditie)
+        if role is None or cond is None:
+            return await interaction.response.send_message(
+                "⚠️ Rol invalid — alege din liste.", ephemeral=True)
+        await self._run(interaction, "remove_from", role, cond, True)
 
 
 async def setup(bot: commands.Bot):
