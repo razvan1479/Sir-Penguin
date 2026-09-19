@@ -16,6 +16,7 @@ import re
 import sys
 import ssl
 import time
+import json
 import secrets
 from discord import app_commands
 from functools import wraps
@@ -134,6 +135,58 @@ def _cpu_percent_delta():
         return round(max(0.0, min(100.0, (1 - di / dt) * 100)), 1)
     except Exception:
         return 0.0
+
+
+_MODULE_MAP = {
+    "invites": "Invitații", "invite_sources": "Invitații",
+    "contest": "Concurs invite",
+    "tickets": "Tickete",
+    "giveaways": "Giveaway",
+    "helper_app": "Cereri Helper", "helper_requests": "Cereri Helper",
+    "helper_processing": "Cereri Helper",
+    "reminders": "Remindere",
+    "notifications": "Notificări", "channels": "Notificări",
+    "automod": "Automod",
+    "roles": "Roluri (massrole)",
+    "metin2": "Metin2 tickete", "metin2_open": "Metin2 tickete",
+    "metin2_claims": "Metin2 tickete",
+    "welcome": "Bun venit", "goodbye": "Rămas bun",
+    "embeds": "Embed builder", "rankup": "Rank-uri auto",
+    "backup_index": "Backup", "backup_apply": "Backup",
+    "kingdoms": "Regate", "permissions": "Permisiuni", "colors": "Culori",
+    "game": "Joc numere", "rps": "Piatra-foarfecă",
+    "massdm": "Mesaje în masă", "massrole_job": "Roluri în masă",
+    "newacc": "Conturi noi", "newacc_scan": "Conturi noi",
+    "autodelete": "Curățare mesaje", "cleanup_job": "Curățare mesaje",
+    "meta": "Meta server",
+    "bot_servers": "Sistem (global)", "bot_owner_id": "Sistem (global)",
+    "leave_request": "Sistem (global)", "synced_guilds": "Sistem (global)",
+}
+
+
+def _module_breakdown():
+    """Cat spatiu de date ocupa fiecare modul in baza de date (real, in bytes) si
+    pe cate servere e folosit. NU e RAM per modul (imposibil de separat intr-un
+    singur proces) — e amprenta de date, singura masura corecta per functie."""
+    data = storage.all_data()
+    agg = {}
+    for gid, bucket in data.items():
+        if not isinstance(bucket, dict):
+            continue
+        for key, val in bucket.items():
+            name = _MODULE_MAP.get(key, key)
+            try:
+                b = len(json.dumps(val, ensure_ascii=False).encode("utf-8"))
+            except Exception:
+                b = 0
+            e = agg.setdefault(name, {"bytes": 0, "servers": set()})
+            e["bytes"] += b
+            if gid not in ("0", "_global"):
+                e["servers"].add(gid)
+    mods = [{"name": n, "bytes": v["bytes"], "servers": len(v["servers"])}
+            for n, v in agg.items()]
+    mods.sort(key=lambda x: -x["bytes"])
+    return {"total_bytes": sum(m["bytes"] for m in mods), "modules": mods}
 
 
 def _read_system_stats():
@@ -1835,6 +1888,14 @@ def system_api():
     if not _is_owner_session():
         return jsonify({"error": "forbidden"}), 403
     return jsonify(_read_system_stats())
+
+
+@app.route("/api/modules")
+def modules_api():
+    # amprenta de date pe fiecare modul — doar owner-ul botului
+    if not _is_owner_session():
+        return jsonify({"error": "forbidden"}), 403
+    return jsonify(_module_breakdown())
 
 
 @app.route("/servers", methods=["GET", "POST"])

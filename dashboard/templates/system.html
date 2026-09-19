@@ -103,6 +103,12 @@
           <div class="stat"><span class="muted">RAM disponibil</span><b id="mem-avail">–</b></div>
           <div class="stat"><span class="muted">Uptime server</span><b id="uptime">–</b></div>
         </div>
+
+        <div class="card full">
+          <h2>🧩 Consum pe module <span id="mod-total" class="muted" style="font-weight:500;font-size:13px;margin-left:auto"></span></h2>
+          <p class="muted" style="font-size:12.5px;margin:-6px 0 12px">Cât spațiu de date ocupă fiecare funcție în baza de date și pe câte servere e activă. (Nu e RAM — modulele împart aceeași memorie; asta e amprenta reală de date.)</p>
+          <div id="mods"><span class="muted">Se încarcă…</span></div>
+        </div>
       </div>
     {% endif %}
   </div>
@@ -159,7 +165,31 @@
         $('uptime').textContent = fmtUptime(d.uptime);
       } catch (e) { /* silentios */ }
     }
+    async function loadModules(){
+      try {
+        const r = await fetch('/api/modules', {cache:'no-store'});
+        if (!r.ok) return;
+        const d = await r.json();
+        $('mod-total').textContent = 'total: ' + fmt(d.total_bytes);
+        const max = Math.max(1, ...d.modules.map(m => m.bytes));
+        const box = $('mods');
+        if (!d.modules.length){ box.innerHTML = '<span class="muted">Nicio dată încă.</span>'; return; }
+        box.innerHTML = d.modules.map(m => {
+          const pct = (m.bytes / max * 100).toFixed(1);
+          const srv = m.servers ? (m.servers + (m.servers===1?' server':' servere')) : 'global';
+          return `<div style="margin-bottom:12px">
+            <div class="row" style="color:var(--text);margin-bottom:5px">
+              <span>${m.name} <span class="muted" style="font-size:12px">· ${srv}</span></span>
+              <b>${fmt(m.bytes)}</b>
+            </div>
+            <div class="bar"><span style="width:${pct}%;background:var(--accent2)"></span></div>
+          </div>`;
+        }).join('');
+      } catch(e) { /* silentios */ }
+    }
+
     tick(); setInterval(tick, 3000);
+    loadModules(); setInterval(loadModules, 30000);
   </script>
   {% endif %}
 </body>
