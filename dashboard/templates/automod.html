@@ -28,6 +28,12 @@
   @media (max-width:640px){ .grid2 { grid-template-columns:1fr; } }
   .note { background:rgba(250,166,26,.1); border:1px solid rgba(250,166,26,.3); border-radius:10px; padding:12px 15px; font-size:13px; color:var(--text); line-height:1.6; margin-bottom:16px; }
   code { background:var(--input); padding:2px 7px; border-radius:5px; font-size:12.5px; }
+  .picklist { max-height:190px; overflow-y:auto; display:flex; flex-direction:column; gap:7px; background:var(--bg); border:1px solid var(--glass-border); border-radius:8px; padding:11px; }
+  .picklist label { display:flex; align-items:center; gap:10px; font-size:14px; cursor:pointer; text-transform:none; letter-spacing:0; color:var(--text); font-weight:500; margin:0; }
+  .picklist input { width:17px; height:17px; accent-color:var(--accent); flex:none; }
+  .rdot { width:11px; height:11px; border-radius:50%; flex:none; }
+  .grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
+  @media (max-width:640px){ .grid3 { grid-template-columns:1fr; } }
 {% endblock %}
 
 {% block content %}
@@ -93,6 +99,69 @@
         <input type="hidden" name="action" value="add_word">
         <input type="text" name="word" placeholder="adaugă un cuvânt interzis">
         <button type="submit">➕ Adaugă</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <h3>🔗 Anti-link
+        {% if links.get('enabled') %}<span class="badge on">PORNIT</span>{% else %}<span class="badge off">OPRIT</span>{% endif %}
+      </h3>
+      <p class="sub">Pe canalele alese, dacă cineva pune un link i se șterge automat. Dacă repetă de X ori în Y minute, primește mute pe durata aleasă de tine. Se aplică doar membrilor cu rolurile alese.</p>
+    </div>
+    <div class="panel-body">
+      <form method="POST">
+        <input type="hidden" name="action" value="link_settings">
+        <div class="toggle">
+          <input type="checkbox" name="links_enabled" id="lken" {% if links.get('enabled') %}checked{% endif %}>
+          <div><b>Activează anti-link</b><br><span class="sub">Cât e oprit, linkurile nu sunt atinse.</span></div>
+        </div>
+
+        <div class="field">
+          <label>📍 Canale verificate (poți alege mai multe)</label>
+          {% if text_channels %}
+          <div class="picklist">
+            {% for ch in text_channels %}
+            <label><input type="checkbox" name="link_channels" value="{{ ch.id }}"
+              {% if ch.id|string in (links.get('channel_ids') or [])|map('string')|list %}checked{% endif %}>
+              #{{ ch.name }}</label>
+            {% endfor %}
+          </div>
+          {% else %}<p class="sub">Nu am găsit canale text.</p>{% endif %}
+        </div>
+
+        <div class="field">
+          <label>👥 Roluri vizate (se aplică DOAR acestor roluri)</label>
+          {% if roles %}
+          <div class="picklist">
+            {% for r in roles %}
+            <label><input type="checkbox" name="link_roles" value="{{ r.id }}"
+              {% if r.id|string in (links.get('role_ids') or [])|map('string')|list %}checked{% endif %}>
+              <span class="rdot" style="background:{{ r.color or '#99aab5' }}"></span>{{ r.name }}</label>
+            {% endfor %}
+          </div>
+          {% else %}<p class="sub">Nu am găsit roluri.</p>{% endif %}
+          <p class="sub" style="margin-top:9px">💡 Dacă nu bifezi niciun rol, regula se aplică <b>tuturor</b> (fără Administratori).</p>
+        </div>
+
+        <div class="grid3">
+          <div class="field">
+            <label>🔢 Câte linkuri</label>
+            <input type="text" name="threshold" value="{{ links.get('threshold', 3) }}" placeholder="3">
+          </div>
+          <div class="field">
+            <label>⏱️ În câte minute</label>
+            <input type="text" name="window_minutes" value="{{ links.get('window_minutes', 5) }}" placeholder="5">
+          </div>
+          <div class="field">
+            <label>🔇 Mute (minute)</label>
+            <input type="text" name="mute_minutes" value="{{ links.get('mute_minutes', 5) }}" placeholder="5">
+          </div>
+        </div>
+        <p class="sub" style="margin:0 0 14px">Exemplu: 3 linkuri în 5 minute → mute 5 minute. Primele linkuri se șterg oricum; mute-ul vine la al treilea.</p>
+
+        <button class="save" type="submit">💾 Salvează</button>
       </form>
     </div>
   </div>

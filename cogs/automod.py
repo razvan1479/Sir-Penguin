@@ -18,8 +18,19 @@ CE NU FACE:
 
 Storage (cheia "automod", per guild):
   enabled, channel_id, timeout_minutes, banned_words (lista de string-uri)
+
+  links: {                      # REGULA DE LINKURI (separata de filtrul de cuvinte)
+    enabled, channel_ids [list], role_ids [list],
+    threshold (cate linkuri), window_minutes (in cat timp),
+    mute_minutes (durata mute)
+  }
+  Pe canalele alese, daca un membru cu unul din rolurile alese pune un link,
+  mesajul se sterge. Daca repeta de <threshold> ori in <window_minutes>, primeste
+  mute <mute_minutes>. Daca NU alegi niciun rol -> regula se aplica tuturor
+  (fara Administratori si boti).
 """
 import re
+import time
 import datetime
 
 import discord
@@ -28,6 +39,19 @@ from discord.ext import commands
 from utils import storage
 
 DEFAULT_TIMEOUT_MINUTES = 2
+
+# Detecteaza linkuri: protocol explicit, www., invitatii discord, si domenii
+# "goale" cu un TLD cunoscut (ex. site.com, server.ro). Acopera cazurile uzuale
+# de pe un server de Metin2 (alte servere, invitatii discord etc).
+_LINK_RE = re.compile(
+    r"(https?://\S+"
+    r"|www\.\S+"
+    r"|discord\.(?:gg|com/invite|me)/\S+"
+    r"|\b[a-z0-9][a-z0-9\-]*\.(?:com|net|org|ro|gg|io|me|tv|xyz|co|info|biz|"
+    r"online|store|shop|link|site|app|dev|eu|uk|de|fr|es|it|pl|ru|fun|gg)\b"
+    r"(?:/\S*)?)",
+    re.IGNORECASE,
+)
 
 # Substituiri comune folosite pentru a "masca" un cuvant (leetspeak simplu).
 # Nu e un filtru perfect (niciun filtru de cuvinte nu poate fi 100%), dar
@@ -64,11 +88,88 @@ def _is_admin(member) -> bool:
 class AutoMod(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        # evidenta in memorie a linkurilor sterse recent, per (guild, user):
+        # lista de timestamp-uri. Se curata singura (fereastra de timp), deci
+        # ramane mica — nu creste memoria. Se reseteaza la restart (nu conteaza
+        # pentru o fereastra de cateva minute).
+        self._link_hits: dict = {}
+
+    # ---------------------------------------------------- filtru de LINKURI
+    async def _maybe_filter_links(self, message: discord.Message) -> bool:
+        """Returneaza True daca a tratat mesajul (l-a sters). Altfel False."""
+        cfg = _cfg(message.guild.id)
+        lk = cfg.get("links") or {}
+        if not lk.get("enabled"):
+            return False
+
+        channel_ids = {str(c) for c in (lk.get("channel_ids") or [])}
+        if str(message.channel.id) not in channel_ids:
+            return False  # nu e un canal vizat
+
+        member = message.author
+        if _is_admin(member):
+            return False  # Administratorii sunt mereu scutiti
+
+        # roluri vizate: daca ai ales roluri, regula se aplica DOAR celor care au
+        # unul din ele. Daca nu ai ales niciun rol -> se aplica tuturor.
+        role_ids = {str(r) for r in (lk.get("role_ids") or [])}
+        if role_ids:
+            member_roles = {str(r.id) for r in getattr(member, "roles", [])}
+            if not (role_ids & member_roles):
+                return False  # nu are niciun rol vizat -> il lasam in pace
+
+        if not _LINK_RE.search(message.content or ""):
+            return False  # nu contine link
+
+        # 1) stergem mesajul cu link
+        try:
+            await message.delete()
+        except discord.Forbidden:
+            return False  # fara Manage Messages -> nu putem face nimic sigur
+        except discord.NotFound:
+            pass  # deja sters
+
+        # 2) numaram incalcarile in fereastra de timp
+        threshold = max(1, int(lk.get("threshold", 3)))
+        window = max(1, int(lk.get("window_minutes", 5))) * 60
+        now = time.time()
+        key = (message.guild.id, member.id)
+        hits = [t for t in self._link_hits.get(key, []) if now - t < window]
+        hits.append(now)
+        self._link_hits[key] = hits
+        self._prune_hits(now)
+
+        # 3) daca a atins pragul -> mute pe durata aleasa
+        if len(hits) >= threshold:
+            self._link_hits[key] = []  # resetam dupa ce dam mute
+            mins = max(1, int(lk.get("mute_minutes", 5)))
+            until = discord.utils.utcnow() + datetime.timedelta(minutes=mins)
+            current_until = getattr(member, "timed_out_until", None)
+            if current_until is None or current_until < until:
+                try:
+                    await member.timeout(until, reason="Spam linkuri (automod)")
+                except discord.Forbidden:
+                    pass  # lipseste "Moderate Members" sau rolul botului e prea jos
+                except discord.HTTPException:
+                    pass
+        return True
+
+    def _prune_hits(self, now: float):
+        """Scoate intrarile vechi ca sa nu creasca memoria (rar, doar cand e cazul)."""
+        if len(self._link_hits) < 500:
+            return
+        for k in list(self._link_hits.keys()):
+            if not self._link_hits[k] or now - self._link_hits[k][-1] > 3600:
+                self._link_hits.pop(k, None)
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         if message.author.bot or message.guild is None:
             return  # ignoram alte boturi (inclusiv pe noi) si DM-urile
+
+        # intai filtrul de linkuri; daca a sters mesajul, ne oprim aici
+        if await self._maybe_filter_links(message):
+            return
 
         cfg = _cfg(message.guild.id)
         if not cfg.get("enabled", False):

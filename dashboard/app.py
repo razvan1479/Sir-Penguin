@@ -1081,11 +1081,27 @@ def automod_page(guild_id):
             words = [x for x in (cfg.get("banned_words") or []) if x != w]
             cfg["banned_words"] = words
             storage.set(gid, "automod", cfg)
+        elif action == "link_settings":
+            lk = cfg.get("links") or {}
+            lk["enabled"] = request.form.get("links_enabled") == "on"
+            lk["channel_ids"] = request.form.getlist("link_channels")  # multi
+            lk["role_ids"] = request.form.getlist("link_roles")        # multi
+            th = _to_int(request.form.get("threshold", ""))
+            lk["threshold"] = max(1, min(th or 3, 50))
+            wm = _to_int(request.form.get("window_minutes", ""))
+            lk["window_minutes"] = max(1, min(wm or 5, 1440))
+            mm = _to_int(request.form.get("mute_minutes", ""))
+            lk["mute_minutes"] = max(1, min(mm or 5, 40320))  # Discord: max 28 zile
+            cfg["links"] = lk
+            storage.set(gid, "automod", cfg)
         return redirect(url_for("automod_page", guild_id=guild_id, saved=1))
 
     channels = storage.get(gid, "channels", {}) or {}
+    roles = storage.get(gid, "roles", {}) or {}
     return render_template("automod.html", guild_id=guild_id, cfg=cfg,
                            text_channels=channels.get("texts", []),
+                           roles=roles.get("list", []),
+                           links=cfg.get("links") or {},
                            words=cfg.get("banned_words") or [],
                            meta=storage.get(gid, "meta", {}),
                            section="automod", saved=request.args.get("saved"))
