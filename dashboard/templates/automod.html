@@ -165,4 +165,57 @@
       </form>
     </div>
   </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <h3>🔇 Persoane cu timeout
+        {% if timed_out is not none %}<span class="badge off" style="background:rgba(148,163,184,.15)">{{ timed_out|length }}</span>{% endif %}
+        <a href="/automod/{{ guild_id }}" style="float:right;font-size:13px;color:var(--muted);text-decoration:none">🔄 Reîmprospătează</a>
+      </h3>
+      <p class="sub">Toți cei care au ACUM timeout pe server. Când expiră, dispar automat de aici. Apasă „Scoate" ca să ridici timeout-ul imediat.</p>
+    </div>
+    <div class="panel-body">
+      {% if timed_out is none %}
+        <p class="sub">⚠️ Nu pot citi starea acum (botul pare offline). Încearcă din nou în câteva secunde.</p>
+      {% elif timed_out|length == 0 %}
+        <p class="sub">✅ Nimeni nu are timeout momentan.</p>
+      {% else %}
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          {% for m in timed_out %}
+          <div style="display:flex; align-items:center; gap:12px; background:var(--input); border:1px solid var(--glass-border); border-radius:12px; padding:11px 14px;">
+            {% if m.avatar %}<img src="{{ m.avatar }}" style="width:38px;height:38px;border-radius:50%;flex:none">{% endif %}
+            <div style="flex:1; min-width:0;">
+              <div style="font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ m.name }}</div>
+              <div class="sub" style="margin:0">expiră <span data-until="{{ m.until_ts }}">—</span> · <code>{{ m.id }}</code></div>
+            </div>
+            <form method="POST" style="margin:0; flex:none;">
+              <input type="hidden" name="action" value="remove_timeout">
+              <input type="hidden" name="user_id" value="{{ m.id }}">
+              <button type="submit" style="background:rgba(244,63,94,.15); color:#fb7185; border:1px solid rgba(244,63,94,.35); border-radius:9px; padding:9px 16px; font-weight:700; cursor:pointer; font-size:13px;">🔓 Scoate</button>
+            </form>
+          </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <script>
+    // afiseaza "expira in X" pe fusul userului, prietenos
+    (function(){
+      function rel(ts){
+        var diff = ts*1000 - Date.now();
+        if (diff <= 0) return 'acum';
+        var m = Math.round(diff/60000);
+        if (m < 60) return 'în ' + m + ' min';
+        var h = Math.floor(m/60), mm = m%60;
+        if (h < 24) return 'în ' + h + 'h' + (mm?(' '+mm+'m'):'');
+        var d = Math.floor(h/24);
+        return 'în ' + d + ' zile';
+      }
+      document.querySelectorAll('[data-until]').forEach(function(el){
+        el.textContent = rel(parseInt(el.dataset.until, 10));
+      });
+    })();
+  </script>
 {% endblock %}

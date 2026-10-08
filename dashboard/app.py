@@ -110,6 +110,70 @@ def _notify_owner_login(user_id, user_name):
         pass
 
 
+def _list_timed_out(guild_id):
+    """Lista membrilor care au ACUM timeout activ pe server (live, din bot).
+    Returneaza None daca botul nu e disponibil (ca sa afisam un mesaj clar).
+    Cei carora le-a expirat timeout-ul nu apar — se citeste starea curenta."""
+    try:
+        import asyncio
+        import datetime as _dt
+        from utils import botref
+        bot = botref.bot
+        loop = getattr(bot, "loop", None) if bot else None
+        if bot is None or loop is None:
+            return None
+
+        async def _collect():
+            guild = bot.get_guild(int(guild_id))
+            if guild is None:
+                return []
+            now = _dt.datetime.now(_dt.timezone.utc)
+            out = []
+            for m in guild.members:
+                until = getattr(m, "timed_out_until", None)
+                if until and until > now:
+                    out.append({
+                        "id": str(m.id),
+                        "name": m.display_name,
+                        "avatar": (m.display_avatar.url if getattr(m, "display_avatar", None) else None),
+                        "until_ts": int(until.timestamp()),
+                    })
+            out.sort(key=lambda x: x["until_ts"])
+            return out
+
+        return asyncio.run_coroutine_threadsafe(_collect(), loop).result(timeout=10)
+    except Exception:
+        return None
+
+
+def _remove_timeout(guild_id, user_id):
+    """Scoate timeout-ul unui membru (din bot). True daca a reusit."""
+    try:
+        import asyncio
+        from utils import botref
+        bot = botref.bot
+        loop = getattr(bot, "loop", None) if bot else None
+        if bot is None or loop is None:
+            return False
+
+        async def _do():
+            guild = bot.get_guild(int(guild_id))
+            if guild is None:
+                return False
+            member = guild.get_member(int(user_id))
+            if member is None:
+                return False
+            try:
+                await member.timeout(None, reason="Timeout scos din dashboard")
+                return True
+            except Exception:
+                return False
+
+        return asyncio.run_coroutine_threadsafe(_do(), loop).result(timeout=10)
+    except Exception:
+        return False
+
+
 # ---------------------------------------------------------------------------
 # Resurse server (RAM/CPU/disk) — citite direct din /proc (Linux), fara nicio
 # dependenta noua. Dashboard-ul ruleaza CHIAR pe serverul Oracle, deci vede
@@ -1094,15 +1158,22 @@ def automod_page(guild_id):
             lk["mute_minutes"] = max(1, min(mm or 5, 40320))  # Discord: max 28 zile
             cfg["links"] = lk
             storage.set(gid, "automod", cfg)
+        elif action == "remove_timeout":
+            uid = request.form.get("user_id", "")
+            if uid.isdigit():
+                _remove_timeout(gid, uid)
+            return redirect(url_for("automod_page", guild_id=guild_id))
         return redirect(url_for("automod_page", guild_id=guild_id, saved=1))
 
     channels = storage.get(gid, "channels", {}) or {}
     roles = storage.get(gid, "roles", {}) or {}
+    timed_out = _list_timed_out(gid)  # None = botul indisponibil; [] = nimeni
     return render_template("automod.html", guild_id=guild_id, cfg=cfg,
                            text_channels=channels.get("texts", []),
                            roles=roles.get("list", []),
                            links=cfg.get("links") or {},
                            words=cfg.get("banned_words") or [],
+                           timed_out=timed_out,
                            meta=storage.get(gid, "meta", {}),
                            section="automod", saved=request.args.get("saved"))
 
