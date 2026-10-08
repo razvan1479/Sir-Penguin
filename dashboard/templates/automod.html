@@ -161,6 +161,30 @@
         </div>
         <p class="sub" style="margin:0 0 14px">Exemplu: 3 linkuri în 5 minute → mute 5 minute. Primele linkuri se șterg oricum; mute-ul vine la al treilea.</p>
 
+        <div class="toggle">
+          <input type="checkbox" name="warn_enabled" id="warnen" {% if links.get('warn_enabled') %}checked{% endif %}>
+          <div><b>Trimite un avertisment la ștergere</b><br><span class="sub">Îl anunță că dacă repetă primește mute.</span></div>
+        </div>
+
+        <div class="field">
+          <label>📨 Cum ajunge avertismentul</label>
+          <select name="warn_mode">
+            <option value="channel" {% if links.get('warn_mode','channel') != 'dm' %}selected{% endif %}>În canal — îl menționează doar pe el, dispare singur după câteva secunde</option>
+            <option value="dm" {% if links.get('warn_mode') == 'dm' %}selected{% endif %}>DM privat — doar el vede (nu merge dacă are DM-urile închise)</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>✏️ Textul avertismentului (gol = cel implicit)</label>
+          <textarea name="warn_text" placeholder="⚠️ {user}, linkurile nu sunt permise aici. Dacă mai încerci, primești mute automat {mute} minute.">{{ links.get('warn_text','') }}</textarea>
+          <p class="sub" style="margin-top:8px">Poți folosi <code>{user}</code> = îl menționează, <code>{mute}</code> = durata mute-ului (minutele de mai sus).</p>
+        </div>
+
+        <div class="field">
+          <label>⏳ În canal: după câte secunde dispare mesajul</label>
+          <input type="text" name="warn_delete_seconds" value="{{ links.get('warn_delete_seconds', 8) }}" placeholder="8">
+        </div>
+
         <button class="save" type="submit">💾 Salvează</button>
       </form>
     </div>

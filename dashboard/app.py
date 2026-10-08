@@ -1156,6 +1156,13 @@ def automod_page(guild_id):
             lk["window_minutes"] = max(1, min(wm or 5, 1440))
             mm = _to_int(request.form.get("mute_minutes", ""))
             lk["mute_minutes"] = max(1, min(mm or 5, 40320))  # Discord: max 28 zile
+            # avertisment la stergere link
+            lk["warn_enabled"] = request.form.get("warn_enabled") == "on"
+            wmode = request.form.get("warn_mode", "channel")
+            lk["warn_mode"] = "dm" if wmode == "dm" else "channel"
+            lk["warn_text"] = request.form.get("warn_text", "").strip()
+            ws = _to_int(request.form.get("warn_delete_seconds", ""))
+            lk["warn_delete_seconds"] = max(1, min(ws or 8, 60))
             cfg["links"] = lk
             storage.set(gid, "automod", cfg)
         elif action == "remove_timeout":

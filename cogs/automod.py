@@ -140,9 +140,9 @@ class AutoMod(commands.Cog):
         self._prune_hits(now)
 
         # 3) daca a atins pragul -> mute pe durata aleasa
+        mins = max(1, int(lk.get("mute_minutes", 5)))
         if len(hits) >= threshold:
             self._link_hits[key] = []  # resetam dupa ce dam mute
-            mins = max(1, int(lk.get("mute_minutes", 5)))
             until = discord.utils.utcnow() + datetime.timedelta(minutes=mins)
             current_until = getattr(member, "timed_out_until", None)
             if current_until is None or current_until < until:
@@ -152,7 +152,37 @@ class AutoMod(commands.Cog):
                     pass  # lipseste "Moderate Members" sau rolul botului e prea jos
                 except discord.HTTPException:
                     pass
+        else:
+            # inca nu a atins pragul -> ii trimitem un avertisment (daca e pornit)
+            await self._send_link_warning(message, member, lk, mins)
         return True
+
+    async def _send_link_warning(self, message, member, lk, mute_minutes):
+        """Avertisment cand i se sterge un link (inainte de a primi mute).
+        mod 'channel' = mesaj scurt in canal care-l mentioneaza, auto-sters;
+        mod 'dm' = mesaj privat. Gol/oprit = nu trimite nimic."""
+        if not lk.get("warn_enabled"):
+            return
+        default_text = ("⚠️ {user}, linkurile nu sunt permise aici. "
+                        "Dacă mai încerci, primești mute automat {mute} minute.")
+        text = (lk.get("warn_text") or default_text)
+        text = text.replace("{user}", member.mention).replace("{mute}", str(mute_minutes))
+
+        if lk.get("warn_mode") == "dm":
+            try:
+                await member.send(text)
+            except (discord.Forbidden, discord.HTTPException):
+                pass  # are DM-urile inchise -> nu putem face nimic
+            return
+
+        # mod implicit: mesaj in canal, auto-sters dupa cateva secunde
+        secs = max(1, min(int(lk.get("warn_delete_seconds", 8)), 60))
+        try:
+            await message.channel.send(
+                text, allowed_mentions=discord.AllowedMentions(users=True),
+                delete_after=secs)
+        except discord.HTTPException:
+            pass
 
     def _prune_hits(self, now: float):
         """Scoate intrarile vechi ca sa nu creasca memoria (rar, doar cand e cazul)."""
