@@ -30,9 +30,26 @@ ABSOLUTE_USERNAMES = {"w1.ideal"}
 ABSOLUTE_IDS = {1493163753447882894}  # w1.ideal (owner) — fixat pe ID, nu se strica niciodata
 
 
+def stored_absolute_ids() -> set:
+    """ID-urile de useri absoluti adaugate din DASHBOARD (pagina Accese), pe langa
+    cele din cod. Asa poti da/scoate acces fara sa mai editezi codul."""
+    try:
+        rows = (storage.get(0, "access", {}) or {}).get("bot_absolute", []) or []
+        out = set()
+        for r in rows:
+            rid = r.get("id") if isinstance(r, dict) else r
+            try:
+                out.add(int(rid))
+            except (TypeError, ValueError):
+                pass
+        return out
+    except Exception:
+        return set()
+
+
 def _is_absolute(user) -> bool:
     try:
-        if user.id in ABSOLUTE_IDS:
+        if user.id in ABSOLUTE_IDS or user.id in stored_absolute_ids():
             return True
         uname = (getattr(user, "name", "") or "").lower()
         return uname in {u.lower() for u in ABSOLUTE_USERNAMES}

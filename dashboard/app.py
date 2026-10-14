@@ -146,15 +146,50 @@ def _list_timed_out(guild_id):
         return None
 
 
-def _is_super_user(user_id):
-    """True daca userul e owner-ul botului sau un user ABSOLUT (vede/administreaza tot)."""
+def _access_cfg():
+    return storage.get(0, "access", {}) or {}
+
+
+def _ids_of(key):
+    """Set de ID-uri (int) dintr-o lista salvata de forma [{'id','name'}, ...]."""
+    out = set()
+    for r in _access_cfg().get(key, []) or []:
+        rid = r.get("id") if isinstance(r, dict) else r
+        try:
+            out.add(int(rid))
+        except (TypeError, ValueError):
+            pass
+    return out
+
+
+def _is_true_owner(user_id=None):
+    """DOAR owner-ul real al botului (w1.ideal). El singur gestioneaza accesele.
+    Nu include dash-adminii — ca sa nu-si poata da singuri mai multe drepturi."""
     try:
         from utils import perms as _perms
+        if user_id is None:
+            if "user" not in session:
+                return False
+            user_id = session["user"]["id"]
         uid = int(user_id)
         owner_id = storage.get(0, "bot_owner_id", None)
         if owner_id and str(uid) == str(owner_id):
             return True
         return uid in getattr(_perms, "ABSOLUTE_IDS", set())
+    except Exception:
+        return False
+
+
+def _dash_admin_ids():
+    """Useri carora le-ai dat acces la DASHBOARD (din pagina Accese)."""
+    return _ids_of("dash_admins")
+
+
+def _is_super_user(user_id):
+    """Vede/administreaza TOT in dashboard: owner-ul real SAU un dash-admin."""
+    try:
+        uid = int(user_id)
+        return _is_true_owner(uid) or uid in _dash_admin_ids()
     except Exception:
         return False
 
@@ -508,7 +543,8 @@ def index():
         invite = (f"https://discord.com/oauth2/authorize?client_id={CLIENT_ID}"
                   f"&permissions=1099780287665&scope=bot%20applications.commands")
     return render_template("index.html", guilds=active, not_added=not_added,
-                           user=session["user"], invite_url=invite)
+                           user=session["user"], invite_url=invite,
+                           is_owner=_is_true_owner())
 
 
 @app.route("/api/guild/<guild_id>")
@@ -2021,9 +2057,14 @@ def restart_bot():
 
 
 def _is_owner_session():
-    owner_id = storage.get(0, "bot_owner_id", None)
-    return bool(owner_id and "user" in session
-                and str(session["user"]["id"]) == str(owner_id))
+    """Acces la paginile owner-only (restart, servere, resurse): owner-ul real
+    SAU un user caruia i-ai dat acces la dashboard (dash-admin)."""
+    if "user" not in session:
+        return False
+    uid = session["user"]["id"]
+    if _is_true_owner(uid):
+        return True
+    return int(uid) in _dash_admin_ids() if str(uid).isdigit() else False
 
 
 @app.route("/system")
@@ -2041,6 +2082,45 @@ def system_api():
     if not _is_owner_session():
         return jsonify({"error": "forbidden"}), 403
     return jsonify(_read_system_stats())
+
+
+@app.route("/access", methods=["GET", "POST"])
+def access_page():
+    # DOAR owner-ul real (w1.ideal) poate vedea si gestiona accesele.
+    if "user" not in session:
+        return redirect(url_for("index"))
+    if not _is_true_owner():
+        return render_template("access.html", denied=True)
+
+    cfg = _access_cfg()
+    cfg.setdefault("bot_absolute", [])
+    cfg.setdefault("dash_admins", [])
+
+    if request.method == "POST":
+        action = request.form.get("action", "")
+        cat = request.form.get("cat", "")  # "bot_absolute" sau "dash_admins"
+        if cat not in ("bot_absolute", "dash_admins"):
+            return redirect(url_for("access_page"))
+
+        if action == "add":
+            raw = (request.form.get("user_id", "") or "").strip()
+            name = (request.form.get("name", "") or "").strip()
+            if raw.isdigit():
+                # nu adaugam owner-ul real (are deja tot) si nu dublam
+                if not _is_true_owner(raw) and all(
+                        str(r.get("id")) != raw for r in cfg[cat]):
+                    cfg[cat].append({"id": raw, "name": name or raw})
+                    storage.set(0, "access", cfg)
+        elif action == "del":
+            rid = (request.form.get("user_id", "") or "").strip()
+            cfg[cat] = [r for r in cfg[cat] if str(r.get("id")) != rid]
+            storage.set(0, "access", cfg)
+        return redirect(url_for("access_page", saved=1))
+
+    return render_template("access.html", denied=False,
+                           bot_absolute=cfg.get("bot_absolute", []),
+                           dash_admins=cfg.get("dash_admins", []),
+                           saved=request.args.get("saved"))
 
 
 @app.route("/servers", methods=["GET", "POST"])
