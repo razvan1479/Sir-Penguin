@@ -146,6 +146,93 @@ def _list_timed_out(guild_id):
         return None
 
 
+def _is_super_user(user_id):
+    """True daca userul e owner-ul botului sau un user ABSOLUT (vede/administreaza tot)."""
+    try:
+        from utils import perms as _perms
+        uid = int(user_id)
+        owner_id = storage.get(0, "bot_owner_id", None)
+        if owner_id and str(uid) == str(owner_id):
+            return True
+        return uid in getattr(_perms, "ABSOLUTE_IDS", set())
+    except Exception:
+        return False
+
+
+def _live_manage_guilds(user_id):
+    """Serverele CU BOTUL pe care userul le poate administra — LIVE din bot.
+    Asa, un server pe care tocmai ai adaugat botul apare imediat, fara re-login.
+    Returneaza None daca botul nu e disponibil (atunci folosim lista din sesiune)."""
+    try:
+        import asyncio
+        from utils import botref
+        bot = botref.bot
+        loop = getattr(bot, "loop", None) if bot else None
+        if bot is None or loop is None:
+            return None
+        uid = int(user_id)
+        is_super = _is_super_user(uid)
+
+        async def _collect():
+            out = []
+            for guild in list(bot.guilds):
+                allow = is_super
+                if not allow:
+                    m = guild.get_member(uid)
+                    if m is None:
+                        try:
+                            m = await guild.fetch_member(uid)
+                        except Exception:
+                            m = None
+                    if m is not None:
+                        p = m.guild_permissions
+                        allow = bool(p.administrator or p.manage_guild
+                                     or guild.owner_id == uid)
+                if allow:
+                    out.append({
+                        "id": str(guild.id), "name": guild.name,
+                        "icon": (guild.icon.url if guild.icon else None),
+                        "members": guild.member_count,
+                    })
+            out.sort(key=lambda g: g["name"].lower())
+            return out
+
+        return asyncio.run_coroutine_threadsafe(_collect(), loop).result(timeout=15)
+    except Exception:
+        return None
+
+
+def _can_manage(user_id, guild_id):
+    """Verificare LIVE: userul poate administra acel server (cu botul pe el)?"""
+    try:
+        import asyncio
+        from utils import botref
+        bot = botref.bot
+        loop = getattr(bot, "loop", None) if bot else None
+        if bot is None or loop is None:
+            return False
+        uid = int(user_id)
+        if _is_super_user(uid):
+            return True
+
+        async def _chk():
+            g = bot.get_guild(int(guild_id))
+            if g is None:
+                return False
+            m = g.get_member(uid)
+            if m is None:
+                try:
+                    m = await g.fetch_member(uid)
+                except Exception:
+                    return False
+            p = m.guild_permissions
+            return bool(p.administrator or p.manage_guild or g.owner_id == uid)
+
+        return asyncio.run_coroutine_threadsafe(_chk(), loop).result(timeout=10)
+    except Exception:
+        return False
+
+
 def _remove_timeout(guild_id, user_id):
     """Scoate timeout-ul unui membru (din bot). True daca a reusit."""
     try:
@@ -262,15 +349,19 @@ def login_required(f):
 
 
 def guild_required(f):
-    """Acces doar la serverele pe care le administreaza userul logat."""
+    """Acces doar la serverele pe care le administreaza userul logat.
+    Intai verificam lista din sesiune (rapid); daca lipseste (ex. server adaugat
+    dupa login), verificam LIVE din bot — asa nu mai trebuie re-login."""
     @wraps(f)
     def w(guild_id, *a, **k):
         if "user" not in session:
             return redirect(url_for("index"))
         managed = {g["id"] for g in session.get("guilds", [])}
-        if str(guild_id) not in managed:
-            abort(403)
-        return f(guild_id, *a, **k)
+        if str(guild_id) in managed:
+            return f(guild_id, *a, **k)
+        if _can_manage(session["user"]["id"], guild_id):
+            return f(guild_id, *a, **k)
+        abort(403)
     return w
 
 
@@ -377,19 +468,37 @@ def index():
     if "user" not in session:
         return render_template("login.html", configured=OAUTH_OK)
 
-    bot_g = _bot_guilds()
-    mine = session.get("guilds", [])
-    active, not_added = [], []
-    for g in mine:
-        if g["id"] in bot_g:
+    uid = session["user"]["id"]
+    live = _live_manage_guilds(uid)  # serverele CU BOTUL, administrabile — live
+
+    if live is not None:
+        # sursa principala: lista live din bot (mereu proaspata)
+        active = []
+        for g in live:
             meta = storage.get(int(g["id"]), "meta", {})
             g = dict(g)
-            g["members"] = meta.get("members")
+            if not g.get("members"):
+                g["members"] = meta.get("members")
             if not g.get("icon"):
                 g["icon"] = meta.get("icon")
             active.append(g)
-        else:
-            not_added.append(g)
+        # "de adaugat": serverele tale (din sesiune) unde botul inca NU e
+        have = {g["id"] for g in active}
+        not_added = [g for g in session.get("guilds", []) if g["id"] not in have]
+    else:
+        # botul indisponibil -> cadem pe logica veche (lista din sesiune)
+        bot_g = _bot_guilds()
+        active, not_added = [], []
+        for g in session.get("guilds", []):
+            if g["id"] in bot_g:
+                meta = storage.get(int(g["id"]), "meta", {})
+                g = dict(g)
+                g["members"] = meta.get("members")
+                if not g.get("icon"):
+                    g["icon"] = meta.get("icon")
+                active.append(g)
+            else:
+                not_added.append(g)
 
     invite = None
     if CLIENT_ID:
