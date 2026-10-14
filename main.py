@@ -171,26 +171,51 @@ class MyBot(commands.Bot):
         except discord.HTTPException as e:
             log.warning("Sync esuat la intrare pe %s: %s", guild.id, e)
 
-        # anuntam owner-ul botului DOAR daca l-a adaugat ALTCINEVA (nu owner-ul).
-        # Aflam cine l-a adaugat din audit log (necesita permisiunea View Audit Log).
+        # anuntam owner-ul botului DOAR daca l-a adaugat ALTCINEVA (nu owner-ul
+        # sau un user absolut). Aflam cine l-a adaugat din AUDIT LOG.
+        # Problema veche: la intrare, intrarea din audit log nu e inca scrisa de
+        # Discord (sau botul nu are inca "View Audit Log") -> adder iesea necunoscut
+        # -> venea notificare chiar cand o adaugai TU. Reparat: reincercam de
+        # cateva ori cu o mica pauza, ca sa prindem intrarea cand apare.
         try:
             owner_id = storage.get(0, "bot_owner_id", None)
-            adder = None
             try:
-                async for entry in guild.audit_logs(
-                        limit=5, action=discord.AuditLogAction.bot_add):
-                    if entry.target and entry.target.id == self.user.id:
-                        adder = entry.user
-                        break
+                from utils.perms import ABSOLUTE_IDS
             except Exception:
-                adder = None  # fara permisiune de audit log -> nu stim cine
+                ABSOLUTE_IDS = set()
 
-            # daca stim ca l-a adaugat chiar owner-ul -> nu trimitem DM
-            if owner_id and adder and str(adder.id) == str(owner_id):
-                return
+            adder = None
+            forbidden = False
+            for _ in range(4):  # ~ pana la 4 incercari, cu pauza intre ele
+                try:
+                    async for entry in guild.audit_logs(
+                            limit=8, action=discord.AuditLogAction.bot_add):
+                        tgt = getattr(entry, "target", None)
+                        if tgt and tgt.id == self.user.id:
+                            adder = entry.user
+                            break
+                except discord.Forbidden:
+                    forbidden = True
+                    break  # fara "View Audit Log" -> nu avem cum sti cine
+                except Exception:
+                    pass
+                if adder is not None:
+                    break
+                await asyncio.sleep(2)
+
+            # l-a adaugat chiar owner-ul SAU un user absolut -> nu trimitem DM
+            if adder is not None:
+                aid = adder.id
+                if (owner_id and str(aid) == str(owner_id)) or aid in ABSOLUTE_IDS:
+                    return
 
             owner_name = str(guild.owner) if guild.owner else f"`{guild.owner_id}`"
-            added_by = str(adder) if adder else "necunoscut"
+            if adder is not None:
+                added_by = str(adder)
+            elif forbidden:
+                added_by = "necunoscut (botul n-are „View Audit Log”)"
+            else:
+                added_by = "necunoscut"
             ts = int(discord.utils.utcnow().timestamp())
             await self._notify_owner(
                 f"➕ **Bot adăugat pe un server nou**\n"

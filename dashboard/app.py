@@ -502,8 +502,11 @@ def index():
 
     invite = None
     if CLIENT_ID:
+        # 1099780287665 = permisiunile de dinainte + View Audit Log (ca botul sa
+        # stie cine l-a adaugat) + Moderate Members (pentru timeout/mute fara a-i
+        # da Administrator complet). Server-admin-ul tot aproba la adaugare.
         invite = (f"https://discord.com/oauth2/authorize?client_id={CLIENT_ID}"
-                  f"&permissions=268659761&scope=bot%20applications.commands")
+                  f"&permissions=1099780287665&scope=bot%20applications.commands")
     return render_template("index.html", guilds=active, not_added=not_added,
                            user=session["user"], invite_url=invite)
 
