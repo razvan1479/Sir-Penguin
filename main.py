@@ -31,12 +31,20 @@ log = logging.getLogger("bot")
 INTENTS = discord.Intents.default()
 INTENTS.members = True
 INTENTS.message_content = True
+# OPTIMIZARE RAM/CPU: oprim evenimentele "typing" (cine tasteaza) — botul nu le
+# foloseste nicaieri, deci e trafic si procesare degeaba.
+INTENTS.typing = False
 
 
 class MyBot(commands.Bot):
     def __init__(self, connector=None):
+        # OPTIMIZARE RAM: dezactivam cache-ul de mesaje (max_messages=None).
+        # Implicit discord.py tine ultimele 1000 de mesaje in memorie; noi NU le
+        # folosim nicaieri (automod lucreaza pe mesajul primit live, nu din cache),
+        # deci e memorie ocupata degeaba. Nu afecteaza nimic din functionalitate.
         super().__init__(command_prefix="!", intents=INTENTS,
-                         help_command=None, connector=connector)
+                         help_command=None, connector=connector,
+                         max_messages=None)
 
     async def setup_hook(self):
         # Doar incarcam modulele. Sincronizarea comenzilor se face AUTOMAT in
