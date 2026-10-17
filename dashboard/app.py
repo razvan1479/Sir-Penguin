@@ -1408,10 +1408,14 @@ def helperapp_page(guild_id):
     questions = (cfg["questions"] if cfg.get("questions") is not None else [dict(q) for q in DEFAULT_HELPER_QUESTIONS])
     edit_qid = request.args.get("editq", "")
     editing_q = next((q for q in questions if q.get("id") == edit_qid), None)
+    # cei acceptati — cei mai noi primii
+    accepted = storage.get(gid, "helper_accepted", []) or []
+    accepted = sorted(accepted, key=lambda r: r.get("ts", 0), reverse=True)
     return render_template("helperapp.html", guild_id=guild_id, cfg=cfg,
                            roles=roles.get("list", []),
                            text_channels=channels.get("texts", []),
                            pending_count=len(pending),
+                           accepted=accepted,
                            questions=questions, editing_q=editing_q,
                            max_questions=5,
                            meta=storage.get(gid, "meta", {}),

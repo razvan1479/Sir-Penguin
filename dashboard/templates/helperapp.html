@@ -30,6 +30,12 @@
   .mv { width:26px; height:22px; background:var(--card); border:1px solid var(--glass-border); color:var(--text); border-radius:5px; cursor:pointer; font-size:10px; padding:0; }
   .mv:disabled { opacity:.25; cursor:default; }
   .del { background:var(--card); border:1px solid var(--glass-border); color:#fb7185; border-radius:8px; padding:6px 12px; cursor:pointer; font-size:13px; }
+  table.acc { width:100%; border-collapse:collapse; font-size:14px; }
+  table.acc th { text-align:left; color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.3px; font-weight:700; padding:0 8px 10px; border-bottom:1px solid var(--glass-border); }
+  table.acc td { padding:11px 8px; border-bottom:1px solid var(--glass-border); }
+  table.acc tr:last-child td { border-bottom:none; }
+  table.acc td.nm { font-weight:600; }
+  table.acc td.wh { color:var(--muted); white-space:nowrap; }
 {% endblock %}
 
 {% block content %}
@@ -207,4 +213,49 @@
       </div>
     </div>
   </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <h3>✅ Helperi acceptați <span class="badge">{{ accepted|length }}</span></h3>
+      <p class="sub">Toți cei acceptați, cei mai recenți primii. Se salvează de la fiecare acceptare încolo.</p>
+    </div>
+    <div class="panel-body">
+      {% if accepted %}
+      <table class="acc">
+        <thead><tr><th>Nume</th><th>Acceptat</th></tr></thead>
+        <tbody>
+          {% for a in accepted %}
+          <tr>
+            <td class="nm">{{ a.name }}</td>
+            <td class="wh" data-ts="{{ a.ts|int }}">—</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="sub">Niciun helper acceptat încă. (Cei acceptați de acum înainte vor apărea aici.)</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <script>
+    // afisam data/ora pe fusul userului, prietenos
+    (function(){
+      function fmt(ts){
+        var d = new Date(ts*1000);
+        if (isNaN(d)) return '—';
+        var azi = new Date(); azi.setHours(0,0,0,0);
+        var zi = new Date(d); zi.setHours(0,0,0,0);
+        var dd = Math.round((azi - zi) / 86400000);
+        var ora = d.toLocaleTimeString('ro-RO', {hour:'2-digit', minute:'2-digit'});
+        if (dd === 0) return 'azi ' + ora;
+        if (dd === 1) return 'ieri ' + ora;
+        return d.toLocaleDateString('ro-RO', {day:'2-digit', month:'2-digit', year:'numeric'}) + ' ' + ora;
+      }
+      document.querySelectorAll('td.wh[data-ts]').forEach(function(el){
+        var ts = parseInt(el.dataset.ts, 10);
+        if (ts) el.textContent = fmt(ts);
+      });
+    })();
+  </script>
 {% endblock %}

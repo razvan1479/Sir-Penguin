@@ -319,6 +319,19 @@ class HelperApp(commands.Cog):
                 except discord.HTTPException:
                     nick_ok = False
 
+        # 2c) salvam in evidenta celor ACCEPTATI (pentru tabelul din dashboard)
+        if accept:
+            nume = member.display_name if member else f"ID {info['user_id']}"
+            accepted = storage.get(interaction.guild_id, "helper_accepted", []) or []
+            accepted.append({
+                "id": str(info["user_id"]),
+                "name": nume,
+                "ts": time.time(),
+            })
+            if len(accepted) > 500:       # pastram ultimele 500, sa nu creasca la nesfarsit
+                accepted = accepted[-500:]
+            storage.set(interaction.guild_id, "helper_accepted", accepted)
+
         # 3) curatam evidentele + stergem mesajul cererii
         reqs.pop(req_id, None)
         storage.set(interaction.guild_id, "helper_requests", reqs)
