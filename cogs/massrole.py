@@ -183,13 +183,24 @@ class MassRole(commands.Cog):
             res = await self.apply_roles(guild, job["action"], role, cond,
                                          job.get("include_bots", False))
             job.update(status="done",
-                       result=f"{res['changed']} membri modificati, {res['errors']} erori (din {res['total']}).")
+                       result=f"{res['changed']} membri modificati, {res['errors']} erori "
+                              f"(din {res['total']}){self._result_note(job['action'], res)}.")
             storage.set(guild.id, "massrole_job", job)
             self._store_roles(guild)
 
     @job_loop.before_loop
     async def _before(self):
         await self.bot.wait_until_ready()
+
+    @staticmethod
+    def _result_note(action, res):
+        """Explica un rezultat de 0 modificari (ca sa nu para ca 'nu merge'):
+        la 'give' = toti aveau deja rolul; la 'remove' = nimeni nu-l avea."""
+        if res["changed"] == 0 and res["errors"] == 0:
+            if action.startswith("give"):
+                return " — toți aveau deja rolul, nimic de adăugat"
+            return " — nimeni nu avea rolul, nimic de scos"
+        return ""
 
     # ----------------------------------------------- comenzi slash
     massrole = app_commands.Group(name="massrole", description="Roluri in masa")
@@ -205,7 +216,8 @@ class MassRole(commands.Cog):
         extra = f" celor cu rolul **{condition.name}**" if condition else ""
         await interaction.followup.send(
             f"✓ Am {verb} rolul **{role.name}**{extra} — "
-            f"{res['changed']} membri ({res['errors']} erori, din {res['total']}).",
+            f"{res['changed']} membri ({res['errors']} erori, din {res['total']})"
+            f"{self._result_note(action, res)}.",
             ephemeral=True)
 
     @massrole.command(name="give_all", description="Da un rol TUTUROR membrilor")

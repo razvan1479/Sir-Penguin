@@ -1072,11 +1072,18 @@ def massrole(guild_id):
     if request.method == "POST":
         action = request.form.get("action", "")
         if action in ("give_all", "remove_all", "give_to", "remove_from"):
+            # condiția (rolul-condiție) se foloseste DOAR la give_to/remove_from.
+            # La give_all/remove_all o IGNORAM — altfel select-ul ascuns trimite
+            # oricum o valoare, iar botul ar sari peste toti cei fara acel rol
+            # (de-aia "0 membri modificati" desi nimeni nu avea rolul).
+            cond_id = None
+            if action in ("give_to", "remove_from"):
+                cond_id = _to_int(request.form.get("condition_role_id", ""))
             job = {
                 "id": uuid.uuid4().hex[:8],
                 "action": action,
                 "role_id": _to_int(request.form.get("role_id", "")),
-                "condition_role_id": _to_int(request.form.get("condition_role_id", "")),
+                "condition_role_id": cond_id,
                 "include_bots": request.form.get("include_bots") == "on",
                 "status": "pending",
                 "result": "",
