@@ -1307,6 +1307,7 @@ def _scan_stickers_live(guild_id, channel_id, limit):
     """Ruleaza scanarea pe loop-ul botului si salveaza rezultatul in storage.
     Returneaza (items, err)."""
     try:
+        import asyncio
         from utils import botref
         from cogs.stickers import scan_and_download
         bot = botref.bot
