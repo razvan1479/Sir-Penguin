@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Voice temporar · {{ meta.get('name','Server') }}{% endblock %}
+
+{% block extra_style %}
+  .panel { padding:0; margin-bottom:22px; overflow:hidden; }
+  .panel-head { padding:20px 24px; border-bottom:1px solid var(--glass-border); background:rgba(255,255,255,.02); }
+  .panel-head h3 { margin:0 0 4px; font-size:18px; }
+  .panel-body { padding:22px 24px; }
+  .sub { color:var(--muted); font-size:13px; margin:0; line-height:1.6; }
+  .field { background:var(--input); border:1px solid var(--glass-border); border-radius:12px; padding:14px 16px; margin-bottom:12px; }
+  .field > label { display:block; font-size:12.5px; color:var(--muted); margin:0 0 9px; font-weight:700; text-transform:uppercase; letter-spacing:.3px; }
+  input[type=text], select { width:100%; padding:11px; border-radius:8px; border:1px solid var(--glass-border); background:var(--bg); color:var(--text); font-size:14px; box-sizing:border-box; font-family:inherit; }
+  .save { margin-top:6px; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; border:none; padding:12px 26px; border-radius:11px; font-weight:700; font-size:14px; cursor:pointer; }
+  .saved { background:rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.3); color:#4ade80; border-radius:10px; padding:11px 15px; margin-bottom:16px; font-size:14px; }
+  .toggle { display:flex; align-items:center; gap:12px; background:linear-gradient(135deg,rgba(79,209,197,.12),rgba(79,209,197,.04)); border:1px solid var(--glass-border); border-radius:12px; padding:16px 18px; margin-bottom:16px; }
+  .toggle input { width:20px; height:20px; accent-color:var(--accent); flex:none; }
+  .toggle b { font-size:15px; }
+  .badge { display:inline-block; padding:3px 12px; border-radius:20px; font-size:12px; font-weight:700; margin-left:8px; }
+  .on { background:rgba(34,197,94,.15); color:#4ade80; } .off { background:rgba(148,163,184,.15); color:#94a3b8; }
+  .note { background:rgba(250,166,26,.1); border:1px solid rgba(250,166,26,.3); border-radius:10px; padding:12px 15px; font-size:13px; color:var(--text); line-height:1.6; margin-bottom:16px; }
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  @media (max-width:640px){ .two { grid-template-columns:1fr; } }
+  code { background:var(--input); padding:2px 7px; border-radius:5px; font-size:12.5px; }
+  .steps { list-style:none; padding:0; margin:0; }
+  .steps li { padding:9px 0 9px 28px; position:relative; font-size:13.5px; color:var(--text); border-bottom:1px solid var(--glass-border); line-height:1.5; }
+  .steps li:last-child { border-bottom:none; }
+  .steps li b { position:absolute; left:0; top:9px; width:19px; height:19px; border-radius:50%; background:var(--accent); color:#fff; font-size:11px; display:flex; align-items:center; justify-content:center; }
+{% endblock %}
+
+{% block content %}
+  {% if saved %}<div class="saved">✅ Salvat!</div>{% endif %}
+
+  <div class="panel">
+    <div class="panel-head">
+      <h3>🔊 Voice temporar (Join to Create)
+        {% if cfg.get('enabled') %}<span class="badge on">PORNIT</span>{% else %}<span class="badge off">OPRIT</span>{% endif %}
+      </h3>
+      <p class="sub">Cine intră în canalul „generator" primește automat un canal de voice propriu, cu un panou de butoane (privat/public, permite pe cineva, redenumește, limită). Canalul se șterge singur când rămâne gol.</p>
+    </div>
+    <div class="panel-body">
+      <form method="POST">
+        <div class="toggle">
+          <input type="checkbox" name="enabled" id="en" {% if cfg.get('enabled') %}checked{% endif %}>
+          <div><b>Activează voice temporar</b><br><span class="sub">Cât e oprit, nu se creează nimic.</span></div>
+        </div>
+
+        <div class="field">
+          <label>🎙️ Canalul „generator" (cel în care intri ca să ți se facă unul nou)</label>
+          <select name="generator_id">
+            <option value="">— alege un canal de voice —</option>
+            {% for v in voices %}
+            <option value="{{ v.id }}" {% if cfg.get('generator_id')|string==v.id|string %}selected{% endif %}>🔊 {{ v.name }}</option>
+            {% endfor %}
+          </select>
+          <p class="sub" style="margin-top:8px">Recomandare: fă un canal de voice numit ex. <code>➕ Creează voice</code> și alege-l aici.</p>
+        </div>
+
+        <div class="field">
+          <label>📂 Categoria unde apar canalele noi (gol = aceeași cu generatorul)</label>
+          <select name="category_id">
+            <option value="">— aceeași categorie cu generatorul —</option>
+            {% for c in categories %}
+            <option value="{{ c.id }}" {% if cfg.get('category_id')|string==c.id|string %}selected{% endif %}>{{ c.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="two">
+          <div class="field" style="margin:0">
+            <label>✏️ Numele canalelor noi</label>
+            <input type="text" name="name_tpl" value="{{ cfg.get('name_tpl','🔊 {user}') }}" placeholder="🔊 {user}">
+            <p class="sub" style="margin-top:8px"><code>{user}</code> = numele persoanei.</p>
+          </div>
+          <div class="field" style="margin:0">
+            <label>👥 Limită locuri (0 = nelimitat)</label>
+            <input type="text" name="user_limit" value="{{ cfg.get('user_limit', 0) }}" placeholder="0">
+          </div>
+        </div>
+
+        <label class="toggle" style="margin-top:4px">
+          <input type="checkbox" name="default_private" {% if cfg.get('default_private') %}checked{% endif %}>
+          <div><b>Canalele pornesc PRIVATE</b><br><span class="sub">Dacă bifezi, canalul nou e privat din start (proprietarul dă acces din panou). Altfel e public.</span></div>
+        </label>
+
+        <button class="save" type="submit">💾 Salvează</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <h3>ℹ️ Cum merge, pas cu pas</h3>
+    </div>
+    <div class="panel-body">
+      <ul class="steps">
+        <li><b>1</b>Membrul intră în canalul „generator" ales mai sus.</li>
+        <li><b>2</b>Botul îi creează instant un canal de voice propriu și îl mută acolo.</li>
+        <li><b>3</b>În chat-ul canalului de voice îi apare un panou: 🔒 Privat / 🔓 Public, ➕ Permite, 🚫 Scoate acces, ✏️ Redenumește, 👥 Limită.</li>
+        <li><b>4</b>Când e privat, apasă ➕ Permite și alege cine poate intra.</li>
+        <li><b>5</b>Când pleacă toți, canalul se șterge automat.</li>
+      </ul>
+      <div class="note" style="margin:16px 0 0">⚠️ Botul are nevoie de permisiunile <b>Manage Channels</b> și <b>Move Members</b> pe server (le are dacă e Administrator).</div>
+    </div>
+  </div>
+{% endblock %}

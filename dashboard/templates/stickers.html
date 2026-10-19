@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Stickere · {{ meta.get('name','Server') }}{% endblock %}
+
+{% block extra_style %}
+  .panel { padding:0; margin-bottom:22px; overflow:hidden; }
+  .panel-head { padding:20px 24px; border-bottom:1px solid var(--glass-border); background:rgba(255,255,255,.02); }
+  .panel-head h3 { margin:0 0 4px; font-size:18px; }
+  .panel-body { padding:22px 24px; }
+  .sub { color:var(--muted); font-size:13px; margin:0; line-height:1.6; }
+  .field { background:var(--input); border:1px solid var(--glass-border); border-radius:12px; padding:14px 16px; margin-bottom:12px; }
+  .field > label { display:block; font-size:12.5px; color:var(--muted); margin:0 0 9px; font-weight:700; text-transform:uppercase; letter-spacing:.3px; }
+  input[type=text], select { width:100%; padding:11px; border-radius:8px; border:1px solid var(--glass-border); background:var(--bg); color:var(--text); font-size:14px; box-sizing:border-box; font-family:inherit; }
+  .save { background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; border:none; padding:12px 26px; border-radius:11px; font-weight:700; font-size:14px; cursor:pointer; }
+  .saved { background:rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.3); color:#4ade80; border-radius:10px; padding:11px 15px; margin-bottom:16px; font-size:14px; }
+  .err { background:rgba(244,63,94,.12); border:1px solid rgba(244,63,94,.3); color:#fb7185; border-radius:10px; padding:11px 15px; margin-bottom:16px; font-size:14px; }
+  .note { background:rgba(250,166,26,.1); border:1px solid rgba(250,166,26,.3); border-radius:10px; padding:12px 15px; font-size:12.5px; color:var(--text); line-height:1.6; margin-top:6px; }
+  .two { display:grid; grid-template-columns:2fr 1fr auto; gap:12px; align-items:end; }
+  @media (max-width:640px){ .two { grid-template-columns:1fr; } }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:14px; }
+  .st { background:var(--input); border:1px solid var(--glass-border); border-radius:14px; padding:12px; text-align:center; }
+  .st .imgbox { width:100%; height:96px; display:flex; align-items:center; justify-content:center; background:var(--bg); border-radius:10px; margin-bottom:9px; overflow:hidden; }
+  .st img { max-width:90px; max-height:90px; }
+  .st .lottie { color:var(--muted); font-size:12px; line-height:1.4; padding:6px; }
+  .st .nm { font-size:12.5px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:8px; }
+  .st a.dl { display:inline-block; background:var(--card); border:1px solid var(--glass-border); color:var(--text); border-radius:8px; padding:7px 12px; font-size:12.5px; text-decoration:none; font-weight:600; }
+  .st a.dl:hover { border-color:var(--accent); }
+  .allbtn { display:inline-block; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; border-radius:11px; padding:12px 24px; font-weight:700; text-decoration:none; font-size:14px; }
+  code { background:var(--input); padding:2px 7px; border-radius:5px; font-size:12.5px; }
+{% endblock %}
+
+{% block content %}
+  {% if saved %}<div class="saved">✅ Scanare gata!</div>{% endif %}
+  {% if scan_err %}<div class="err">⚠️ {{ scan_err }}</div>{% endif %}
+
+  <div class="panel">
+    <div class="panel-head">
+      <h3>🩹 Descarcă stickere dintr-un canal</h3>
+      <p class="sub">Alege un canal, iar botul adună toate stickerele trimise acolo. Apoi le descarci individual sau pe toate ca .zip — ca să le pui pe serverul tău.</p>
+    </div>
+    <div class="panel-body">
+      <form method="POST">
+        <div class="two">
+          <div class="field" style="margin:0">
+            <label>📍 Canalul de scanat</label>
+            <select name="channel_id" required>
+              <option value="">— alege canalul —</option>
+              {% for ch in text_channels %}
+              <option value="{{ ch.id }}" {% if scan.get('channel_id')|string==ch.id|string %}selected{% endif %}>#{{ ch.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="field" style="margin:0">
+            <label>🔢 Câte mesaje (max 10000)</label>
+            <input type="text" name="limit" value="2000" placeholder="2000">
+          </div>
+          <button class="save" type="submit">🔍 Scanează</button>
+        </div>
+      </form>
+      <div class="note">⏳ Scanarea poate dura câteva secunde (sau mai mult la canale mari). Stickerele animate „Lottie" (cele Nitro) se descarcă ca <code>.json</code> — nu pot fi puse direct ca sticker, dar le primești oricum.</div>
+    </div>
+  </div>
+
+  {% if scan.get('items') %}
+  <div class="panel">
+    <div class="panel-head">
+      <h3>✅ {{ scan['items']|length }} stickere din #{{ scan.get('channel_name','canal') }}</h3>
+      <p class="sub">Apasă pe un sticker ca să-l descarci, sau ia-le pe toate odată.</p>
+    </div>
+    <div class="panel-body">
+      <a class="allbtn" href="/stickers/{{ guild_id }}/zip" style="margin-bottom:18px">⬇️ Descarcă toate (.zip)</a>
+      <div class="grid" style="margin-top:18px">
+        {% for it in scan['items'] %}
+        <div class="st">
+          <div class="imgbox">
+            {% if it.ext == 'json' %}
+              <div class="lottie">🎞️ animat<br>(Lottie)</div>
+            {% else %}
+              <img src="/stickers/{{ guild_id }}/file/{{ it.id }}" alt="{{ it.name }}" loading="lazy">
+            {% endif %}
+          </div>
+          <div class="nm" title="{{ it.name }}">{{ it.name }}</div>
+          <a class="dl" href="/stickers/{{ guild_id }}/file/{{ it.id }}" download="{{ it.file }}">⬇️ Descarcă</a>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% elif scan and not scan.get('items') and not scan_err %}
+  <div class="panel"><div class="panel-body"><p class="sub">Nu am găsit niciun sticker în #{{ scan.get('channel_name','canalul ales') }}.</p></div></div>
+  {% endif %}
+{% endblock %}

@@ -28,7 +28,7 @@ import requests
 from requests.adapters import HTTPAdapter
 from dotenv import load_dotenv
 from flask import (Flask, render_template, request, redirect, url_for,
-                   jsonify, session, abort)
+                   jsonify, session, abort, send_file)
 
 from utils import storage
 
@@ -1271,6 +1271,124 @@ DEFAULT_HELPER_QUESTIONS = [
     {"id": "q3", "label": "Cat timp poti sta zilnic", "emoji": "⏱️", "style": "short", "required": True},
     {"id": "q4", "label": "Varsta", "emoji": "🎂", "style": "short", "required": True},
 ]
+
+
+@app.route("/tempvoice/<guild_id>", methods=["GET", "POST"])
+@guild_required
+def tempvoice_page(guild_id):
+    gid = int(guild_id)
+    cfg = storage.get(gid, "tempvoice", {}) or {}
+    if request.method == "POST":
+        cfg["enabled"] = request.form.get("enabled") == "on"
+        cfg["generator_id"] = _to_int(request.form.get("generator_id", "")) or None
+        cfg["category_id"] = _to_int(request.form.get("category_id", "")) or None
+        cfg["name_tpl"] = (request.form.get("name_tpl", "").strip() or "🔊 {user}")[:100]
+        cfg["default_private"] = request.form.get("default_private") == "on"
+        lim = _to_int(request.form.get("user_limit", ""))
+        cfg["user_limit"] = max(0, min(lim or 0, 99))
+        storage.set(gid, "tempvoice", cfg)
+        return redirect(url_for("tempvoice_page", guild_id=guild_id, saved=1))
+
+    channels = storage.get(gid, "channels", {}) or {}
+    return render_template("tempvoice.html", guild_id=guild_id, cfg=cfg,
+                           voices=channels.get("voices", []),
+                           categories=channels.get("categories", []),
+                           meta=storage.get(gid, "meta", {}),
+                           section="tempvoice", saved=request.args.get("saved"))
+
+
+def _stickers_dir(guild_id):
+    d = os.path.join(ROOT, "data", "stickers", str(guild_id))
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def _scan_stickers_live(guild_id, channel_id, limit):
+    """Ruleaza scanarea pe loop-ul botului si salveaza rezultatul in storage.
+    Returneaza (items, err)."""
+    try:
+        from utils import botref
+        from cogs.stickers import scan_and_download
+        bot = botref.bot
+        loop = getattr(bot, "loop", None) if bot else None
+        if bot is None or loop is None:
+            return None, "Botul nu e disponibil acum."
+
+        async def _do():
+            guild = bot.get_guild(int(guild_id))
+            if guild is None:
+                return [], "Serverul nu e găsit."
+            ch = guild.get_channel(int(channel_id))
+            if ch is None:
+                return [], "Canalul nu e găsit."
+            items, err = await scan_and_download(ch, limit)
+            if err is None:
+                storage.set(int(guild_id), "stickers_scan", {
+                    "ts": time.time(), "channel_id": str(channel_id),
+                    "channel_name": ch.name, "items": items,
+                })
+            return items, err
+
+        return asyncio.run_coroutine_threadsafe(_do(), loop).result(timeout=180)
+    except Exception as e:
+        return None, str(e)
+
+
+@app.route("/stickers/<guild_id>", methods=["GET", "POST"])
+@guild_required
+def stickers_page(guild_id):
+    gid = int(guild_id)
+    scan_err = None
+    if request.method == "POST":
+        ch_id = _to_int(request.form.get("channel_id", ""))
+        limit = max(1, min(_to_int(request.form.get("limit", "2000")) or 2000, 10000))
+        if ch_id:
+            _, scan_err = _scan_stickers_live(gid, ch_id, limit)
+        if not scan_err:
+            return redirect(url_for("stickers_page", guild_id=guild_id, saved=1))
+
+    channels = storage.get(gid, "channels", {}) or {}
+    scan = storage.get(gid, "stickers_scan", {}) or {}
+    return render_template("stickers.html", guild_id=guild_id,
+                           text_channels=channels.get("texts", []),
+                           scan=scan, scan_err=scan_err,
+                           meta=storage.get(gid, "meta", {}),
+                           section="stickers", saved=request.args.get("saved"))
+
+
+@app.route("/stickers/<guild_id>/file/<sid>")
+@guild_required
+def sticker_file(guild_id, sid):
+    scan = storage.get(int(guild_id), "stickers_scan", {}) or {}
+    it = next((x for x in scan.get("items", []) if str(x["id"]) == str(sid)), None)
+    if not it:
+        abort(404)
+    path = os.path.join(_stickers_dir(guild_id), it["file"])
+    if not os.path.exists(path):
+        abort(404)
+    return send_file(path, as_attachment=False, download_name=it["file"])
+
+
+@app.route("/stickers/<guild_id>/zip")
+@guild_required
+def stickers_zip(guild_id):
+    scan = storage.get(int(guild_id), "stickers_scan", {}) or {}
+    items = scan.get("items", [])
+    if not items:
+        abort(404)
+    import io
+    import zipfile
+    gdir = _stickers_dir(guild_id)
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for it in items:
+            fp = os.path.join(gdir, it["file"])
+            if os.path.exists(fp):
+                z.write(fp, it["file"])
+    buf.seek(0)
+    nume = scan.get("channel_name", "canal")
+    return send_file(buf, as_attachment=True,
+                     download_name=f"stickere_{nume}.zip", mimetype="application/zip")
 
 
 @app.route("/automod/<guild_id>", methods=["GET", "POST"])

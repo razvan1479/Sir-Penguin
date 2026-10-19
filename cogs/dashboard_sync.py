@@ -31,17 +31,21 @@ class DashboardSync(commands.Cog):
         })
 
     def _save_channels(self, guild: discord.Guild):
-        """Scrie categoriile si canalele text, pentru dropdown-urile din dashboard."""
+        """Scrie categoriile, canalele text SI voice, pentru dropdown-urile din dashboard."""
         if guild is None:
             return
-        cats, texts = [], []
+        cats, texts, voices = [], [], []
         for ch in guild.channels:
             if isinstance(ch, discord.CategoryChannel):
                 cats.append({"id": str(ch.id), "name": ch.name})
             elif isinstance(ch, discord.TextChannel):
                 texts.append({"id": str(ch.id), "name": ch.name,
                               "category": str(ch.category_id) if ch.category_id else None})
-        storage.set(guild.id, "channels", {"categories": cats, "texts": texts})
+            elif isinstance(ch, discord.VoiceChannel):
+                voices.append({"id": str(ch.id), "name": ch.name,
+                               "category": str(ch.category_id) if ch.category_id else None})
+        storage.set(guild.id, "channels",
+                    {"categories": cats, "texts": texts, "voices": voices})
 
     @commands.Cog.listener()
     async def on_ready(self):
