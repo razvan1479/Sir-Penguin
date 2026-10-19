@@ -1341,6 +1341,17 @@ def stickers_page(guild_id):
     gid = int(guild_id)
     scan_err = None
     if request.method == "POST":
+        action = request.form.get("action", "scan")
+        if action == "clear":
+            # golim fisierele de pe server + evidenta scanarii
+            gdir = _stickers_dir(gid)
+            for f in os.listdir(gdir):
+                try:
+                    os.remove(os.path.join(gdir, f))
+                except OSError:
+                    pass
+            storage.set(gid, "stickers_scan", {})
+            return redirect(url_for("stickers_page", guild_id=guild_id, cleared=1))
         ch_id = _to_int(request.form.get("channel_id", ""))
         limit = max(1, min(_to_int(request.form.get("limit", "2000")) or 2000, 10000))
         if ch_id:
@@ -1354,7 +1365,8 @@ def stickers_page(guild_id):
                            text_channels=channels.get("texts", []),
                            scan=scan, scan_err=scan_err,
                            meta=storage.get(gid, "meta", {}),
-                           section="stickers", saved=request.args.get("saved"))
+                           section="stickers", saved=request.args.get("saved"),
+                           cleared=request.args.get("cleared"))
 
 
 @app.route("/stickers/<guild_id>/file/<sid>")

@@ -30,6 +30,7 @@
 
 {% block content %}
   {% if saved %}<div class="saved">✅ Scanare gata!</div>{% endif %}
+  {% if cleared %}<div class="saved">🗑️ Am golit stickerele de pe server.</div>{% endif %}
   {% if scan_err %}<div class="err">⚠️ {{ scan_err }}</div>{% endif %}
 
   <div class="panel">
@@ -67,7 +68,13 @@
       <p class="sub">Apasă pe un sticker ca să-l descarci, sau ia-le pe toate odată.</p>
     </div>
     <div class="panel-body">
-      <a class="allbtn" href="/stickers/{{ guild_id }}/zip" style="margin-bottom:18px">⬇️ Descarcă toate (.zip)</a>
+      <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-bottom:18px">
+        <a class="allbtn" href="/stickers/{{ guild_id }}/zip">⬇️ Descarcă toate (.zip)</a>
+        <form method="POST" style="margin:0" onsubmit="return confirm('Sigur ștergi stickerele de pe server? (fișierele deja descărcate pe PC rămân la tine)')">
+          <input type="hidden" name="action" value="clear">
+          <button type="submit" style="background:rgba(244,63,94,.15); color:#fb7185; border:1px solid rgba(244,63,94,.35); border-radius:11px; padding:12px 22px; font-weight:700; font-size:14px; cursor:pointer;">🗑️ Golește de pe server</button>
+        </form>
+      </div>
       <div class="grid" style="margin-top:18px">
         {% for it in scan['items'] %}
         <div class="st">
