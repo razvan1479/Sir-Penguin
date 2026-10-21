@@ -48,6 +48,7 @@
       <label class="toggle"><input type="checkbox" name="show_avatar" id="show_avatar" {% if cfg.get('show_avatar', True) %}checked{% endif %}><span>Arata poza de profil (avatar)</span></label>
       <label class="toggle"><input type="checkbox" name="show_banner" id="show_banner" {% if cfg.get('show_banner', True) %}checked{% endif %}><span>Arata bannerul</span></label>
       <label class="toggle"><input type="checkbox" name="show_inviter" id="show_inviter" {% if cfg.get('show_inviter', True) %}checked{% endif %}><span>Arata cine a invitat (necesita modulul invites)</span></label>
+      <label class="toggle"><input type="checkbox" name="mention" id="mention" {% if cfg.get('mention', True) %}checked{% endif %}><span>Dă tag (ping) la cine intră și la invitator. Dacă debifezi, apare doar numele, fără @ și fără ping pentru nimeni.</span></label>
 
       <button class="save" type="submit">💾 Salveaza</button>
     </form>
@@ -77,8 +78,10 @@
   const $ = id => document.getElementById(id);
   function render() {
     const msg = $('message').value || 'Bun venit {user} pe {server}!';
+    const tag = $('mention').checked;
+    const userVal = tag ? '<span class="mention">@NumeUtilizator</span>' : 'NumeUtilizator';
     $('pv-desc').innerHTML = msg
-      .replaceAll('{user}', '<span class="mention">@NumeUtilizator</span>')
+      .replaceAll('{user}', userVal)
       .replaceAll('{username}', 'NumeUtilizator')
       .replaceAll('{server}', 'Serverul Tau')
       .replaceAll('{count}', '128')
@@ -90,7 +93,7 @@
     $('pv-banner').style.display = $('show_banner').checked ? 'block' : 'none';
     $('pv-inviter').style.display = $('show_inviter').checked ? 'block' : 'none';
   }
-  ['message','color','show_avatar','show_banner','show_inviter'].forEach(id => {
+  ['message','color','show_avatar','show_banner','show_inviter','mention'].forEach(id => {
     $(id).addEventListener('input', render); $(id).addEventListener('change', render);
   });
   render();

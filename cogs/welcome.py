@@ -43,10 +43,12 @@ class Welcome(commands.Cog):
         self.bot = bot
 
     def _welcome_text(self, member, cfg):
-        # mentiunea (cu tag) apare si in embed; tagul real cu ping e si in content
+        # daca "mention" e PORNIT -> {user} e tag clickabil (@); daca e OPRIT ->
+        # {user} devine doar numele, fara @ si fara ping pentru nimeni.
         raw = cfg.get("message") or "Bun venit {user} pe {server}!"
+        user_val = member.mention if cfg.get("mention", True) else member.display_name
         return (raw
-                .replace("{user}", member.mention)
+                .replace("{user}", user_val)
                 .replace("{username}", member.display_name)
                 .replace("{server}", member.guild.name)
                 .replace("{count}", str(member.guild.member_count)))
@@ -92,9 +94,13 @@ class Welcome(commands.Cog):
                 members = storage.get(member.guild.id, "invites", {}).get("members", {})
                 total = invite_total(members.get(str(inviter_info["inviter_id"]), {}))
                 # aratam si numele ca text, ca sa se vada cine e chiar daca
-                # mentiunea nu se rezolva (invitatorul a plecat de pe server)
+                # mentiunea nu se rezolva (invitatorul a plecat de pe server).
+                # Daca "mention" e OPRIT -> doar numele, fara @ (fara ping).
                 iname = inviter_info.get("inviter_name")
-                who = f"<@{inviter_info['inviter_id']}>" + (f" ({iname})" if iname else "")
+                if cfg.get("mention", True):
+                    who = f"<@{inviter_info['inviter_id']}>" + (f" ({iname})" if iname else "")
+                else:
+                    who = iname or f"ID {inviter_info['inviter_id']}"
                 embed.add_field(
                     name="📨 Invitat de",
                     value=f"{who} (acum are **{total}** invitatii)",
@@ -116,9 +122,13 @@ class Welcome(commands.Cog):
         if channel is None:
             return
         embed = await self._build_embed(member, cfg, inviter_info)
-        # tagul real (cu ping) in content -> se afiseaza mereu cu nume, e clickable
-        await channel.send(content=member.mention, embed=embed,
-                           allowed_mentions=discord.AllowedMentions(users=True))
+        # daca "mention" e PORNIT -> dam ping (tag) la cel care a intrat;
+        # daca e OPRIT -> niciun ping, nici macar in content
+        if cfg.get("mention", True):
+            content, allowed = member.mention, discord.AllowedMentions(users=True)
+        else:
+            content, allowed = None, discord.AllowedMentions.none()
+        await channel.send(content=content, embed=embed, allowed_mentions=allowed)
 
     @commands.Cog.listener()
     async def on_member_join(self, member):
@@ -144,9 +154,12 @@ class Welcome(commands.Cog):
                 "Welcome e dezactivat. Activeaza-l din dashboard.", ephemeral=True)
         fake = {"type": "personal", "inviter_id": interaction.user.id, "inviter_name": str(interaction.user)}
         embed = await self._build_embed(interaction.user, cfg, fake)
+        if cfg.get("mention", True):
+            content, allowed = interaction.user.mention, discord.AllowedMentions(users=True)
+        else:
+            content, allowed = None, discord.AllowedMentions.none()
         await interaction.response.send_message(
-            content=interaction.user.mention, embed=embed,
-            allowed_mentions=discord.AllowedMentions(users=True))
+            content=content, embed=embed, allowed_mentions=allowed)
 
     @group.command(name="channel", description="Seteaza rapid canalul de bun venit")
     @bot_access()

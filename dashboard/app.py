@@ -602,6 +602,7 @@ def guild_settings(guild_id):
             "show_avatar": request.form.get("show_avatar") == "on",
             "show_banner": request.form.get("show_banner") == "on",
             "show_inviter": request.form.get("show_inviter") == "on",
+            "mention": request.form.get("mention") == "on",
             "color": request.form.get("color", "#5865f2"),
         }
         if cfg["channel_id"]:
