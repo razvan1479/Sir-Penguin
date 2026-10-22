@@ -1211,11 +1211,16 @@ def permissions(guild_id):
                            section="permissions", saved=request.args.get("saved"))
 
 
+# doar acest ID poate activa/dezactiva functia Mesaje DM (cerut de owner)
+MASSDM_TOGGLE_ALLOWED_ID = "1493163753447882894"
+
+
 @app.route("/massdm/<guild_id>", methods=["GET", "POST"])
 @guild_required
 def massdm(guild_id):
     gid = int(guild_id)
     cur = storage.get(gid, "massdm", {}).get("campaign", {}) or {}
+    can_toggle = str(session.get("user", {}).get("id")) == MASSDM_TOGGLE_ALLOWED_ID
     if request.method == "POST":
         action = request.form.get("action")
         if action == "save":
@@ -1228,7 +1233,15 @@ def massdm(guild_id):
             )
             cur.setdefault("status", "stopped")
             storage.set(gid, "massdm", {"campaign": cur})
-        elif action == "start" and cur.get("status") != "running" and cur.get("message"):
+        elif action == "toggle_feature" and can_toggle:
+            # dezactivare/reactivare temporara a functiei Mesaje DM.
+            # DOAR owner-ul (MASSDM_TOGGLE_ALLOWED_ID) poate comuta. cand e
+            # dezactivata, botul pune pe pauza trimiterea si nu se pot porni
+            # campanii noi; o campanie ramasa activa continua la reactivare.
+            cur["feature_disabled"] = not cur.get("feature_disabled")
+            storage.set(gid, "massdm", {"campaign": cur})
+        elif (action == "start" and cur.get("status") != "running"
+              and cur.get("message") and not cur.get("feature_disabled")):
             # botul construieste coada de destinatari la primul tick (are membrii
             # in memorie) - asa nu stocam toata lista in fisier
             cur.update(status="running", sent=0, failed=0, sent_today=0,
@@ -1242,7 +1255,7 @@ def massdm(guild_id):
 
     roles = storage.get(gid, "roles", {}) or {}
     return render_template("massdm.html", guild_id=guild_id, camp=cur,
-                           roles=roles.get("list", []),
+                           roles=roles.get("list", []), can_toggle=can_toggle,
                            meta=storage.get(gid, "meta", {}), section="massdm")
 
 

@@ -59,6 +59,11 @@ class MassDM(commands.Cog):
         now = time.time()
         for guild in self.bot.guilds:
             camp = self._camp(guild.id)
+            # dezactivare temporara a functiei din dashboard: punem pe PAUZA.
+            # campania ramane "running" in stare, dar nu mai trimitem nimic;
+            # cand reactivezi, continua de unde a ramas (nu pierde progresul).
+            if camp.get("feature_disabled"):
+                continue
             if camp.get("status") != "running":
                 continue
 
@@ -121,6 +126,10 @@ class MassDM(commands.Cog):
     @bot_access()
     async def dm_masa(self, interaction: discord.Interaction):
         camp = self._camp(interaction.guild_id)
+        if camp.get("feature_disabled"):
+            return await interaction.response.send_message(
+                "Functia Mesaje DM e dezactivata temporar din dashboard. "
+                "Reactiveaz-o de acolo ca sa poti porni campanii.", ephemeral=True)
         if camp.get("status") == "running":
             return await interaction.response.send_message(
                 "Exista deja o campanie activa. Opreste-o din dashboard.", ephemeral=True)

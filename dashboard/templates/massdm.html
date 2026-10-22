@@ -23,6 +23,20 @@
     .stat { display:flex; justify-content:space-between; font-size:13px; color:var(--muted); }
     .badge { display:inline-block; padding:5px 14px; border-radius:20px; font-size:13px; font-weight:600; }
     .on { background:#1e3a23; color:#3ba55d; } .off { background:var(--input); color:var(--muted); }
+    .feat { display:flex; align-items:center; justify-content:space-between; gap:14px;
+            background:var(--input); border-radius:11px; padding:14px 16px; margin-bottom:18px; }
+    .feat .txt { font-size:13.5px; line-height:1.5; }
+    .feat .txt b { font-size:14px; }
+    .switch { position:relative; display:inline-block; width:52px; height:28px; flex-shrink:0; }
+    .switch input { opacity:0; width:0; height:0; }
+    .slider { position:absolute; inset:0; cursor:pointer; background:#4f545c; border-radius:28px; transition:.2s; }
+    .slider:before { content:""; position:absolute; height:22px; width:22px; left:3px; top:3px;
+                     background:#fff; border-radius:50%; transition:.2s; }
+    .switch input:checked + .slider { background:#3ba55d; }
+    .switch input:checked + .slider:before { transform:translateX(24px); }
+    .feat-off { background:#3a1f1f; }
+    .disabled-note { background:#3a1f1f; color:#f0a0a0; border-radius:9px; padding:12px 14px;
+                     font-size:13px; line-height:1.6; margin-top:16px; }
 {% endblock %}
 
 {% block content %}
@@ -34,8 +48,31 @@
 
   <div class="panel">
     {% set st = camp.get('status') %}
+    {% set off = camp.get('feature_disabled') %}
+
+    <form method="POST" class="feat {% if off %}feat-off{% endif %}">
+      <input type="hidden" name="action" value="toggle_feature">
+      <div class="txt">
+        <b>Funcția Mesaje DM</b><br>
+        {% if off %}
+          🔴 Dezactivată temporar — botul nu trimite niciun DM și nu se pot porni campanii.
+          O campanie rămasă activă continuă automat când o reactivezi.
+        {% else %}
+          🟢 Activă — poți configura și porni trimiterea de mesaje DM.
+        {% endif %}
+        {% if not can_toggle %}<br><span style="color:var(--muted); font-size:12px">
+          🔒 Doar owner-ul poate activa/dezactiva această funcție.</span>{% endif %}
+      </div>
+      <label class="switch" title="{% if can_toggle %}Pornește / oprește temporar funcția{% else %}Doar owner-ul poate schimba{% endif %}">
+        <input type="checkbox" {% if not off %}checked{% endif %}
+               {% if can_toggle %}onchange="this.form.submit()"{% else %}disabled{% endif %}>
+        <span class="slider"></span>
+      </label>
+    </form>
+
     {% if st == 'running' %}<span class="badge on">📤 Campanie activă</span>
     {% else %}<span class="badge off">Inactiv</span>{% endif %}
+    {% if off and st == 'running' %}<span class="badge off" style="margin-left:8px">⏸️ pe pauză</span>{% endif %}
 
     <form method="POST" style="margin-top:8px">
       <input type="hidden" name="action" value="save">
@@ -96,14 +133,19 @@
       <script>setTimeout(function(){ location.reload(); }, 8000);</script>
     {% endif %}
 
-    <form method="POST">
-      {% if st == 'running' %}
+    {% if st == 'running' %}
+      <form method="POST">
         <input type="hidden" name="action" value="stop">
         <button class="stop" type="submit">🛑 Oprește campania</button>
-      {% else %}
+      </form>
+    {% elif off %}
+      <div class="disabled-note">⏸️ Funcția e dezactivată temporar. Comută înapoi pe
+        <b>Activă</b> (sus) ca să poți porni trimiterea.</div>
+    {% else %}
+      <form method="POST">
         <input type="hidden" name="action" value="start">
         <button class="start" type="submit">📤 Pornește trimiterea</button>
-      {% endif %}
-    </form>
+      </form>
+    {% endif %}
   </div>
 {% endblock %}
