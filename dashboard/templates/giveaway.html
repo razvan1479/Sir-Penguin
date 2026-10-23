@@ -45,6 +45,36 @@
 {% block content %}
   {% if saved %}<div class="saved">✓ Salvat! Botul foloseste deja noua configurare.</div>{% endif %}
   {% if cancelled %}<div class="saved">🗑️ Giveaway-ul a fost șters.</div>{% endif %}
+  {% if unscheduled %}<div class="saved">🚫 Programarea a fost anulată.</div>{% endif %}
+
+  <!-- PROGRAMATE (urmează să fie postate, încă neactive) -->
+  <div class="panel" style="margin-bottom:20px">
+    <div class="preview-title">⏳ Programat (urmează să fie postat)</div>
+    {% if upcoming %}
+      <div style="display:flex;align-items:center;gap:12px;background:var(--input);border-radius:10px;padding:12px 14px;flex-wrap:wrap;margin-top:4px">
+        <div style="flex:1;min-width:200px">
+          <div style="font-weight:600;font-size:14px">🗓️ {{ upcoming.prize }}</div>
+          <div style="color:var(--muted);font-size:12.5px;margin-top:3px">
+            🕐 se postează la <b style="color:var(--text)">{{ upcoming.when }}</b> (ora României)
+            · 📢 {% if upcoming.channel_name %}#{{ upcoming.channel_name }}{% elif upcoming.channel_id %}canal {{ upcoming.channel_id }}{% else %}fără canal{% endif %}
+            · 🔁 {{ upcoming.mode_label }}
+          </div>
+        </div>
+        {% if upcoming.mode == 'exact' %}
+        <form method="POST" style="margin:0"
+              onsubmit="return confirm('Anulezi programarea pentru „{{ upcoming.prize }}”? Nu se va mai posta automat la ora setată.')">
+          <input type="hidden" name="action" value="cancel_scheduled">
+          <button type="submit" style="background:rgba(244,63,94,.15);color:#fb7185;border:1px solid rgba(244,63,94,.35);border-radius:9px;padding:9px 16px;font-weight:600;font-size:13px;cursor:pointer;white-space:nowrap">🚫 Anulează programarea</button>
+        </form>
+        {% endif %}
+      </div>
+      {% if upcoming.mode != 'exact' %}
+      <p class="hint" style="margin-top:10px">Programare recurentă — ca să o oprești, schimbă „Tip de programare" pe <b>Durată fixă</b> și salvează.</p>
+      {% endif %}
+    {% else %}
+      <p class="hint" style="margin-top:4px">Nimic programat. Alege „📅 Programat o singură dată" și pune o dată de START în viitor ca să apară aici.</p>
+    {% endif %}
+  </div>
 
   <!-- GIVEAWAY-URI ACTIVE -->
   <div class="panel" style="margin-bottom:20px">

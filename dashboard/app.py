@@ -793,6 +793,17 @@ def giveaway(guild_id):
         _cancel_giveaway(gid, request.form.get("mid", ""))
         return redirect(url_for("giveaway", guild_id=guild_id, cancelled=1))
 
+    if request.method == "POST" and request.form.get("action") == "cancel_scheduled":
+        # anuleaza o postare PROGRAMATA (inca neactiva) din modul "o singura data"
+        d = storage.get(gid, "giveaways", {})
+        cfg = d.get("config", {})
+        # marcam startul ca procesat ca auto-repararea din bot sa nu-l repuna
+        cfg["_exact_done"] = str(cfg.get("start_datetime", ""))
+        d["config"] = cfg
+        d["next_post_ts"] = None
+        storage.set(gid, "giveaways", d)
+        return redirect(url_for("giveaway", guild_id=guild_id, unscheduled=1))
+
     if request.method == "POST":
         sched_mode = request.form.get("sched_mode", "duration")
         if sched_mode not in ("duration", "exact", "interval", "weekly"):
@@ -937,15 +948,33 @@ def giveaway(guild_id):
         })
     active_list.sort(key=lambda g: g["end_str"])
 
+    # postare PROGRAMATA dar inca neactiva (asteapta ora de start)
+    upcoming = None
+    if data.get("next_post_ts"):
+        _cfg = data.get("config", {})
+        _m = _cfg.get("sched_mode") or ("interval" if _cfg.get("recurring") else "duration")
+        _labels = {"exact": "o singură dată", "interval": "recurent la interval",
+                   "weekly": "recurent săptămânal"}
+        upcoming = {
+            "when": next_post_str,
+            "prize": _cfg.get("prize", "Premiu"),
+            "channel_id": _cfg.get("channel_id"),
+            "channel_name": _chan_names.get(str(_cfg.get("channel_id"))),
+            "mode": _m,
+            "mode_label": _labels.get(_m, _m),
+        }
+
     return render_template("giveaway.html", guild_id=guild_id,
                            cfg=data.get("config", {}),
                            active_count=len(data.get("active", {})),
                            active_list=active_list,
+                           upcoming=upcoming,
                            next_post_str=next_post_str,
                            mode=mode,
                            meta=meta,
                            section="giveaway", saved=request.args.get("saved"),
-                           cancelled=request.args.get("cancelled"))
+                           cancelled=request.args.get("cancelled"),
+                           unscheduled=request.args.get("unscheduled"))
 
 
 import uuid
