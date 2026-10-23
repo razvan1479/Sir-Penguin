@@ -482,10 +482,33 @@ class Giveaway(commands.Cog):
                 # postam o data si golim next_post_ts (nu se repeta). Daca n-ai pus
                 # start, next_post_ts e None -> il postezi manual cu /giveaway_start.
                 nxt = data.get("next_post_ts")
+
+                # AUTO-REPARARE: daca lipseste next_post_ts dar exista un
+                # start_datetime in config (ex. config vechi salvat pe o versiune
+                # anterioara, sau next_post_ts pierdut), il recalculam singuri aici.
+                # Asa postarea automata merge chiar daca dashboard-ul n-a apucat
+                # sa-l calculeze. Nu reprocesam acelasi start de doua ori (_exact_done).
+                if nxt is None:
+                    sraw = str(cfg.get("start_datetime", ""))
+                    if "T" in sraw and cfg.get("_exact_done") != sraw:
+                        try:
+                            _sd, _st = sraw.split("T", 1)
+                            _y, _mo, _d = (int(x) for x in _sd.split("-"))
+                            _hh, _mm = (int(x) for x in _st[:5].split(":"))
+                            nxt = datetime.datetime(_y, _mo, _d, _hh, _mm, tzinfo=TZ).timestamp()
+                            data["next_post_ts"] = nxt
+                            storage.set(guild.id, "giveaways", data)
+                        except (ValueError, TypeError):
+                            nxt = None
+
                 if nxt is not None and now >= nxt:
                     await self._post_giveaway(guild, cfg)
                     data = storage.get(guild.id, "giveaways", {})
                     data["next_post_ts"] = None
+                    # marcam acest start ca postat, ca auto-repararea sa nu-l repuna
+                    cfg2 = data.get("config", {})
+                    cfg2["_exact_done"] = str(cfg2.get("start_datetime", ""))
+                    data["config"] = cfg2
                     storage.set(guild.id, "giveaways", data)
 
     @ticker.before_loop
