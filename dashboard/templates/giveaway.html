@@ -44,7 +44,37 @@
 
 {% block content %}
   {% if saved %}<div class="saved">✓ Salvat! Botul foloseste deja noua configurare.</div>{% endif %}
-  {% if active_count %}<p class="cmd" style="margin-bottom:14px">🎁 Giveaway-uri active acum: <strong>{{ active_count }}</strong></p>{% endif %}
+  {% if cancelled %}<div class="saved">🗑️ Giveaway-ul a fost șters.</div>{% endif %}
+
+  <!-- GIVEAWAY-URI ACTIVE -->
+  <div class="panel" style="margin-bottom:20px">
+    <div class="preview-title">🎁 Giveaway-uri active acum ({{ active_list|length }})</div>
+    {% if active_list %}
+      <div style="display:flex;flex-direction:column;gap:10px;margin-top:4px">
+        {% for g in active_list %}
+        <div style="display:flex;align-items:center;gap:12px;background:var(--input);border-radius:10px;padding:12px 14px;flex-wrap:wrap">
+          <div style="flex:1;min-width:200px">
+            <div style="font-weight:600;font-size:14px">🎁 {{ g.prize }}</div>
+            <div style="color:var(--muted);font-size:12.5px;margin-top:3px">
+              📢 {% if g.channel_name %}#{{ g.channel_name }}{% else %}canal {{ g.channel_id }}{% endif %}
+              · ⏰ final {{ g.end_str }}
+              · 👥 {{ g.participants }} participanți
+              · 🏆 {{ g.winners }} câștigător{{ 'i' if g.winners != 1 else '' }}
+            </div>
+          </div>
+          <form method="POST" style="margin:0"
+                onsubmit="return confirm('Sigur ștergi giveaway-ul „{{ g.prize }}”? Mesajul de pe Discord va fi șters și nu se mai aleg câștigători.')">
+            <input type="hidden" name="action" value="cancel">
+            <input type="hidden" name="mid" value="{{ g.mid }}">
+            <button type="submit" style="background:rgba(244,63,94,.15);color:#fb7185;border:1px solid rgba(244,63,94,.35);border-radius:9px;padding:9px 16px;font-weight:600;font-size:13px;cursor:pointer;white-space:nowrap">🗑️ Șterge</button>
+          </form>
+        </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="hint" style="margin-top:4px">Niciun giveaway activ momentan.</p>
+    {% endif %}
+  </div>
 
   <!-- SELECTOR MOD -->
   <div class="panel" style="margin-bottom:20px">

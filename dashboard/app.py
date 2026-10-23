@@ -296,6 +296,63 @@ def _remove_timeout(guild_id, user_id):
         return False
 
 
+def _cancel_giveaway(guild_id, mid):
+    """Anuleaza/sterge un giveaway activ din dashboard.
+    1) il scoate din 'active' in storage -> incheierea programata nu mai
+       anunta castigatori (_finalize e idempotent, gaseste gol si iese).
+    2) prin bot, incearca sa STEARGA mesajul de pe Discord; daca nu poate
+       (permisiuni/mesaj lipsa), il editeaza ca 'anulat' si scoate butonul.
+    Intoarce True daca a fost scos din lista (indiferent de mesajul Discord)."""
+    # pasul 1: scoatem din active (merge si daca botul e offline)
+    data = storage.get(int(guild_id), "giveaways", {})
+    active = data.get("active", {})
+    gw = active.pop(str(mid), None)
+    if gw is None:
+        return False
+    data["active"] = active
+    storage.set(int(guild_id), "giveaways", data)
+
+    # pasul 2: curatam mesajul pe Discord (best-effort)
+    try:
+        import asyncio
+        from utils import botref
+        bot = botref.bot
+        loop = getattr(bot, "loop", None) if bot else None
+        if bot is None or loop is None:
+            return True
+
+        async def _do():
+            guild = bot.get_guild(int(guild_id))
+            if guild is None:
+                return
+            channel = guild.get_channel(int(gw.get("channel_id"))) if gw.get("channel_id") else None
+            if channel is None:
+                return
+            try:
+                msg = await channel.fetch_message(int(mid))
+            except Exception:
+                return
+            try:
+                await msg.delete()
+            except Exception:
+                # nu l-am putut sterge -> il marcam ca anulat si scoatem butonul
+                try:
+                    if msg.embeds:
+                        e = msg.embeds[0]
+                        e.description = "🚫 **Giveaway anulat din dashboard.**"
+                        e.set_footer(text="Anulat")
+                        await msg.edit(embed=e, view=None)
+                    else:
+                        await msg.edit(content="🚫 Giveaway anulat.", view=None)
+                except Exception:
+                    pass
+
+        asyncio.run_coroutine_threadsafe(_do(), loop).result(timeout=10)
+    except Exception:
+        pass
+    return True
+
+
 # ---------------------------------------------------------------------------
 # Resurse server (RAM/CPU/disk) — citite direct din /proc (Linux), fara nicio
 # dependenta noua. Dashboard-ul ruleaza CHIAR pe serverul Oracle, deci vede
@@ -731,6 +788,11 @@ def giveaway(guild_id):
     gid = int(guild_id)
     data = storage.get(gid, "giveaways", {})
 
+    if request.method == "POST" and request.form.get("action") == "cancel":
+        # stergere/anulare a unui giveaway activ
+        _cancel_giveaway(gid, request.form.get("mid", ""))
+        return redirect(url_for("giveaway", guild_id=guild_id, cancelled=1))
+
     if request.method == "POST":
         sched_mode = request.form.get("sched_mode", "duration")
         if sched_mode not in ("duration", "exact", "interval", "weekly"):
@@ -850,13 +912,40 @@ def giveaway(guild_id):
         next_post_str = datetime.datetime.fromtimestamp(
             data["next_post_ts"], ZoneInfo("Europe/Bucharest")).strftime("%d.%m %H:%M")
 
+    # lista giveaway-urilor active, cu detalii lizibile pentru dashboard
+    import datetime as _dt
+    from zoneinfo import ZoneInfo as _ZI
+    _tz = _ZI("Europe/Bucharest")
+    meta = storage.get(gid, "meta", {}) or {}
+    _chans = storage.get(gid, "channels", {}) or {}
+    _chan_names = {str(c.get("id")): c.get("name")
+                   for c in (_chans.get("texts", []) + _chans.get("voices", []))}
+    active_list = []
+    for mid, gw in (data.get("active", {}) or {}).items():
+        try:
+            end_str = _dt.datetime.fromtimestamp(gw.get("end_ts", 0), _tz).strftime("%d.%m %H:%M")
+        except (ValueError, OSError, TypeError):
+            end_str = "—"
+        active_list.append({
+            "mid": mid,
+            "prize": gw.get("prize", "Premiu"),
+            "winners": gw.get("winners", 1),
+            "participants": len(gw.get("participants", [])),
+            "end_str": end_str,
+            "channel_id": gw.get("channel_id"),
+            "channel_name": _chan_names.get(str(gw.get("channel_id"))),
+        })
+    active_list.sort(key=lambda g: g["end_str"])
+
     return render_template("giveaway.html", guild_id=guild_id,
                            cfg=data.get("config", {}),
                            active_count=len(data.get("active", {})),
+                           active_list=active_list,
                            next_post_str=next_post_str,
                            mode=mode,
-                           meta=storage.get(gid, "meta", {}),
-                           section="giveaway", saved=request.args.get("saved"))
+                           meta=meta,
+                           section="giveaway", saved=request.args.get("saved"),
+                           cancelled=request.args.get("cancelled"))
 
 
 import uuid
