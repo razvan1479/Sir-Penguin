@@ -37,7 +37,12 @@ class Reminders(commands.Cog):
 
     @tasks.loop(seconds=20)
     async def check_loop(self):
-        await self._tick()
+        # protejam bucla: o eroare intr-un tur NU trebuie sa opreasca definitiv
+        # verificarea reminderelor (altfel reminderele nu ar mai porni deloc).
+        try:
+            await self._tick()
+        except Exception as e:
+            print(f"[reminders] eroare in check_loop: {e!r}")
 
     async def _tick(self):
         """Un tur de verificare — separat de tasks.loop ca sa poata fi testat

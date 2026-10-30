@@ -167,8 +167,13 @@ class RankUp(commands.Cog):
     @tasks.loop(hours=24)
     async def rank_loop(self):
         for guild in self.bot.guilds:
-            if _cfg(guild.id).get("enabled"):
-                await self.process_guild(guild)
+            # izolam fiecare server: o eroare pe unul nu opreste restul si nu
+            # omoara bucla de 24h (altfel rank-urile nu s-ar mai aplica deloc).
+            try:
+                if _cfg(guild.id).get("enabled"):
+                    await self.process_guild(guild)
+            except Exception as e:
+                print(f"[rankup] eroare pe serverul {guild.id}: {e!r}")
 
     @rank_loop.before_loop
     async def _before(self):

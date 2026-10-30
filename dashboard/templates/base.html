@@ -119,7 +119,7 @@
       <a class="nav {% if section=='colors' %}active{% endif %}" href="/culori/{{ guild_id }}"><span class="ic">🎨</span> Culori la nume</a>
 
       <p class="side-title">🧪 Unelte</p>
-      <a class="nav {% if section=='system' %}active{% endif %}" href="/system"><span class="ic">🖥️</span> Resurse & versiune</a>
+      {% if is_owner %}<a class="nav {% if section=='system' %}active{% endif %}" href="/system"><span class="ic">🖥️</span> Resurse & versiune</a>{% endif %}
     </aside>
 
     <main>{% block content %}{% endblock %}</main>

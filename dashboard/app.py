@@ -54,6 +54,19 @@ if not _flask_secret:
           file=sys.stderr)
 app.secret_key = _flask_secret
 
+# Securitatea cookie-ului de sesiune:
+#  - HttpOnly: JS din pagina nu poate citi cookie-ul (anti-XSS furt de sesiune)
+#  - SameSite=Lax: browserul NU trimite cookie-ul pe POST-uri cross-site ->
+#    protejeaza formularele (restart, wipe, salvari) de atacuri CSRF
+#  - Secure: cookie-ul merge doar pe HTTPS (activat automat daca redirect e https)
+from datetime import timedelta
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=REDIRECT_URI.lower().startswith("https"),
+    PERMANENT_SESSION_LIFETIME=timedelta(days=30),
+)
+
 
 # --- sesiune HTTP cu fix SSL (acelasi ca la bot, pt retele corporate) ---
 class _LaxAdapter(HTTPAdapter):
@@ -1508,10 +1521,12 @@ def sticker_file(guild_id, sid):
     it = next((x for x in scan.get("items", []) if str(x["id"]) == str(sid)), None)
     if not it:
         abort(404)
-    path = os.path.join(_stickers_dir(guild_id), it["file"])
+    # basename() -> imposibil orice "../" in numele fisierului (anti path traversal)
+    safe_name = os.path.basename(str(it["file"]))
+    path = os.path.join(_stickers_dir(guild_id), safe_name)
     if not os.path.exists(path):
         abort(404)
-    return send_file(path, as_attachment=False, download_name=it["file"])
+    return send_file(path, as_attachment=False, download_name=safe_name)
 
 
 @app.route("/stickers/<guild_id>/zip")
@@ -2304,8 +2319,8 @@ def restart_bot():
 
 
 def _is_owner_session():
-    """Acces la paginile owner-only (restart, servere, resurse): owner-ul real
-    SAU un user caruia i-ai dat acces la dashboard (dash-admin)."""
+    """Acces la paginile owner-only (restart, servere): owner-ul real SAU un
+    user caruia i-ai dat acces la dashboard (dash-admin)."""
     if "user" not in session:
         return False
     uid = session["user"]["id"]
@@ -2314,11 +2329,20 @@ def _is_owner_session():
     return int(uid) in _dash_admin_ids() if str(uid).isdigit() else False
 
 
+# DOAR acest ID poate vedea pagina Resurse server (cerut explicit de owner).
+# Nici dash-adminii, nimeni altcineva — doar tu.
+SYSTEM_ALLOWED_ID = "1493163753447882894"
+
+
+def _can_see_system():
+    return "user" in session and str(session["user"].get("id")) == SYSTEM_ALLOWED_ID
+
+
 @app.route("/system")
 def system_page():
     if "user" not in session:
         return redirect(url_for("index"))
-    if not _is_owner_session():
+    if not _can_see_system():
         return render_template("system.html", denied=True)
 
     # info versiune (din Git, de pe server) + optional verificare update pe GitHub
@@ -2352,8 +2376,8 @@ def system_page():
 
 @app.route("/api/system")
 def system_api():
-    # date live pentru pagina /system — doar owner-ul botului
-    if not _is_owner_session():
+    # date live pentru pagina /system — doar ID-ul permis (tu)
+    if not _can_see_system():
         return jsonify({"error": "forbidden"}), 403
     return jsonify(_read_system_stats())
 

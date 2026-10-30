@@ -192,6 +192,19 @@ class MassRole(commands.Cog):
     async def _before(self):
         await self.bot.wait_until_ready()
 
+    @job_loop.error
+    async def _job_loop_error(self, exc):
+        # daca bucla crapa, deblocam orice job ramas in "running" si repornim
+        # bucla, ca sa nu ramana modulul blocat pana la repornirea botului.
+        print(f"[massrole] job_loop a crapat: {exc!r}; repornesc.")
+        for g in self.bot.guilds:
+            j = storage.get(g.id, "massrole_job", None)
+            if j and j.get("status") == "running":
+                j.update(status="error",
+                         result="Eroare internă în timpul aplicării. Încearcă din nou.")
+                storage.set(g.id, "massrole_job", j)
+        self.job_loop.restart()
+
     @staticmethod
     def _result_note(action, res):
         """Explica un rezultat de 0 modificari (ca sa nu para ca 'nu merge'):

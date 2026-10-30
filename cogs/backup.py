@@ -113,6 +113,19 @@ class Backup(commands.Cog):
     async def _before(self):
         await self.bot.wait_until_ready()
 
+    @apply_loop.error
+    async def _apply_loop_error(self, exc):
+        # daca bucla crapa, deblocam orice job ramas in "running" (ca sa nu
+        # ramana blocat pe veci) si repornim bucla ca sa nu moara definitiv.
+        print(f"[backup] apply_loop a crapat: {exc!r}; repornesc.")
+        for g in self.bot.guilds:
+            j = storage.get(g.id, "backup_apply", None)
+            if j and j.get("status") == "running":
+                j.update(status="error",
+                         result="Eroare internă în timpul aplicării. Încearcă din nou.")
+                storage.set(g.id, "backup_apply", j)
+        self.apply_loop.restart()
+
     # ----------------------------------------------------- creare backup
     def snapshot(self, guild: discord.Guild, name: str) -> dict:
         roles = []
