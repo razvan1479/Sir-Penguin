@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Șterge tot · {{ meta.get('name','Server') }}{% endblock %}
+
+{% block extra_style %}
+    .panel { padding:28px; max-width:680px; }
+    .head { display:flex; align-items:center; gap:16px; margin-bottom:10px; }
+    .head .badge { width:56px; height:56px; border-radius:16px; display:flex; align-items:center; justify-content:center; font-size:28px; background:linear-gradient(135deg,#7f1d1d,#b91c1c); box-shadow:0 0 26px rgba(185,28,28,.4); }
+    h3 { margin:0; font-size:20px; font-weight:800; }
+    .sub { color:var(--muted); font-size:14px; margin:2px 0 0; line-height:1.6; }
+    .warn { background:rgba(244,63,94,.1); border:1px solid rgba(244,63,94,.35); color:#fda4af; border-radius:14px; padding:16px 18px; font-size:13.5px; line-height:1.7; margin:20px 0; }
+    .warn b { color:#fff; }
+    .status { border-radius:12px; padding:14px 16px; font-size:14px; margin:18px 0; font-weight:600; border:1px solid var(--glass-border); }
+    .st-done { background:rgba(34,197,94,.12); color:#4ade80; }
+    .st-error { background:rgba(244,63,94,.12); color:#fb7185; }
+    .st-pending, .st-running { background:rgba(251,191,36,.1); color:#fbbf24; }
+    .wipebtn { background:linear-gradient(135deg,#7f1d1d,#b91c1c); color:#fff; border:none; padding:14px 26px; border-radius:12px; font-size:15px; font-weight:700; cursor:pointer; box-shadow:0 8px 20px rgba(185,28,28,.35); font-family:inherit; }
+    .wipebtn:hover { filter:brightness(1.08); }
+    .wipebtn:disabled { opacity:.5; cursor:not-allowed; filter:none; }
+    .lock { background:rgba(255,255,255,.04); border:1px solid var(--glass-border); border-radius:12px; padding:14px 16px; font-size:13.5px; color:var(--muted); margin-top:14px; line-height:1.6; }
+{% endblock %}
+
+{% block content %}
+  <div class="panel">
+    <div class="head">
+      <div class="badge">💣</div>
+      <div>
+        <h3>Șterge tot de pe server</h3>
+        <p class="sub">Șterge <b>toate canalele și toate categoriile</b> de pe <b>{{ gname or 'acest server' }}</b>. Rolurile, emoji-urile și membrii rămân.</p>
+      </div>
+    </div>
+
+    <div class="warn">
+      ⚠️ <b>Atenție — ireversibil!</b> Odată pornit, botul șterge fiecare canal și categorie de pe server. Nu se poate anula.<br>
+      Botul are nevoie de permisiunea <b>Gestionează canale</b>. Canalele obligatorii de Community (reguli/anunțuri) nu pot fi șterse cât timp Community e activ.
+    </div>
+
+    {% if wipe_status and wipe_status.status %}
+      <div class="status st-{{ wipe_status.status }}">
+        {% if wipe_status.status == 'done' %}✅ {{ wipe_status.result }}
+        {% elif wipe_status.status == 'error' %}❌ {{ wipe_status.result }}
+        {% else %}⏳ Se șterg canalele... (poate dura un minut){% endif %}
+      </div>
+    {% endif %}
+
+    {% if can_use %}
+      <form method="POST" id="wipe-form">
+        <input type="hidden" name="action" value="wipe">
+        <input type="hidden" name="confirm_name" value="">
+        <button type="button" class="wipebtn" onclick="doWipe()">💣 Șterge tot de pe server</button>
+      </form>
+    {% else %}
+      <button class="wipebtn" disabled>💣 Șterge tot de pe server</button>
+      <div class="lock">🔒 Poți vedea unealta, dar <b>doar owner-ul botului</b> o poate folosi.</div>
+    {% endif %}
+  </div>
+{% endblock %}
+
+{% block scripts %}
+{% if can_use %}
+<script>
+  function doWipe(){
+    var name = {{ gname|tojson }};
+    if (!name){ alert('Nu știu numele serverului încă (botul îl sincronizează periodic). Reîncearcă în ~20s.'); return; }
+    var t = prompt('⚠️ ȘTERGERE TOTALĂ a serverului „' + name + '”.\n\n'
+      + 'Se vor șterge TOATE canalele ȘI categoriile. IREVERSIBIL!\n\n'
+      + 'Ca să confirmi, scrie exact numele serverului:');
+    if (t === null) return;
+    if (t.trim() !== name){ alert('Numele nu se potrivește. Am anulat — nu s-a șters nimic.'); return; }
+    var f = document.getElementById('wipe-form');
+    f.querySelector('input[name=confirm_name]').value = t.trim();
+    f.submit();
+  }
+  {% if wipe_status and wipe_status.status in ['pending','running'] %}
+  setTimeout(function(){ location.reload(); }, 4000);
+  {% endif %}
+</script>
+{% endif %}
+{% endblock %}

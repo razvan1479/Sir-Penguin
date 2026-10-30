@@ -2382,6 +2382,40 @@ def system_api():
     return jsonify(_read_system_stats())
 
 
+@app.route("/wipe/<guild_id>", methods=["GET", "POST"])
+@guild_required
+def wipe_page(guild_id):
+    # Unealta „Șterge tot" (canale + categorii) pentru serverul CURENT.
+    # Pagina o pot vedea toți adminii serverului, dar o poate FOLOSI doar
+    # ID-ul permis (tu). Botul execută prin wipe_loop din cogs/admin.py.
+    gid = int(guild_id)
+    meta = storage.get(gid, "meta", {}) or {}
+    gname = meta.get("name", "")
+    can_use = str(session.get("user", {}).get("id")) == SYSTEM_ALLOWED_ID
+
+    if request.method == "POST" and request.form.get("action") == "wipe":
+        if not can_use:
+            abort(403)  # dublă siguranță pe server, nu doar în interfață
+        typed = request.form.get("confirm_name", "").strip()
+        if gname and typed == gname:
+            storage.set(0, "wipe_request", {
+                "guild_id": str(gid), "status": "pending", "result": "", "name": gname})
+        else:
+            storage.set(0, "wipe_request", {
+                "guild_id": str(gid), "status": "error", "name": gname,
+                "result": "Numele tastat nu se potrivește — am anulat pentru siguranță."})
+        return redirect(url_for("wipe_page", guild_id=guild_id))
+
+    # aratam statusul doar daca se refera la ACEST server
+    wipe_status = storage.get(0, "wipe_request", None)
+    if wipe_status and str(wipe_status.get("guild_id")) != str(gid):
+        wipe_status = None
+
+    return render_template("wipe.html", guild_id=guild_id, meta=meta,
+                           gname=gname, can_use=can_use,
+                           wipe_status=wipe_status, section="wipe")
+
+
 @app.route("/access", methods=["GET", "POST"])
 def access_page():
     # DOAR owner-ul real (w1.ideal) poate vedea si gestiona accesele.
