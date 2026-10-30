@@ -2037,37 +2037,10 @@ def invitelog(guild_id):
 @app.route("/test/<guild_id>")
 @guild_required
 def test_page(guild_id):
-    import subprocess
-    root = os.path.join(os.path.dirname(__file__), "..")
-
-    def _git(args, timeout=8):
-        try:
-            return subprocess.check_output(
-                ["git", "-C", root] + args,
-                stderr=subprocess.DEVNULL, timeout=timeout).decode().strip()
-        except Exception:
-            return None
-
-    version = _git(["log", "-1", "--pretty=%s"])
-    commit = _git(["rev-parse", "--short", "HEAD"])
-    commit_date = _git(["log", "-1", "--pretty=%cd", "--date=format:%d.%m.%Y %H:%M"])
-    local_full = _git(["rev-parse", "HEAD"])
-
-    # verifica pe GitHub daca e ceva nou (fara sa traga nimic)
-    update_available = None
-    remote_msg = None
-    if request.args.get("check"):
-        remote_line = _git(["ls-remote", "origin", "refs/heads/main"], timeout=12)
-        if remote_line and local_full:
-            remote_hash = remote_line.split()[0]
-            update_available = (remote_hash != local_full)
-
-    return render_template("test.html", guild_id=guild_id,
-                           meta=storage.get(int(guild_id), "meta", {}),
-                           version=version, commit=commit, commit_date=commit_date,
-                           update_available=update_available,
-                           checked=bool(request.args.get("check")),
-                           section="test")
+    # „Versiune & Update" s-a mutat in pagina Resurse server (/system).
+    # Pastram ruta veche ca redirect, ca link-urile/bookmark-urile sa mearga.
+    check = "?check=1" if request.args.get("check") else ""
+    return redirect("/system" + check)
 
 
 @app.context_processor
@@ -2347,7 +2320,34 @@ def system_page():
         return redirect(url_for("index"))
     if not _is_owner_session():
         return render_template("system.html", denied=True)
-    return render_template("system.html", denied=False)
+
+    # info versiune (din Git, de pe server) + optional verificare update pe GitHub
+    import subprocess
+    root = os.path.join(os.path.dirname(__file__), "..")
+
+    def _git(args, timeout=8):
+        try:
+            return subprocess.check_output(
+                ["git", "-C", root] + args,
+                stderr=subprocess.DEVNULL, timeout=timeout).decode().strip()
+        except Exception:
+            return None
+
+    version = _git(["log", "-1", "--pretty=%s"])
+    commit = _git(["rev-parse", "--short", "HEAD"])
+    commit_date = _git(["log", "-1", "--pretty=%cd", "--date=format:%d.%m.%Y %H:%M"])
+    local_full = _git(["rev-parse", "HEAD"])
+
+    update_available = None
+    if request.args.get("check"):
+        remote_line = _git(["ls-remote", "origin", "refs/heads/main"], timeout=12)
+        if remote_line and local_full:
+            update_available = (remote_line.split()[0] != local_full)
+
+    return render_template("system.html", denied=False,
+                           version=version, commit=commit, commit_date=commit_date,
+                           update_available=update_available,
+                           checked=bool(request.args.get("check")))
 
 
 @app.route("/api/system")

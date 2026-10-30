@@ -49,6 +49,24 @@
     .dot { width:9px; height:9px; border-radius:50%; background:var(--ok); box-shadow:0 0 0 0 rgba(34,197,94,.6); animation:pulse 2s infinite; }
     @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(34,197,94,.5);} 70%{box-shadow:0 0 0 8px rgba(34,197,94,0);} 100%{box-shadow:0 0 0 0 rgba(34,197,94,0);} }
     .denied { background:var(--card); border:1px solid var(--glass-border); border-radius:16px; padding:40px; text-align:center; }
+
+    .section-title { font-size:18px; font-weight:800; margin:30px 0 14px; display:flex; align-items:center; gap:9px; }
+    .notif { border-radius:14px; padding:16px 18px; margin:0 0 18px; display:flex; align-items:center; gap:13px; font-size:14.5px; font-weight:600; }
+    .notif .ni { font-size:24px; }
+    .notif.up { background:rgba(245,158,11,.13); border:1px solid rgba(245,158,11,.3); color:var(--warn); }
+    .notif.ok { background:rgba(34,197,94,.13); border:1px solid rgba(34,197,94,.3); color:#4ade80; }
+    .notif .sub2 { color:var(--muted); font-weight:400; font-size:12.5px; margin-top:3px; }
+    .verrow { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:10px 0; border-bottom:1px solid var(--glass-border); }
+    .verrow:last-child { border-bottom:none; }
+    .verrow .k { color:var(--muted); font-size:13px; font-weight:600; }
+    .verrow .v { font-weight:700; font-size:15px; text-align:right; }
+    .verrow .v code { background:var(--bg); padding:3px 9px; border-radius:6px; font-size:13px; color:#c4b5fd; }
+    .btnrow { display:flex; gap:12px; flex-wrap:wrap; margin-top:16px; }
+    .btn { background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; text-decoration:none; border:none; padding:12px 22px; border-radius:11px; font-size:14px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:8px; box-shadow:0 8px 20px rgba(79,209,197,.3); font-family:inherit; }
+    .btn.ghost { background:var(--input); border:1px solid var(--glass-border); box-shadow:none; color:var(--text); }
+    .btn.restart { background:linear-gradient(135deg,#f59e0b,#d97706); box-shadow:0 8px 20px rgba(245,158,11,.3); }
+    .hint2 { margin-top:18px; background:rgba(34,211,238,0.06); border:1px solid rgba(34,211,238,0.18); border-radius:12px; padding:14px 16px; font-size:12.5px; color:#9fd8e8; line-height:1.7; }
+    .hint2 b { color:var(--text); }
   </style>
 </head>
 <body>
@@ -102,6 +120,60 @@
           <div class="stat"><span class="muted">Memorie folosită de bot</span><b id="proc">–</b></div>
           <div class="stat"><span class="muted">RAM disponibil</span><b id="mem-avail">–</b></div>
           <div class="stat"><span class="muted">Uptime server</span><b id="uptime">–</b></div>
+        </div>
+      </div>
+
+      <!-- VERSIUNE & UPDATE (mutat din pagina Test deploy) -->
+      <div class="section-title">🚀 Versiune & Update</div>
+
+      {% if checked %}
+        {% if update_available %}
+          <div class="notif up"><span class="ni">🔔</span>
+            <div>Update disponibil pe GitHub!
+              <div class="sub2">Există modificări noi pe GitHub care încă nu sunt pe server. Cu auto-deploy pornit se aplică singur în ~30s după push; altfel trage-le manual.</div>
+            </div>
+          </div>
+        {% elif update_available == False %}
+          <div class="notif ok"><span class="ni">✅</span>
+            <div>Ești la zi!
+              <div class="sub2">Versiunea de pe server e identică cu ultima de pe GitHub.</div>
+            </div>
+          </div>
+        {% else %}
+          <div class="notif up"><span class="ni">⚠️</span>
+            <div>N-am putut verifica GitHub
+              <div class="sub2">Serverul nu a putut ajunge la GitHub acum. Încearcă din nou peste puțin.</div>
+            </div>
+          </div>
+        {% endif %}
+      {% endif %}
+
+      <div class="card">
+        <h2>🧩 Ce rulează acum</h2>
+        <div class="verrow"><span class="k">Versiune activă pe server</span><span class="v">{% if version %}{{ version }}{% else %}necunoscută{% endif %}</span></div>
+        {% if commit %}<div class="verrow"><span class="k">Commit</span><span class="v"><code>{{ commit }}</code></span></div>{% endif %}
+        {% if commit_date %}<div class="verrow"><span class="k">Data</span><span class="v">{{ commit_date }}</span></div>{% endif %}
+
+        <div class="btnrow">
+          <a class="btn" href="/system?check=1">🔍 Verifică update pe GitHub</a>
+          <a class="btn ghost" href="/system">↺ Reîmprospătează</a>
+        </div>
+
+        {% if is_owner %}
+        <div style="margin-top:22px; padding-top:20px; border-top:1px solid var(--glass-border)">
+          <h2 style="margin-bottom:6px">🔄 Repornește botul</h2>
+          <p class="muted" style="font-size:13px; margin-bottom:12px; line-height:1.6">Repornește botul ca să încarce ultimul cod (util după un push). Durează ~15 secunde. Doar owner-ul botului poate face asta.</p>
+          <form method="POST" action="/restart" onsubmit="return confirm('Repornești botul acum? Va fi indisponibil ~15 secunde.')">
+            <button class="btn restart" type="submit">🔄 Repornește botul acum</button>
+          </form>
+        </div>
+        {% endif %}
+
+        <div class="hint2">
+          <b>Cum funcționează:</b><br>
+          Versiunea de mai sus e luată direct din Git, de pe server — exact commit-ul care rulează acum.<br>
+          „Verifică update" compară ce ai pe server cu ultima versiune de pe GitHub, fără să tragă nimic.<br>
+          Dacă ai auto-deploy pornit (GitHub Actions), după fiecare push modificările ajung singure pe server în ~30 secunde.
         </div>
       </div>
     {% endif %}
