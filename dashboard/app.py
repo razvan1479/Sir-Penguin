@@ -2411,9 +2411,25 @@ def servers():
 
     if request.method == "POST":
         gid = request.form.get("guild_id", "")
-        if request.form.get("action") == "leave" and gid.isdigit():
+        action = request.form.get("action")
+        if action == "leave" and gid.isdigit():
             storage.set(0, "leave_request", {
                 "guild_id": gid, "status": "pending", "result": ""})
+        elif action == "wipe" and gid.isdigit():
+            # golire totala (canale + categorii). Dubla siguranta: trebuie sa
+            # tastezi EXACT numele serverului, altfel anulam.
+            servers = storage.get(0, "bot_servers", []) or []
+            srv = next((s for s in servers if str(s["id"]) == gid), None)
+            typed = request.form.get("confirm_name", "").strip()
+            if srv and typed and typed == srv.get("name"):
+                storage.set(0, "wipe_request", {
+                    "guild_id": gid, "status": "pending", "result": "",
+                    "name": srv.get("name")})
+            else:
+                storage.set(0, "wipe_request", {
+                    "guild_id": gid, "status": "error",
+                    "name": srv.get("name") if srv else "",
+                    "result": "Numele tastat nu se potrivește — am anulat pentru siguranță."})
         return redirect(url_for("servers"))
 
     bot_servers = storage.get(0, "bot_servers", []) or []
@@ -2421,8 +2437,10 @@ def servers():
     for s in bot_servers:
         s["i_manage"] = str(s["id"]) in my_ids
     leave_status = storage.get(0, "leave_request", None)
+    wipe_status = storage.get(0, "wipe_request", None)
     return render_template("servers.html", servers=bot_servers,
-                           leave_status=leave_status, section="servers", denied=False)
+                           leave_status=leave_status, wipe_status=wipe_status,
+                           section="servers", denied=False)
 
 
 if __name__ == "__main__":

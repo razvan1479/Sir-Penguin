@@ -17,10 +17,12 @@ class Admin(commands.Cog):
         self.bot = bot
         self.sync_loop.start()
         self.leave_loop.start()
+        self.wipe_loop.start()
 
     def cog_unload(self):
         self.sync_loop.cancel()
         self.leave_loop.cancel()
+        self.wipe_loop.cancel()
 
     # scrie lista serverelor pentru dashboard
     @tasks.loop(seconds=20)
@@ -68,6 +70,54 @@ class Admin(commands.Cog):
 
     @leave_loop.before_loop
     async def _lsync(self):
+        await self.bot.wait_until_ready()
+
+    # executa cererile de "wipe" (sterge TOATE canalele + categoriile) din dashboard
+    @tasks.loop(seconds=5)
+    async def wipe_loop(self):
+        job = storage.get(0, "wipe_request", None)
+        if not job or job.get("status") != "pending":
+            return
+        gid = job.get("guild_id")
+        guild = self.bot.get_guild(int(gid)) if gid and str(gid).isdigit() else None
+        if guild is None:
+            job.update(status="error", result="Nu sunt pe niciun server cu acest ID.")
+            storage.set(0, "wipe_request", job)
+            return
+
+        # marcam "in lucru" ca sa nu reluam acelasi job cat timp sterge
+        job.update(status="running")
+        storage.set(0, "wipe_request", job)
+
+        deleted, failed = 0, 0
+        reason = "Golire server ceruta din dashboard (owner)"
+        # intai toate canalele non-categorie (text/voce/stage/forum/anunturi)
+        for ch in list(guild.channels):
+            if isinstance(ch, discord.CategoryChannel):
+                continue
+            try:
+                await ch.delete(reason=reason)
+                deleted += 1
+            except discord.HTTPException:
+                failed += 1
+        # apoi categoriile ramase (acum goale)
+        for cat in list(guild.categories):
+            try:
+                await cat.delete(reason=reason)
+                deleted += 1
+            except discord.HTTPException:
+                failed += 1
+
+        result = f"Am sters {deleted} canale/categorii de pe {guild.name}."
+        if failed:
+            result += (f" {failed} nu au putut fi sterse "
+                       "(lipsa permisiuni sau canale obligatorii de Community).")
+        job.update(status="done", result=result)
+        storage.set(0, "wipe_request", job)
+        await self.sync_loop()  # reimprospatam lista serverelor
+
+    @wipe_loop.before_loop
+    async def _wsync(self):
         await self.bot.wait_until_ready()
 
     @app_commands.command(name="serverlist", description="(owner) Lista serverelor pe care e botul")

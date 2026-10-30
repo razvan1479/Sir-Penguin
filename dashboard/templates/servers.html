@@ -72,9 +72,14 @@
     }
     button:hover { transform:translateY(-2px); filter:brightness(1.08); box-shadow:0 12px 26px rgba(244,63,94,.45); }
     button:active { transform:translateY(0); }
+    .actions { display:flex; flex-direction:column; gap:8px; flex-shrink:0; }
+    .actions form { margin:0; }
+    .actions button { width:100%; }
+    button.wipebtn { background:linear-gradient(135deg,#7f1d1d,#b91c1c); box-shadow:0 8px 20px rgba(185,28,28,.35); }
+    button.wipebtn:hover { box-shadow:0 12px 26px rgba(185,28,28,.5); }
 
     .empty { background:var(--card); border:1px solid var(--glass-border); border-radius:16px; padding:26px; color:var(--muted); text-align:center; animation:fadeUp .5s ease both; }
-    @media (max-width:560px){ .srv{ flex-wrap:wrap; } .srv button{ width:100%; } }
+    @media (max-width:560px){ .srv{ flex-wrap:wrap; } .srv .actions{ width:100%; } .srv button{ width:100%; } }
   </style>
 </head>
 <body>
@@ -105,6 +110,14 @@
       </div>
     {% endif %}
 
+    {% if wipe_status and wipe_status.status %}
+      <div class="status st-{{ 'pending' if wipe_status.status=='running' else wipe_status.status }}">
+        {% if wipe_status.status=='done' %}✅ {{ wipe_status.result }}
+        {% elif wipe_status.status=='error' %}❌ {{ wipe_status.result }}
+        {% else %}⏳ Se șterg canalele de pe {{ wipe_status.name or 'server' }}... (poate dura un minut){% endif %}
+      </div>
+    {% endif %}
+
     {% if not servers %}
       <div class="empty">Lista se încarcă... reîncarcă pagina în ~20 secunde (botul o actualizează periodic).</div>
     {% else %}
@@ -117,11 +130,20 @@
           </div>
           <div class="meta">{{ s.members }} membri · ID {{ s.id }}{% if s.owner %} · owner: {{ s.owner }}{% endif %}</div>
         </div>
-        <form method="POST" onsubmit="return confirm('Sigur scoți botul de pe „{{ s.name }}”? Va trebui reinvitat ca să revină.')">
-          <input type="hidden" name="action" value="leave">
-          <input type="hidden" name="guild_id" value="{{ s.id }}">
-          <button type="submit">🚪 Scoate botul</button>
-        </form>
+        <div class="actions">
+          <form method="POST" onsubmit="return confirm('Sigur scoți botul de pe „{{ s.name }}”? Va trebui reinvitat ca să revină.')">
+            <input type="hidden" name="action" value="leave">
+            <input type="hidden" name="guild_id" value="{{ s.id }}">
+            <button type="submit">🚪 Scoate botul</button>
+          </form>
+          <form method="POST" id="wipe-{{ s.id }}">
+            <input type="hidden" name="action" value="wipe">
+            <input type="hidden" name="guild_id" value="{{ s.id }}">
+            <input type="hidden" name="confirm_name" value="">
+            <button type="button" class="wipebtn"
+                    onclick="wipeServer('{{ s.id }}', {{ s.name|tojson }})">💣 Șterge tot</button>
+          </form>
+        </div>
       </div>
       {% endfor %}
     {% endif %}
@@ -133,6 +155,16 @@
         setTimeout(function(){ location.reload(); }, 4000);
       }
     })();
+    function wipeServer(id, name){
+      var t = prompt('⚠️ ȘTERGERE TOTALĂ a serverului „' + name + '”.\n\n'
+        + 'Se vor șterge TOATE canalele ȘI categoriile. Acțiune IREVERSIBILĂ!\n\n'
+        + 'Ca să confirmi, scrie exact numele serverului:');
+      if (t === null) return;
+      if (t.trim() !== name) { alert('Numele nu se potrivește. Am anulat — nu s-a șters nimic.'); return; }
+      var f = document.getElementById('wipe-' + id);
+      f.querySelector('input[name=confirm_name]').value = t.trim();
+      f.submit();
+    }
   </script>
 </body>
 </html>
