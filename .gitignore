@@ -1,4 +1,4 @@
 .env
-data/
+data/store.json
 __pycache__/
-venv/
+*.pyc

@@ -1,8 +1,0 @@
-# Caddy face singur certificatul HTTPS (Let's Encrypt).
-# Înlocuiește cu numele tău (ex: licente.92-5-36-4.sslip.io sau un subdomeniu propriu).
-licente.92-5-36-4.sslip.io {
-    # API-ul intern e doar pentru dashboard-ul Sir Penguin (pe 127.0.0.1), nu din internet
-    respond /internal/* 404
-
-    reverse_proxy 127.0.0.1:8100
-}
