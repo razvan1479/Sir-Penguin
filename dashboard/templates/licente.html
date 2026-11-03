@@ -64,6 +64,19 @@
     .tabs a.on { color:var(--text); font-weight:700; }
     .empty { color:var(--muted); font-size:13.5px; }
     .denied { background:var(--card); border:1px solid var(--glass-border); border-radius:16px; padding:40px; text-align:center; }
+    .actions { display:flex; gap:6px; flex-wrap:wrap; }
+    .modal-bg { position:fixed; inset:0; background:rgba(3,3,8,.65); backdrop-filter:blur(4px); display:none;
+      align-items:center; justify-content:center; padding:16px; z-index:50; }
+    .modal-bg.open { display:flex; }
+    .modal { width:100%; max-width:440px; background:#11121b; border:1px solid var(--glass-border); border-radius:16px; padding:22px; }
+    .modal h3 { font-size:17px; font-weight:700; margin-bottom:14px; }
+    .lbl { display:flex; flex-direction:column; gap:5px; font-size:12px; color:var(--muted); margin-bottom:10px; flex:1; }
+    .lbl input { width:100%; }
+    .quick { display:flex; gap:8px; flex-wrap:wrap; margin:4px 0 10px; }
+    .chk { display:flex; align-items:center; gap:8px; font-size:14px; cursor:pointer; margin:4px 0; }
+    .chk input { width:16px; height:16px; accent-color:var(--accent); }
+    .modal-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
+    input:disabled { opacity:.45; }
     @media (max-width:640px) { .stats { grid-template-columns:1fr; } }
   </style>
 </head>
@@ -143,15 +156,25 @@
               </form>
             </td>
             <td>
-              <form method="POST" style="margin:0"
-                    onsubmit='return confirm({{ (("Reactivezi" if u.state == "revoked" else "Revoci") ~ " licența lui " ~ u.username ~ "?")|tojson }})'>
-                <input type="hidden" name="discord_id" value="{{ u.discord_id }}">
-                {% if u.state == 'revoked' %}
-                  <input type="hidden" name="action" value="unrevoke"><button class="sm ghost" type="submit">Reactivează</button>
-                {% else %}
-                  <input type="hidden" name="action" value="revoke"><button class="sm del" type="submit">Revocă</button>
-                {% endif %}
-              </form>
+              <div class="actions">
+                <button class="sm ghost" type="button"
+                        onclick='openUserEdit({{ {"id": u.discord_id, "name": u.username, "exp": u.expires_input, "perm": u.permanent}|tojson }})'>Editează</button>
+                <form method="POST" style="margin:0"
+                      onsubmit='return confirm({{ (("Reactivezi" if u.state == "revoked" else "Revoci") ~ " licența lui " ~ u.username ~ "?")|tojson }})'>
+                  <input type="hidden" name="discord_id" value="{{ u.discord_id }}">
+                  {% if u.state == 'revoked' %}
+                    <input type="hidden" name="action" value="unrevoke"><button class="sm ghost" type="submit">Reactivează</button>
+                  {% else %}
+                    <input type="hidden" name="action" value="revoke"><button class="sm del" type="submit">Revocă</button>
+                  {% endif %}
+                </form>
+                <form method="POST" style="margin:0"
+                      onsubmit='return confirm({{ ("Ștergi complet licența lui " ~ u.username ~ "? Va putea intra doar cu o cheie nouă.")|tojson }})'>
+                  <input type="hidden" name="discord_id" value="{{ u.discord_id }}">
+                  <input type="hidden" name="action" value="delete_user">
+                  <button class="sm del" type="submit">Șterge</button>
+                </form>
+              </div>
             </td>
           </tr>
           {% endfor %}
@@ -179,11 +202,15 @@
                 {% else %}<span class="pill p-idle">nefolosită</span>{% endif %}</td>
             <td>
               {% if not k.used_by %}
-              <form method="POST" style="margin:0" onsubmit='return confirm({{ ("Ștergi cheia " ~ k.key ~ "?")|tojson }})'>
-                <input type="hidden" name="action" value="delete">
-                <input type="hidden" name="key" value="{{ k.key }}">
-                <button class="sm del" type="submit">Șterge</button>
-              </form>
+              <div class="actions">
+                <button class="sm ghost" type="button"
+                        onclick='openKeyEdit({{ {"key": k.key, "d": k.duration_days, "h": k.duration_hours, "perm": k.permanent, "note": k.note}|tojson }})'>Editează</button>
+                <form method="POST" style="margin:0" onsubmit='return confirm({{ ("Ștergi cheia " ~ k.key ~ "?")|tojson }})'>
+                  <input type="hidden" name="action" value="delete">
+                  <input type="hidden" name="key" value="{{ k.key }}">
+                  <button class="sm del" type="submit">Șterge</button>
+                </form>
+              </div>
               {% endif %}
             </td>
           </tr>
@@ -206,5 +233,80 @@
       {% endif %}
     {% endif %}
   </div>
+
+  {% if not denied %}
+  <!-- Editare licență utilizator -->
+  <div class="modal-bg" id="userModal" onclick="if(event.target===this)closeModals()">
+    <form method="POST" class="modal">
+      <h3>Editează licența lui <span id="um-name"></span></h3>
+      <input type="hidden" name="action" value="set_expiry">
+      <input type="hidden" name="discord_id" id="um-id">
+      <label class="lbl">Expiră la
+        <input type="datetime-local" name="expires_local" id="um-exp">
+      </label>
+      <div class="quick">
+        <button type="button" class="sm ghost" onclick="umAdd(1)">+1 zi</button>
+        <button type="button" class="sm ghost" onclick="umAdd(7)">+7 zile</button>
+        <button type="button" class="sm ghost" onclick="umAdd(30)">+30 zile</button>
+        <button type="button" class="sm ghost" onclick="umNow()">Acum (expiră imediat)</button>
+      </div>
+      <label class="chk"><input type="checkbox" name="permanent" value="1" id="um-perm" onchange="umPerm()"> Permanentă</label>
+      <p class="sub" style="font-size:12.5px;margin-top:6px">Dacă licența e revocată, salvarea o reactivează cu noua dată.</p>
+      <div class="modal-actions">
+        <button type="button" class="sm ghost" onclick="closeModals()">Anulează</button>
+        <button type="submit" class="btn">Salvează</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Editare cheie nefolosită -->
+  <div class="modal-bg" id="keyModal" onclick="if(event.target===this)closeModals()">
+    <form method="POST" class="modal">
+      <h3>Editează cheia</h3>
+      <code id="km-label" style="display:inline-block;margin-bottom:12px"></code>
+      <input type="hidden" name="action" value="edit_key">
+      <input type="hidden" name="key" id="km-key">
+      <div class="quick" style="margin-top:0">
+        <label class="lbl">Zile <input type="number" name="days" id="km-d" min="0" max="10000"></label>
+        <label class="lbl">Ore <input type="number" name="hours" id="km-h" min="0" max="23"></label>
+      </div>
+      <label class="chk"><input type="checkbox" name="permanent" value="1" id="km-perm" onchange="kmPerm()"> Permanentă</label>
+      <label class="lbl">Notă <input type="text" name="note" id="km-note" maxlength="200"></label>
+      <div class="modal-actions">
+        <button type="button" class="sm ghost" onclick="closeModals()">Anulează</button>
+        <button type="submit" class="btn">Salvează</button>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const pad = (n) => String(n).padStart(2, "0");
+    const toLocal = (d) => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    function closeModals() { document.querySelectorAll(".modal-bg").forEach(m => m.classList.remove("open")); }
+    function openUserEdit(u) {
+      $("um-id").value = u.id; $("um-name").textContent = u.name;
+      $("um-exp").value = u.exp || toLocal(new Date(Date.now() + 30*86400000));
+      $("um-perm").checked = !!u.perm; umPerm();
+      $("userModal").classList.add("open");
+    }
+    function umAdd(days) {
+      const cur = $("um-exp").value ? new Date($("um-exp").value) : new Date();
+      const base = cur < new Date() ? new Date() : cur;
+      $("um-exp").value = toLocal(new Date(base.getTime() + days*86400000));
+      $("um-perm").checked = false; umPerm();
+    }
+    function umNow() { $("um-exp").value = toLocal(new Date()); $("um-perm").checked = false; umPerm(); }
+    function umPerm() { $("um-exp").disabled = $("um-perm").checked; }
+    function openKeyEdit(k) {
+      $("km-key").value = k.key; $("km-label").textContent = k.key;
+      $("km-d").value = k.perm ? 30 : k.d; $("km-h").value = k.perm ? 0 : k.h;
+      $("km-perm").checked = !!k.perm; $("km-note").value = k.note || ""; kmPerm();
+      $("keyModal").classList.add("open");
+    }
+    function kmPerm() { $("km-d").disabled = $("km-h").disabled = $("km-perm").checked; }
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModals(); });
+  </script>
+  {% endif %}
 </body>
 </html>

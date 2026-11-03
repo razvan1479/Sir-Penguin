@@ -2557,6 +2557,24 @@ def licenses_page():
                 "unit": f.get("unit", "zile"), "actor": actor})
             if data:
                 session["lic_flash"] = f"Licența lui {data['username']} a fost prelungită cu {data['added']}."
+        elif action == "delete_user":
+            data, err = _lic_call("POST", "/internal/users/delete", {
+                "discord_id": f.get("discord_id", ""), "actor": actor})
+            if data:
+                session["lic_flash"] = f"Licența lui {data['username']} a fost ștearsă. Poate intra doar cu o cheie nouă."
+        elif action == "set_expiry":
+            data, err = _lic_call("POST", "/internal/users/set-expiry", {
+                "discord_id": f.get("discord_id", ""), "expires_local": f.get("expires_local", ""),
+                "permanent": f.get("permanent") == "1", "actor": actor})
+            if data:
+                session["lic_flash"] = f"Licența lui {data['username']} expiră acum: {data['expires']}."
+        elif action == "edit_key":
+            data, err = _lic_call("POST", "/internal/keys/edit", {
+                "key": f.get("key", ""), "days": _to_int(f.get("days")) or 0,
+                "hours": _to_int(f.get("hours")) or 0, "permanent": f.get("permanent") == "1",
+                "note": f.get("note", ""), "actor": actor})
+            if data:
+                session["lic_flash"] = f"Cheia a fost actualizată: {data['duration']}."
         elif action in ("revoke", "unrevoke"):
             data, err = _lic_call("POST", "/internal/users/revoke", {
                 "discord_id": f.get("discord_id", ""), "revoked": action == "revoke", "actor": actor})
