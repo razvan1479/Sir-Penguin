@@ -2501,5 +2501,80 @@ def servers():
                            section="servers", denied=False)
 
 
+# ─────────────── Licențe Discord Community Manager ───────────────
+# Dashboard-ul NU ține licențele: vorbește intern (127.0.0.1) cu serverul de licențe,
+# care rulează ca serviciu separat. Dacă acela e oprit, botul merge normal.
+LICENSE_SERVER_URL = os.getenv("LICENSE_SERVER_URL", "http://127.0.0.1:8100").rstrip("/")
+LICENSE_ADMIN_TOKEN = os.getenv("LICENSE_ADMIN_TOKEN", "")
+
+
+def _lic_call(method, path, payload=None, params=None):
+    """Apel către serverul de licențe. Întoarce (date, eroare)."""
+    if not LICENSE_ADMIN_TOKEN:
+        return None, "LICENSE_ADMIN_TOKEN lipsește din .env-ul botului."
+    try:
+        r = requests.request(method, f"{LICENSE_SERVER_URL}{path}", json=payload, params=params,
+                             headers={"X-Admin-Token": LICENSE_ADMIN_TOKEN}, timeout=8)
+    except requests.RequestException:
+        return None, "Serverul de licențe nu răspunde (e pornit? sudo systemctl status license-server)."
+    try:
+        data = r.json()
+    except ValueError:
+        data = {}
+    if r.status_code >= 400:
+        return None, data.get("error") or f"Eroare {r.status_code} de la serverul de licențe."
+    return data, None
+
+
+@app.route("/licente", methods=["GET", "POST"])
+def licenses_page():
+    # DOAR owner-ul real (w1.ideal). Nici dash-adminii nu văd pagina asta.
+    if "user" not in session:
+        return redirect(url_for("index"))
+    if not _is_true_owner():
+        return render_template("licente.html", denied=True)
+
+    actor = session["user"].get("name") or session["user"]["id"]
+
+    if request.method == "POST":
+        action = request.form.get("action", "")
+        f = request.form
+        err = None
+        if action == "create":
+            data, err = _lic_call("POST", "/internal/keys/create", {
+                "amount": _to_int(f.get("amount")) or 1, "unit": f.get("unit", "zile"),
+                "count": _to_int(f.get("count")) or 1, "note": f.get("note", ""), "actor": actor})
+            if data:
+                session["lic_new_keys"] = data
+        elif action == "delete":
+            data, err = _lic_call("POST", "/internal/keys/delete", {"key": f.get("key", ""), "actor": actor})
+            if data:
+                session["lic_flash"] = ("Cheia a fost ștearsă." if data.get("deleted")
+                                        else "Cheia nu se mai poate șterge (a fost folosită).")
+        elif action == "extend":
+            data, err = _lic_call("POST", "/internal/users/extend", {
+                "discord_id": f.get("discord_id", ""), "amount": _to_int(f.get("amount")) or 1,
+                "unit": f.get("unit", "zile"), "actor": actor})
+            if data:
+                session["lic_flash"] = f"Licența lui {data['username']} a fost prelungită cu {data['added']}."
+        elif action in ("revoke", "unrevoke"):
+            data, err = _lic_call("POST", "/internal/users/revoke", {
+                "discord_id": f.get("discord_id", ""), "revoked": action == "revoke", "actor": actor})
+            if data:
+                verb = "revocată" if action == "revoke" else "reactivată"
+                session["lic_flash"] = f"Licența lui {data['username']} a fost {verb}."
+        if err:
+            session["lic_error"] = err
+        return redirect(url_for("licenses_page", filtru=request.args.get("filtru", "toate")))
+
+    filtru = request.args.get("filtru", "toate")
+    data, err = _lic_call("GET", "/internal/overview", params={"filtru": filtru})
+    return render_template("licente.html", denied=False, data=data,
+                           error=session.pop("lic_error", None) or err,
+                           flash=session.pop("lic_flash", None),
+                           new_keys=session.pop("lic_new_keys", None),
+                           filtru=filtru)
+
+
 if __name__ == "__main__":
     app.run(debug=False, port=5000)
