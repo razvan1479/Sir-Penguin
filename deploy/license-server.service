@@ -1,0 +1,15 @@
+[Unit]
+Description=iDeaL License Server (Discord Community Manager)
+After=network.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/license-server
+ExecStart=/home/ubuntu/license-server/venv/bin/uvicorn app:app --host 127.0.0.1 --port 8100 --proxy-headers --forwarded-allow-ips 127.0.0.1
+Restart=always
+RestartSec=5
+# limită de siguranță, ca să nu poată afecta niciodată Sir Penguin
+MemoryMax=200M
+
+[Install]
+WantedBy=multi-user.target

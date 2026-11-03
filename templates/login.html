@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel" style="max-width:420px;margin:12vh auto 0;text-align:center;padding:32px">
+  <h1 style="font-size:20px;margin:0 0 6px">Administrare licențe</h1>
+  <p class="muted" style="margin:0 0 22px">Discord Community Manager</p>
+  {% if error %}<p class="pill bad" style="margin-bottom:16px">{{ error }}</p><br>{% endif %}
+  <a class="btn" href="/admin/login">Login cu Discord</a>
+</div>
+{% endblock %}
