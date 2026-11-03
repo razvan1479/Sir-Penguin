@@ -2549,8 +2549,14 @@ def licenses_page():
         elif action == "delete":
             data, err = _lic_call("POST", "/internal/keys/delete", {"key": f.get("key", ""), "actor": actor})
             if data:
-                session["lic_flash"] = ("Cheia a fost ștearsă." if data.get("deleted")
-                                        else "Cheia nu se mai poate șterge (a fost folosită).")
+                session["lic_flash"] = ("Cheia a fost ștearsă din listă." if data.get("deleted")
+                                        else "Cheia nu mai există.")
+        elif action == "delete_used_keys":
+            data, err = _lic_call("POST", "/internal/keys/delete-used", {})
+            if data:
+                n = data.get("deleted", 0)
+                session["lic_flash"] = (f"Am șters {n} chei folosite din listă. Licențele au rămas neatinse."
+                                        if n else "Nu era nicio cheie folosită de șters.")
         elif action == "extend":
             data, err = _lic_call("POST", "/internal/users/extend", {
                 "discord_id": f.get("discord_id", ""), "amount": _to_int(f.get("amount")) or 1,

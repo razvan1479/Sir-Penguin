@@ -65,6 +65,7 @@
     .empty { color:var(--muted); font-size:13.5px; }
     .denied { background:var(--card); border:1px solid var(--glass-border); border-radius:16px; padding:40px; text-align:center; }
     .actions { display:flex; gap:6px; flex-wrap:wrap; }
+    .keys-bar { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:12px; }
     .modal-bg { position:fixed; inset:0; background:rgba(3,3,8,.65); backdrop-filter:blur(4px); display:none;
       align-items:center; justify-content:center; padding:16px; z-index:50; }
     .modal-bg.open { display:flex; }
@@ -184,10 +185,19 @@
 
       <div class="card">
         <h2>🔑 Chei</h2>
-        <div class="tabs" style="margin-bottom:12px">
-          <a href="?filtru=toate" class="{{ 'on' if filtru == 'toate' }}">Toate</a>
-          <a href="?filtru=nefolosite" class="{{ 'on' if filtru == 'nefolosite' }}">Nefolosite</a>
-          <a href="?filtru=folosite" class="{{ 'on' if filtru == 'folosite' }}">Folosite</a>
+        <div class="keys-bar">
+          <div class="tabs">
+            <a href="?filtru=toate" class="{{ 'on' if filtru == 'toate' }}">Toate</a>
+            <a href="?filtru=nefolosite" class="{{ 'on' if filtru == 'nefolosite' }}">Nefolosite</a>
+            <a href="?filtru=folosite" class="{{ 'on' if filtru == 'folosite' }}">Folosite</a>
+          </div>
+          {% if data["keys"]|selectattr("used_by")|list %}
+          <form method="POST" style="margin:0"
+                onsubmit='return confirm("Ștergi din listă toate cheile folosite? Licențele utilizatorilor rămân neatinse.")'>
+            <input type="hidden" name="action" value="delete_used_keys">
+            <button class="sm del" type="submit">Șterge toate cheile folosite</button>
+          </form>
+          {% endif %}
         </div>
         {% if data["keys"] %}
         <div class="table-wrap"><table>
@@ -201,7 +211,14 @@
             <td>{% if k.used_by %}{{ k.used_by_name }}<br><span class="sub" style="font-size:12px">{{ k.used_fmt }}</span>
                 {% else %}<span class="pill p-idle">nefolosită</span>{% endif %}</td>
             <td>
-              {% if not k.used_by %}
+              {% if k.used_by %}
+              <form method="POST" style="margin:0"
+                    onsubmit='return confirm({{ ("Ștergi cheia " ~ k.key ~ " din listă? Licența utilizatorului rămâne neatinsă.")|tojson }})'>
+                <input type="hidden" name="action" value="delete">
+                <input type="hidden" name="key" value="{{ k.key }}">
+                <button class="sm del" type="submit">Șterge</button>
+              </form>
+              {% else %}
               <div class="actions">
                 <button class="sm ghost" type="button"
                         onclick='openKeyEdit({{ {"key": k.key, "d": k.duration_days|default(30), "h": k.duration_hours|default(0), "perm": k.permanent|default(false), "note": k.note|default("")}|tojson }})'>Editează</button>
