@@ -192,6 +192,119 @@
 
   <div class="panel">
     <div class="panel-head">
+      <h3>🙅 Persoane protejate de menționat
+        {% if mentions.get('enabled') %}<span class="badge on">PORNIT</span>{% else %}<span class="badge off">OPRIT</span>{% endif %}
+      </h3>
+      <p class="sub">Se aplică pe <b>toate canalele</b> serverului. Adaugi oricâte persoane vrei. Dacă cineva le menționează (tag/@ sau reply cu ping), mesajul se șterge. Dacă încearcă de X ori în Y minute, primește mute pe durata aleasă de tine.</p>
+    </div>
+    <div class="panel-body">
+      <form method="POST">
+        <input type="hidden" name="action" value="mention_settings">
+        <div class="toggle">
+          <input type="checkbox" name="mentions_enabled" id="mnen" {% if mentions.get('enabled') %}checked{% endif %}>
+          <div><b>Activează protecția la menționare</b><br><span class="sub">Cât e oprit, nimeni nu e protejat.</span></div>
+        </div>
+
+        <div class="field">
+          <label>🛡️ Persoane protejate (ID-uri — unul pe linie, oricâte)</label>
+          <textarea name="protected_ids" placeholder="Pune ID-urile (sau @mențiuni) persoanelor protejate, unul pe linie:&#10;1493163753447882894&#10;123456789012345678" style="min-height:90px">{{ (mentions.get('protected_ids') or [])|join('\n') }}</textarea>
+          <p class="sub" style="margin-top:8px">💡 Pui ID-ul fiecărei persoane (click dreapta pe user → Copiază ID, cu Mod Dezvoltator pornit). Poți lipi și <code>&lt;@ID&gt;</code> — scot singur ID-ul. Câte vrei.</p>
+        </div>
+
+        <div class="field">
+          <label>📍 Unde se aplică</label>
+          <select name="m_scope" id="m_scope" onchange="document.getElementById('m_chanbox').style.display = this.value==='channels' ? 'block':'none'">
+            <option value="all" {% if mentions.get('scope','all') != 'channels' %}selected{% endif %}>Pe tot serverul (toate canalele)</option>
+            <option value="channels" {% if mentions.get('scope') == 'channels' %}selected{% endif %}>Doar pe canalele alese de mine</option>
+          </select>
+        </div>
+
+        <div class="field" id="m_chanbox" style="display:{% if mentions.get('scope') == 'channels' %}block{% else %}none{% endif %}">
+          <label>📋 Canalele alese</label>
+          {% if text_channels %}
+          <div class="picklist">
+            {% for ch in text_channels %}
+            <label><input type="checkbox" name="mention_channels" value="{{ ch.id }}"
+              {% if ch.id|string in (mentions.get('channel_ids') or [])|map('string')|list %}checked{% endif %}>
+              #{{ ch.name }}</label>
+            {% endfor %}
+          </div>
+          {% else %}<p class="sub">Nu am găsit canale text.</p>{% endif %}
+          <p class="sub" style="margin-top:9px">💡 Dacă nu bifezi niciun canal aici, regula se aplică tot pe <b>tot serverul</b>.</p>
+        </div>
+
+        <div class="field">
+          <label>✅ Persoane scutite (ID-uri — unul pe linie, oricâte)</label>
+          <textarea name="exempt_user_ids" placeholder="Persoanele care AU voie să menționeze, unul pe linie:&#10;123456789012345678" style="min-height:70px">{{ (mentions.get('exempt_user_ids') or [])|join('\n') }}</textarea>
+          <p class="sub" style="margin-top:8px">💡 Aceste persoane sunt scutite de regulă — pot menționa liber. Același format: ID sau <code>&lt;@ID&gt;</code>, câte vrei.</p>
+        </div>
+
+        <div class="field">
+          <label>✅ Roluri scutite (au voie să menționeze)</label>
+          {% if roles %}
+          <div class="picklist">
+            {% for r in roles %}
+            <label><input type="checkbox" name="mention_exempt_roles" value="{{ r.id }}"
+              {% if r.id|string in (mentions.get('exempt_role_ids') or [])|map('string')|list %}checked{% endif %}>
+              <span class="rdot" style="background:{{ r.color or '#99aab5' }}"></span>{{ r.name }}</label>
+            {% endfor %}
+          </div>
+          {% else %}<p class="sub">Nu am găsit roluri.</p>{% endif %}
+          <p class="sub" style="margin-top:9px">💡 Ex: staff-ul tău. Administratorii sunt oricum scutiți automat.</p>
+        </div>
+
+        <div class="grid3">
+          <div class="field">
+            <label>🔢 Câte încercări</label>
+            <input type="text" name="m_threshold" value="{{ mentions.get('threshold', 3) }}" placeholder="3">
+          </div>
+          <div class="field">
+            <label>⏱️ În câte minute</label>
+            <input type="text" name="m_window_minutes" value="{{ mentions.get('window_minutes', 5) }}" placeholder="5">
+          </div>
+          <div class="field">
+            <label>🔇 Mute (minute)</label>
+            <input type="text" name="m_mute_minutes" value="{{ mentions.get('mute_minutes', 5) }}" placeholder="5">
+          </div>
+        </div>
+        <p class="sub" style="margin:0 0 14px">Exemplu: 3 încercări în 5 minute → mute 5 minute. Mesajele se șterg oricum; mute-ul vine la a treia încercare.</p>
+
+        <div class="toggle">
+          <input type="checkbox" name="m_delete" id="mdel" {% if mentions.get('delete_message', True) %}checked{% endif %}>
+          <div><b>Șterge mesajul cu menționarea</b><br><span class="sub">Dacă îl debifezi, mesajul rămâne, dar tot se numără încercarea spre mute.</span></div>
+        </div>
+
+        <div class="toggle">
+          <input type="checkbox" name="m_warn_enabled" id="mwarnen" {% if mentions.get('warn_enabled') %}checked{% endif %}>
+          <div><b>Trimite un avertisment</b><br><span class="sub">Îl anunță că dacă repetă primește mute.</span></div>
+        </div>
+
+        <div class="field">
+          <label>📨 Cum ajunge avertismentul</label>
+          <select name="m_warn_mode">
+            <option value="channel" {% if mentions.get('warn_mode','channel') != 'dm' %}selected{% endif %}>În canal — îl menționează doar pe el, dispare singur după câteva secunde</option>
+            <option value="dm" {% if mentions.get('warn_mode') == 'dm' %}selected{% endif %}>DM privat — doar el vede (nu merge dacă are DM-urile închise)</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>✏️ Textul avertismentului (gol = cel implicit)</label>
+          <textarea name="m_warn_text" placeholder="⚠️ {user}, nu ai voie să menționezi această persoană. Dacă mai încerci, primești mute automat {mute} minute.">{{ mentions.get('warn_text','') }}</textarea>
+          <p class="sub" style="margin-top:8px">Poți folosi <code>{user}</code> = îl menționează pe cel care a greșit, <code>{mute}</code> = durata mute-ului.</p>
+        </div>
+
+        <div class="field">
+          <label>⏳ În canal: după câte secunde dispare mesajul</label>
+          <input type="text" name="m_warn_delete_seconds" value="{{ mentions.get('warn_delete_seconds', 8) }}" placeholder="8">
+        </div>
+
+        <button class="save" type="submit">💾 Salvează</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
       <h3>🔇 Persoane cu timeout
         {% if timed_out is not none %}<span class="badge off" style="background:rgba(148,163,184,.15)">{{ timed_out|length }}</span>{% endif %}
         <a href="/automod/{{ guild_id }}" style="float:right;font-size:13px;color:var(--muted);text-decoration:none">🔄 Reîmprospătează</a>

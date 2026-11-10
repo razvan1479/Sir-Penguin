@@ -1598,6 +1598,37 @@ def automod_page(guild_id):
             lk["warn_delete_seconds"] = max(1, min(ws or 8, 60))
             cfg["links"] = lk
             storage.set(gid, "automod", cfg)
+        elif action == "mention_settings":
+            import re as _re
+            mn = cfg.get("mentions") or {}
+            mn["enabled"] = request.form.get("mentions_enabled") == "on"
+            # persoanele protejate: acceptam ID-uri sau mentiuni (<@id>), oricate,
+            # separate prin linii/virgule/spatii -> extragem toate numerele de ID
+            raw = request.form.get("protected_ids", "")
+            ids = _re.findall(r"\d{15,21}", raw)
+            mn["protected_ids"] = list(dict.fromkeys(ids))  # unice, pastram ordinea
+            # unde se aplica: tot serverul sau doar canalele alese
+            mn["scope"] = "channels" if request.form.get("m_scope") == "channels" else "all"
+            mn["channel_ids"] = request.form.getlist("mention_channels")
+            # persoane scutite (pe ID), oricate, acelasi format ca persoanele protejate
+            raw_ex = request.form.get("exempt_user_ids", "")
+            ex_ids = _re.findall(r"\d{15,21}", raw_ex)
+            mn["exempt_user_ids"] = list(dict.fromkeys(ex_ids))
+            mn["exempt_role_ids"] = request.form.getlist("mention_exempt_roles")
+            th = _to_int(request.form.get("m_threshold", ""))
+            mn["threshold"] = max(1, min(th or 3, 50))
+            wm = _to_int(request.form.get("m_window_minutes", ""))
+            mn["window_minutes"] = max(1, min(wm or 5, 1440))
+            mm = _to_int(request.form.get("m_mute_minutes", ""))
+            mn["mute_minutes"] = max(1, min(mm or 5, 40320))  # Discord: max 28 zile
+            mn["delete_message"] = request.form.get("m_delete") == "on"
+            mn["warn_enabled"] = request.form.get("m_warn_enabled") == "on"
+            mn["warn_mode"] = "dm" if request.form.get("m_warn_mode") == "dm" else "channel"
+            mn["warn_text"] = request.form.get("m_warn_text", "").strip()
+            ws = _to_int(request.form.get("m_warn_delete_seconds", ""))
+            mn["warn_delete_seconds"] = max(1, min(ws or 8, 60))
+            cfg["mentions"] = mn
+            storage.set(gid, "automod", cfg)
         elif action == "remove_timeout":
             uid = request.form.get("user_id", "")
             if uid.isdigit():
@@ -1612,6 +1643,7 @@ def automod_page(guild_id):
                            text_channels=channels.get("texts", []),
                            roles=roles.get("list", []),
                            links=cfg.get("links") or {},
+                           mentions=cfg.get("mentions") or {},
                            words=cfg.get("banned_words") or [],
                            timed_out=timed_out,
                            meta=storage.get(gid, "meta", {}),

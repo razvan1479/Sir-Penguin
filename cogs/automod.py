@@ -93,6 +93,8 @@ class AutoMod(commands.Cog):
         # ramane mica — nu creste memoria. Se reseteaza la restart (nu conteaza
         # pentru o fereastra de cateva minute).
         self._link_hits: dict = {}
+        # la fel, dar pentru incercarile de a mentiona persoane protejate
+        self._mention_hits: dict = {}
 
     # ---------------------------------------------------- filtru de LINKURI
     async def _maybe_filter_links(self, message: discord.Message) -> bool:
@@ -186,11 +188,120 @@ class AutoMod(commands.Cog):
 
     def _prune_hits(self, now: float):
         """Scoate intrarile vechi ca sa nu creasca memoria (rar, doar cand e cazul)."""
-        if len(self._link_hits) < 500:
+        for d in (self._link_hits, self._mention_hits):
+            if len(d) < 500:
+                continue
+            for k in list(d.keys()):
+                if not d[k] or now - d[k][-1] > 3600:
+                    d.pop(k, None)
+
+    # ----------------------------------------- filtru de MENTIUNI protejate
+    async def _maybe_filter_mentions(self, message: discord.Message) -> bool:
+        """Blocheaza mentionarea anumitor persoane. Returneaza True daca a
+        tratat mesajul (l-a sters). Cine incearca repetat primeste mute."""
+        cfg = _cfg(message.guild.id)
+        mn = cfg.get("mentions") or {}
+        if not mn.get("enabled"):
+            return False
+
+        protected = {str(x) for x in (mn.get("protected_ids") or [])}
+        if not protected:
+            return False  # n-ai adaugat nicio persoana protejata
+
+        # unde se aplica: "all" = tot serverul; "channels" = doar canalele alese
+        if mn.get("scope", "all") == "channels":
+            channel_ids = {str(c) for c in (mn.get("channel_ids") or [])}
+            # daca ai pus pe "doar canale alese" dar n-ai bifat niciunul,
+            # tratam ca "tot serverul" (altfel regula n-ar face nimic)
+            if channel_ids and str(message.channel.id) not in channel_ids:
+                return False
+
+        member = message.author
+        if _is_admin(member):
+            return False  # Administratorii sunt mereu scutiti
+
+        # persoane scutite individual (pe ID) -> au voie sa mentioneze
+        exempt_users = {str(x) for x in (mn.get("exempt_user_ids") or [])}
+        if str(member.id) in exempt_users:
+            return False
+
+        # roluri scutite (ex. staff) -> au voie sa mentioneze persoanele protejate
+        exempt = {str(r) for r in (mn.get("exempt_role_ids") or [])}
+        if exempt:
+            member_roles = {str(r.id) for r in getattr(member, "roles", [])}
+            if exempt & member_roles:
+                return False
+
+        # ce persoane au fost mentionate: mentiuni scrise (<@id>) + ping la reply
+        mentioned = {str(u.id) for u in getattr(message, "mentions", [])}
+        mentioned |= {str(i) for i in getattr(message, "raw_mentions", [])}
+        if not (protected & mentioned):
+            return False  # nu a mentionat nicio persoana protejata
+
+        # daca autorul e chiar persoana protejata, il lasam in pace
+        if str(member.id) in protected:
+            return False
+
+        # 1) stergem mesajul (daca e activat; implicit DA)
+        if mn.get("delete_message", True):
+            try:
+                await message.delete()
+            except discord.Forbidden:
+                return False  # fara Manage Messages -> nu putem face nimic sigur
+            except discord.NotFound:
+                pass
+
+        # 2) numaram incercarile in fereastra de timp
+        threshold = max(1, int(mn.get("threshold", 3)))
+        window = max(1, int(mn.get("window_minutes", 5))) * 60
+        now = time.time()
+        key = (message.guild.id, member.id)
+        hits = [t for t in self._mention_hits.get(key, []) if now - t < window]
+        hits.append(now)
+        self._mention_hits[key] = hits
+        self._prune_hits(now)
+
+        # 3) daca a atins pragul -> mute pe durata aleasa
+        mins = max(1, int(mn.get("mute_minutes", 5)))
+        if len(hits) >= threshold:
+            self._mention_hits[key] = []  # resetam dupa ce dam mute
+            until = discord.utils.utcnow() + datetime.timedelta(minutes=mins)
+            current_until = getattr(member, "timed_out_until", None)
+            if current_until is None or current_until < until:
+                try:
+                    await member.timeout(until, reason="Mentionare persoana protejata (automod)")
+                except discord.Forbidden:
+                    pass
+                except discord.HTTPException:
+                    pass
+        else:
+            await self._send_mention_warning(message, member, mn, mins)
+        return True
+
+    async def _send_mention_warning(self, message, member, mn, mute_minutes):
+        """Avertisment cand incearca sa mentioneze o persoana protejata (inainte
+        de mute). La fel ca la linkuri: 'channel' (in canal, auto-sters) sau 'dm'."""
+        if not mn.get("warn_enabled"):
             return
-        for k in list(self._link_hits.keys()):
-            if not self._link_hits[k] or now - self._link_hits[k][-1] > 3600:
-                self._link_hits.pop(k, None)
+        default_text = ("⚠️ {user}, nu ai voie să menționezi această persoană. "
+                        "Dacă mai încerci, primești mute automat {mute} minute.")
+        text = (mn.get("warn_text") or default_text)
+        text = text.replace("{user}", member.mention).replace("{mute}", str(mute_minutes))
+
+        if mn.get("warn_mode") == "dm":
+            try:
+                await member.send(text)
+            except (discord.Forbidden, discord.HTTPException):
+                pass
+            return
+
+        secs = max(1, min(int(mn.get("warn_delete_seconds", 8)), 60))
+        try:
+            await message.channel.send(
+                text, allowed_mentions=discord.AllowedMentions(users=True),
+                delete_after=secs)
+        except discord.HTTPException:
+            pass
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
@@ -199,6 +310,10 @@ class AutoMod(commands.Cog):
 
         # intai filtrul de linkuri; daca a sters mesajul, ne oprim aici
         if await self._maybe_filter_links(message):
+            return
+
+        # apoi protectia la mentiuni; daca a sters mesajul, ne oprim aici
+        if await self._maybe_filter_mentions(message):
             return
 
         cfg = _cfg(message.guild.id)
