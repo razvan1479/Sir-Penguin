@@ -34,6 +34,15 @@
   .rdot { width:11px; height:11px; border-radius:50%; flex:none; }
   .grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
   @media (max-width:640px){ .grid3 { grid-template-columns:1fr; } }
+  .pick-search { width:100%; }
+  .pick-results { margin-top:8px; display:none; flex-direction:column; gap:4px; background:var(--bg); border:1px solid var(--glass-border); border-radius:8px; padding:6px; max-height:230px; overflow-y:auto; }
+  .pick-results.open { display:flex; }
+  .pick-item { display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:7px; cursor:pointer; font-size:14px; }
+  .pick-item:hover { background:var(--input); }
+  .pick-item img { width:26px; height:26px; border-radius:50%; flex:none; background:#1e1f22; }
+  .pick-item .u { color:var(--muted); font-size:12px; }
+  .pick-item .muted-note { color:var(--muted); font-size:13px; padding:8px 10px; }
+  .chip img { width:20px; height:20px; border-radius:50%; margin-right:2px; }
 {% endblock %}
 
 {% block content %}
@@ -206,9 +215,12 @@
         </div>
 
         <div class="field">
-          <label>🛡️ Persoane protejate (ID-uri — unul pe linie, oricâte)</label>
-          <textarea name="protected_ids" placeholder="Pune ID-urile (sau @mențiuni) persoanelor protejate, unul pe linie:&#10;1493163753447882894&#10;123456789012345678" style="min-height:90px">{{ (mentions.get('protected_ids') or [])|join('\n') }}</textarea>
-          <p class="sub" style="margin-top:8px">💡 Pui ID-ul fiecărei persoane (click dreapta pe user → Copiază ID, cu Mod Dezvoltator pornit). Poți lipi și <code>&lt;@ID&gt;</code> — scot singur ID-ul. Câte vrei.</p>
+          <label>🛡️ Persoane protejate</label>
+          <input type="hidden" name="protected_ids" id="prot_val" value="{{ (mentions.get('protected_ids') or [])|join(' ') }}">
+          <input type="text" class="pick-search" id="prot_search" placeholder="🔎 caută un user după nume..." autocomplete="off">
+          <div class="pick-results" id="prot_results"></div>
+          <div class="chips" id="prot_chips" style="margin-top:10px"></div>
+          <p class="sub" style="margin-top:8px">💡 Scrie numele, alege din listă. Poți adăuga oricâți — se iau direct de pe server.</p>
         </div>
 
         <div class="field">
@@ -234,17 +246,21 @@
         </div>
 
         <div class="field">
-          <label>✅ Persoane scutite (ID-uri — unul pe linie, oricâte)</label>
-          <textarea name="exempt_user_ids" placeholder="Persoanele care AU voie să menționeze, unul pe linie:&#10;123456789012345678" style="min-height:70px">{{ (mentions.get('exempt_user_ids') or [])|join('\n') }}</textarea>
-          <p class="sub" style="margin-top:8px">💡 Aceste persoane sunt scutite de regulă — pot menționa liber. Același format: ID sau <code>&lt;@ID&gt;</code>, câte vrei.</p>
+          <label>✅ Persoane scutite (au voie să menționeze)</label>
+          <input type="hidden" name="exempt_user_ids" id="exu_val" value="{{ (mentions.get('exempt_user_ids') or [])|join(' ') }}">
+          <input type="text" class="pick-search" id="exu_search" placeholder="🔎 caută un user după nume..." autocomplete="off">
+          <div class="pick-results" id="exu_results"></div>
+          <div class="chips" id="exu_chips" style="margin-top:10px"></div>
+          <p class="sub" style="margin-top:8px">💡 Aceste persoane sunt scutite — pot menționa liber. Le cauți și le alegi la fel.</p>
         </div>
 
         <div class="field">
           <label>✅ Roluri scutite (au voie să menționeze)</label>
           {% if roles %}
-          <div class="picklist">
+          <input type="text" class="pick-search" id="role_search" placeholder="🔎 caută un rol..." autocomplete="off" onkeyup="filterRoles(this.value)" style="margin-bottom:9px">
+          <div class="picklist" id="role_list">
             {% for r in roles %}
-            <label><input type="checkbox" name="mention_exempt_roles" value="{{ r.id }}"
+            <label data-name="{{ r.name|lower }}"><input type="checkbox" name="mention_exempt_roles" value="{{ r.id }}"
               {% if r.id|string in (mentions.get('exempt_role_ids') or [])|map('string')|list %}checked{% endif %}>
               <span class="rdot" style="background:{{ r.color or '#99aab5' }}"></span>{{ r.name }}</label>
             {% endfor %}
@@ -353,6 +369,85 @@
       document.querySelectorAll('[data-until]').forEach(function(el){
         el.textContent = rel(parseInt(el.dataset.until, 10));
       });
+    })();
+  </script>
+
+  <script>
+    // selector de useri cu CĂUTARE LIVE (ii ia direct de pe server prin bot)
+    (function(){
+      var GID = "{{ guild_id }}";
+      function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, function(c){
+        return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+      function debounce(fn, ms){ var t; return function(){ var a=arguments, c=this;
+        clearTimeout(t); t=setTimeout(function(){ fn.apply(c,a); }, ms); }; }
+
+      function makePicker(prefix){
+        var val = document.getElementById(prefix+'_val');
+        var search = document.getElementById(prefix+'_search');
+        var results = document.getElementById(prefix+'_results');
+        var chips = document.getElementById(prefix+'_chips');
+        if(!val || !search) return;
+        var selected = [];
+
+        function syncHidden(){ val.value = selected.map(function(s){ return s.id; }).join(' '); }
+        function renderChips(){
+          chips.innerHTML = '';
+          selected.forEach(function(s){
+            var span = document.createElement('span');
+            span.className = 'chip';
+            span.innerHTML = (s.avatar ? '<img src="'+s.avatar+'">' : '') + '<span>'+escapeHtml(s.name)+'</span>';
+            var btn = document.createElement('button');
+            btn.type='button'; btn.textContent='✕'; btn.title='Scoate';
+            btn.onclick = function(){ selected = selected.filter(function(x){ return x.id!==s.id; }); syncHidden(); renderChips(); };
+            span.appendChild(btn); chips.appendChild(span);
+          });
+        }
+        function add(m){
+          if(selected.some(function(x){ return x.id===m.id; })) return;
+          selected.push({id:m.id, name:m.name, avatar:m.avatar});
+          syncHidden(); renderChips();
+          search.value=''; results.classList.remove('open'); results.innerHTML='';
+        }
+        var doSearch = debounce(function(){
+          var q = search.value.trim();
+          if(!q){ results.classList.remove('open'); results.innerHTML=''; return; }
+          fetch('/api/members/'+GID+'?q='+encodeURIComponent(q))
+            .then(function(r){ return r.json(); })
+            .then(function(d){
+              results.innerHTML=''; var list = d.members||[];
+              if(!list.length){ results.innerHTML='<div class="muted-note">Niciun user găsit'+(d.error?' (botul pare offline)':'')+'.</div>'; results.classList.add('open'); return; }
+              list.forEach(function(m){
+                var item = document.createElement('div'); item.className='pick-item';
+                item.innerHTML = (m.avatar ? '<img src="'+m.avatar+'">' : '<img>') +
+                  '<div><div>'+escapeHtml(m.name)+'</div><div class="u">@'+escapeHtml(m.username||'')+'</div></div>';
+                item.onclick = function(){ add(m); };
+                results.appendChild(item);
+              });
+              results.classList.add('open');
+            })
+            .catch(function(){ results.innerHTML='<div class="muted-note">Eroare la căutare.</div>'; results.classList.add('open'); });
+        }, 250);
+        search.addEventListener('input', doSearch);
+        document.addEventListener('click', function(e){ if(!results.contains(e.target) && e.target!==search) results.classList.remove('open'); });
+
+        var initial = (val.value||'').trim();
+        if(initial){
+          fetch('/api/members/'+GID+'?ids='+encodeURIComponent(initial))
+            .then(function(r){ return r.json(); })
+            .then(function(d){ selected = (d.members||[]).map(function(m){ return {id:m.id, name:m.name, avatar:m.avatar}; }); renderChips(); })
+            .catch(function(){});
+        }
+      }
+
+      window.filterRoles = function(q){
+        q = (q||'').toLowerCase();
+        document.querySelectorAll('#role_list label').forEach(function(l){
+          l.style.display = (!q || (l.dataset.name||'').indexOf(q) !== -1) ? 'flex' : 'none';
+        });
+      };
+
+      makePicker('prot');
+      makePicker('exu');
     })();
   </script>
 {% endblock %}

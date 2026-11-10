@@ -627,6 +627,66 @@ def api_guild(guild_id):
     return jsonify(meta or {})
 
 
+@app.route("/api/members/<guild_id>")
+@guild_required
+def api_members(guild_id):
+    """Cauta membrii serverului LIVE (din cache-ul botului) ca sa poti alege
+    useri cu search in dashboard, fara sa stochezi mii de membri in fisier.
+    - ?q=text  -> cauta dupa nume/username (max 25 rezultate)
+    - ?ids=... -> rezolva numele unor ID-uri deja selectate (pt. chip-uri)."""
+    import re as _re
+    q = (request.args.get("q", "") or "").strip().lower()
+    ids_param = request.args.get("ids", "")
+    try:
+        import asyncio
+        from utils import botref
+        bot = botref.bot
+        loop = getattr(bot, "loop", None) if bot else None
+        if bot is None or loop is None:
+            return jsonify({"members": [], "error": "offline"})
+
+        def _pack(m):
+            return {"id": str(m.id), "name": m.display_name,
+                    "username": m.name,
+                    "avatar": m.display_avatar.url if m.display_avatar else None}
+
+        async def _run():
+            guild = bot.get_guild(int(guild_id))
+            if guild is None:
+                return []
+            # mod rezolvare: nume pentru ID-uri deja alese
+            if ids_param:
+                wanted = _re.findall(r"\d{15,21}", ids_param)
+                out = []
+                for i in wanted:
+                    m = guild.get_member(int(i))
+                    out.append(_pack(m) if m else
+                               {"id": i, "name": f"(a plecat · {i})", "username": "", "avatar": None})
+                return out
+            # mod cautare
+            matches = []
+            for m in guild.members:
+                if m.bot:
+                    continue
+                disp = (m.display_name or "")
+                name = (m.name or "")
+                gname = (getattr(m, "global_name", None) or "")
+                hay = (disp + " " + name + " " + gname).lower()
+                if q and q not in hay:
+                    continue
+                starts = disp.lower().startswith(q) or name.lower().startswith(q)
+                matches.append((0 if starts else 1, disp.lower(), _pack(m)))
+                if len(matches) >= 300:
+                    break
+            matches.sort(key=lambda x: (x[0], x[1]))
+            return [x[2] for x in matches[:25]]
+
+        members = asyncio.run_coroutine_threadsafe(_run(), loop).result(timeout=10)
+        return jsonify({"members": members})
+    except Exception:
+        return jsonify({"members": [], "error": "fail"})
+
+
 @app.route("/home/<guild_id>")
 @guild_required
 def home(guild_id):
