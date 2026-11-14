@@ -165,6 +165,10 @@ class Game(commands.Cog):
             return
 
         lo, hi = int(cfg.get("min", 0)), int(cfg.get("max", 100))
+        if lo > hi:            # config vechi/invalid -> nu crapam
+            lo, hi = hi, lo
+        if lo == hi:
+            hi = lo + 1
         rnd = random.randint(lo, hi)
         min_diff = min(abs(n - rnd) for n in st.guesses.values())
         winners = [f"<@{uid}> (**{n}**)" for uid, n in st.guesses.items()

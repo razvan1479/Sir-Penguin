@@ -401,14 +401,32 @@ class Giveaway(commands.Cog):
         if channel is None:
             return
         parts = gw.get("participants", [])
-        if not parts:
-            await channel.send(
-                f"🎉 Giveaway pentru **{gw['prize']}** s-a incheiat — niciun participant. 😢")
-        else:
-            n = min(gw.get("winners", 1), len(parts))
-            winners = random.sample(parts, n)
-            mentions = ", ".join(f"<@{u}>" for u in winners)
-            await channel.send(f"🎉 Felicitari {mentions}! Ai castigat **{gw['prize']}**!")
+        # eligibili: cei care sunt INCA pe server (cine a plecat nu poate castiga).
+        # Daca nu stim sigur lista de membri, folosim toti participantii (fallback).
+        eligible = parts
+        try:
+            if guild.get_member is not None:
+                present = [u for u in parts if guild.get_member(int(u)) is not None]
+                if present:
+                    eligible = present
+        except Exception:
+            eligible = parts
+        try:
+            if not parts:
+                await channel.send(
+                    f"🎉 Giveaway pentru **{gw['prize']}** s-a incheiat — niciun participant. 😢")
+            elif not eligible:
+                await channel.send(
+                    f"🎉 Giveaway pentru **{gw['prize']}** s-a incheiat, dar participantii au plecat de pe server. 😢")
+            else:
+                n = min(gw.get("winners", 1), len(eligible))
+                winners = random.sample(eligible, n)
+                mentions = ", ".join(f"<@{u}>" for u in winners)
+                await channel.send(
+                    f"🎉 Felicitari {mentions}! Ai castigat **{gw['prize']}**!",
+                    allowed_mentions=discord.AllowedMentions(users=True))
+        except discord.HTTPException:
+            pass  # fara drept de scriere -> nu oprim ceasul din aceasta cauza
 
         # edit mesajul original: scrie ca s-a terminat si scoate butonul
         try:
@@ -432,88 +450,104 @@ class Giveaway(commands.Cog):
     async def ticker(self):
         now = time.time()
         for guild in self.bot.guilds:
-            data = storage.get(guild.id, "giveaways", {})
-            active = data.get("active", {})
+          # izolam fiecare server: o eroare pe unul nu opreste restul si nu
+          # omoara ceasul (altfel giveaway-urile nu s-ar mai incheia deloc).
+          try:
+              data = storage.get(guild.id, "giveaways", {})
+              active = data.get("active", {})
 
-            # 1. plasa de siguranta: incheiem ce a expirat (de obicei deja
-            #    incheiat de programarea precisa; _finalize e idempotent)
-            expired = [mid for mid, gw in active.items() if gw.get("end_ts", 0) <= now]
-            for mid in expired:
-                await self._finalize(guild, mid)
+              # 1. plasa de siguranta: incheiem ce a expirat (de obicei deja
+              #    incheiat de programarea precisa; _finalize e idempotent)
+              expired = [mid for mid, gw in active.items() if gw.get("end_ts", 0) <= now]
+              for mid in expired:
+                  await self._finalize(guild, mid)
 
-            # 2. postare recurenta (interval sau saptamanal)
-            data = storage.get(guild.id, "giveaways", {})
-            cfg = data.get("config", {})
-            if not cfg.get("channel_id"):
-                continue
-            mode = _sched_mode(cfg)
+              # 2. postare recurenta (interval sau saptamanal)
+              data = storage.get(guild.id, "giveaways", {})
+              cfg = data.get("config", {})
+              if not cfg.get("channel_id"):
+                  continue
+              mode = _sched_mode(cfg)
 
-            if mode == "interval":
-                nxt = data.get("next_post_ts")
-                if nxt is None:
-                    # plasa de siguranta (dashboard-ul o calculeaza ancorat la salvare)
-                    data["next_post_ts"] = now + cfg.get("interval_hours", 24) * 3600
-                    storage.set(guild.id, "giveaways", data)
-                elif now >= nxt:
-                    await self._post_giveaway(guild, cfg)
-                    data = storage.get(guild.id, "giveaways", {})
-                    # avansam de la ORA PROGRAMATA anterior (nu de la "acum"),
-                    # ca sa ramana ancorat si sa nu se acumuleze intarziere
-                    data["next_post_ts"] = nxt + cfg.get("interval_hours", 24) * 3600
-                    storage.set(guild.id, "giveaways", data)
+              if mode == "interval":
+                  nxt = data.get("next_post_ts")
+                  if nxt is None:
+                      # plasa de siguranta (dashboard-ul o calculeaza ancorat la salvare)
+                      data["next_post_ts"] = now + cfg.get("interval_hours", 24) * 3600
+                      storage.set(guild.id, "giveaways", data)
+                  elif now >= nxt:
+                      await self._post_giveaway(guild, cfg)
+                      data = storage.get(guild.id, "giveaways", {})
+                      # avansam de la ORA PROGRAMATA anterior (ancorat), dar sarim
+                      # peste intervalele pierdute pana ajungem IN VIITOR. Altfel,
+                      # daca botul a fost oprit mai multe cicluri, ar posta in rafala.
+                      step = max(1, cfg.get("interval_hours", 24)) * 3600
+                      nxt2 = nxt + step
+                      while nxt2 <= now:
+                          nxt2 += step
+                      data["next_post_ts"] = nxt2
+                      storage.set(guild.id, "giveaways", data)
 
-            elif mode == "weekly":
-                nxt = data.get("next_post_ts")
-                if nxt is None:
-                    data["next_post_ts"] = self._next_weekly_start(cfg, now)
-                    storage.set(guild.id, "giveaways", data)
-                elif now >= nxt:
-                    await self._post_giveaway(guild, cfg)
-                    data = storage.get(guild.id, "giveaways", {})
-                    # urmatorul start dupa "acum" -> daca botul a fost oprit
-                    # mai multe saptamani, nu posteaza in rafala, sare direct
-                    # la urmatoarea aparitie viitoare
-                    data["next_post_ts"] = self._next_weekly_start(cfg, time.time())
-                    storage.set(guild.id, "giveaways", data)
+              elif mode == "weekly":
+                  nxt = data.get("next_post_ts")
+                  if nxt is None:
+                      data["next_post_ts"] = self._next_weekly_start(cfg, now)
+                      storage.set(guild.id, "giveaways", data)
+                  elif now >= nxt:
+                      await self._post_giveaway(guild, cfg)
+                      data = storage.get(guild.id, "giveaways", {})
+                      # urmatorul start dupa "acum" -> daca botul a fost oprit
+                      # mai multe saptamani, nu posteaza in rafala, sare direct
+                      # la urmatoarea aparitie viitoare
+                      data["next_post_ts"] = self._next_weekly_start(cfg, time.time())
+                      storage.set(guild.id, "giveaways", data)
 
-            elif mode == "exact":
-                # programat O SINGURA DATA: daca ai setat o data de START (viitoare),
-                # dashboard-ul pune next_post_ts la acel moment. Cand vine timpul,
-                # postam o data si golim next_post_ts (nu se repeta). Daca n-ai pus
-                # start, next_post_ts e None -> il postezi manual cu /giveaway_start.
-                nxt = data.get("next_post_ts")
+              elif mode == "exact":
+                  # programat O SINGURA DATA: daca ai setat o data de START (viitoare),
+                  # dashboard-ul pune next_post_ts la acel moment. Cand vine timpul,
+                  # postam o data si golim next_post_ts (nu se repeta). Daca n-ai pus
+                  # start, next_post_ts e None -> il postezi manual cu /giveaway_start.
+                  nxt = data.get("next_post_ts")
 
-                # AUTO-REPARARE: daca lipseste next_post_ts dar exista un
-                # start_datetime in config (ex. config vechi salvat pe o versiune
-                # anterioara, sau next_post_ts pierdut), il recalculam singuri aici.
-                # Asa postarea automata merge chiar daca dashboard-ul n-a apucat
-                # sa-l calculeze. Nu reprocesam acelasi start de doua ori (_exact_done).
-                if nxt is None:
-                    sraw = str(cfg.get("start_datetime", ""))
-                    if "T" in sraw and cfg.get("_exact_done") != sraw:
-                        try:
-                            _sd, _st = sraw.split("T", 1)
-                            _y, _mo, _d = (int(x) for x in _sd.split("-"))
-                            _hh, _mm = (int(x) for x in _st[:5].split(":"))
-                            nxt = datetime.datetime(_y, _mo, _d, _hh, _mm, tzinfo=TZ).timestamp()
-                            data["next_post_ts"] = nxt
-                            storage.set(guild.id, "giveaways", data)
-                        except (ValueError, TypeError):
-                            nxt = None
+                  # AUTO-REPARARE: daca lipseste next_post_ts dar exista un
+                  # start_datetime in config (ex. config vechi salvat pe o versiune
+                  # anterioara, sau next_post_ts pierdut), il recalculam singuri aici.
+                  # Asa postarea automata merge chiar daca dashboard-ul n-a apucat
+                  # sa-l calculeze. Nu reprocesam acelasi start de doua ori (_exact_done).
+                  if nxt is None:
+                      sraw = str(cfg.get("start_datetime", ""))
+                      if "T" in sraw and cfg.get("_exact_done") != sraw:
+                          try:
+                              _sd, _st = sraw.split("T", 1)
+                              _y, _mo, _d = (int(x) for x in _sd.split("-"))
+                              _hh, _mm = (int(x) for x in _st[:5].split(":"))
+                              nxt = datetime.datetime(_y, _mo, _d, _hh, _mm, tzinfo=TZ).timestamp()
+                              data["next_post_ts"] = nxt
+                              storage.set(guild.id, "giveaways", data)
+                          except (ValueError, TypeError):
+                              nxt = None
 
-                if nxt is not None and now >= nxt:
-                    await self._post_giveaway(guild, cfg)
-                    data = storage.get(guild.id, "giveaways", {})
-                    data["next_post_ts"] = None
-                    # marcam acest start ca postat, ca auto-repararea sa nu-l repuna
-                    cfg2 = data.get("config", {})
-                    cfg2["_exact_done"] = str(cfg2.get("start_datetime", ""))
-                    data["config"] = cfg2
-                    storage.set(guild.id, "giveaways", data)
+                  if nxt is not None and now >= nxt:
+                      await self._post_giveaway(guild, cfg)
+                      data = storage.get(guild.id, "giveaways", {})
+                      data["next_post_ts"] = None
+                      # marcam acest start ca postat, ca auto-repararea sa nu-l repuna
+                      cfg2 = data.get("config", {})
+                      cfg2["_exact_done"] = str(cfg2.get("start_datetime", ""))
+                      data["config"] = cfg2
+                      storage.set(guild.id, "giveaways", data)
+          except Exception as e:
+            print(f"[giveaway] ticker eroare pe {guild.id}: {e!r}")
 
     @ticker.before_loop
     async def _before(self):
         await self.bot.wait_until_ready()
+
+    @ticker.error
+    async def _ticker_error(self, exc):
+        # daca ceasul crapa totusi, il repornim ca sa nu moara definitiv
+        print(f"[giveaway] ticker a crapat: {exc!r}; repornesc.")
+        self.ticker.restart()
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -574,9 +608,16 @@ class Giveaway(commands.Cog):
         if not gw or not gw.get("participants"):
             return await interaction.response.send_message(
                 "Nu gasesc participanti pentru acest giveaway incheiat.", ephemeral=True)
-        winner = random.choice(gw["participants"])
+        parts = gw["participants"]
+        # preferam cine e inca pe server
+        present = [u for u in parts if interaction.guild.get_member(int(u)) is not None]
+        pool = present or parts
+        n = min(gw.get("winners", 1), len(pool))
+        winners = random.sample(pool, n)
+        mentions = ", ".join(f"<@{u}>" for u in winners)
         await interaction.response.send_message(
-            f"🎲 Noul castigator pentru **{gw['prize']}**: <@{winner}>!")
+            f"🎲 Castigator(i) nou(i) pentru **{gw['prize']}**: {mentions}!",
+            allowed_mentions=discord.AllowedMentions(users=True))
 
 
 async def setup(bot: commands.Bot):

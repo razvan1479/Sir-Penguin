@@ -174,6 +174,9 @@ class TempVoice(commands.Cog):
                     await before.channel.delete(reason="tempvoice: canal gol")
                 except discord.HTTPException:
                     pass
+                # recitim ACUM (dupa await) ca sa nu suprascriem un canal creat
+                # intre timp de altcineva; scoatem doar intrarea asta
+                active = _active(guild.id)
                 active.pop(str(before.channel.id), None)
                 _save_active(guild.id, active)
 
@@ -210,7 +213,14 @@ class TempVoice(commands.Cog):
         try:
             await member.move_to(ch)
         except discord.HTTPException:
-            pass
+            # n-am putut muta membrul (a iesit imediat?) -> daca noul canal e gol,
+            # il stergem ca sa nu ramana un canal orfan pana la restart
+            if len(ch.members) == 0:
+                try:
+                    await ch.delete(reason="tempvoice: nu am putut muta membrul")
+                except discord.HTTPException:
+                    pass
+                return
 
         active = _active(guild.id)
         active[str(ch.id)] = {"owner_id": str(member.id), "private": private}

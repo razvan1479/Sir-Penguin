@@ -62,7 +62,7 @@
         </div>
         {% if upcoming.mode == 'exact' %}
         <form method="POST" style="margin:0"
-              onsubmit="return confirm('Anulezi programarea pentru „{{ upcoming.prize }}”? Nu se va mai posta automat la ora setată.')">
+              data-confirm="Anulezi programarea pentru „{{ upcoming.prize }}”? Nu se va mai posta automat la ora setată.">
           <input type="hidden" name="action" value="cancel_scheduled">
           <button type="submit" style="background:rgba(244,63,94,.15);color:#fb7185;border:1px solid rgba(244,63,94,.35);border-radius:9px;padding:9px 16px;font-weight:600;font-size:13px;cursor:pointer;white-space:nowrap">🚫 Anulează programarea</button>
         </form>
@@ -93,7 +93,7 @@
             </div>
           </div>
           <form method="POST" style="margin:0"
-                onsubmit="return confirm('Sigur ștergi giveaway-ul „{{ g.prize }}”? Mesajul de pe Discord va fi șters și nu se mai aleg câștigători.')">
+                data-confirm="Sigur ștergi giveaway-ul „{{ g.prize }}”? Mesajul de pe Discord va fi șters și nu se mai aleg câștigători.">
             <input type="hidden" name="action" value="cancel">
             <input type="hidden" name="mid" value="{{ g.mid }}">
             <button type="submit" style="background:rgba(244,63,94,.15);color:#fb7185;border:1px solid rgba(244,63,94,.35);border-radius:9px;padding:9px 16px;font-weight:600;font-size:13px;cursor:pointer;white-space:nowrap">🗑️ Șterge</button>

@@ -163,7 +163,7 @@
         <div style="margin-top:22px; padding-top:20px; border-top:1px solid var(--glass-border)">
           <h2 style="margin-bottom:6px">🔄 Repornește botul</h2>
           <p class="muted" style="font-size:13px; margin-bottom:12px; line-height:1.6">Repornește botul ca să încarce ultimul cod (util după un push). Durează ~15 secunde. Doar owner-ul botului poate face asta.</p>
-          <form method="POST" action="/restart" onsubmit="return confirm('Repornești botul acum? Va fi indisponibil ~15 secunde.')">
+          <form method="POST" action="/restart" data-confirm="Repornești botul acum? Va fi indisponibil ~15 secunde.">
             <button class="btn restart" type="submit">🔄 Repornește botul acum</button>
           </form>
         </div>

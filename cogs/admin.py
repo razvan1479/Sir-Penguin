@@ -31,7 +31,8 @@ class Admin(commands.Cog):
         if not getattr(self, "_owner_saved", False):
             try:
                 app = await self.bot.application_info()
-                storage.set(0, "bot_owner_id", str(app.owner.id))
+                owner_id = app.team.owner_id if app.team else app.owner.id
+                storage.set(0, "bot_owner_id", str(owner_id))
                 self._owner_saved = True
             except discord.HTTPException:
                 pass
@@ -123,7 +124,8 @@ class Admin(commands.Cog):
     @app_commands.command(name="serverlist", description="(owner) Lista serverelor pe care e botul")
     async def serverlist(self, interaction: discord.Interaction):
         app = await self.bot.application_info()
-        if interaction.user.id != app.owner.id:
+        owner_id = app.team.owner_id if app.team else app.owner.id
+        if interaction.user.id != owner_id:
             return await interaction.response.send_message("Doar owner-ul botului poate folosi asta.", ephemeral=True)
 
         guilds = sorted(self.bot.guilds, key=lambda g: g.member_count or 0, reverse=True)
@@ -141,7 +143,8 @@ class Admin(commands.Cog):
     @app_commands.describe(server_id="ID-ul serverului de pe care iese botul")
     async def leaveserver(self, interaction: discord.Interaction, server_id: str):
         app = await self.bot.application_info()
-        if interaction.user.id != app.owner.id:
+        owner_id = app.team.owner_id if app.team else app.owner.id
+        if interaction.user.id != owner_id:
             return await interaction.response.send_message("Doar owner-ul botului poate folosi asta.", ephemeral=True)
 
         if not server_id.isdigit():

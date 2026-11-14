@@ -115,6 +115,14 @@ class MassDM(commands.Cog):
             camp["last_ts"] = now
             if not queue:
                 camp["status"] = "done"
+            # recitim ACUM: daca intre timp ai apasat Stop / ai dezactivat functia
+            # din dashboard (cat timp trimiteam DM-ul), nu suprascriem acea decizie
+            # inapoi la "running". Pastram doar contoarele si coada actualizate.
+            latest = self._camp(guild.id)
+            if latest.get("status") == "stopped":
+                camp["status"] = "stopped"
+            if latest.get("feature_disabled"):
+                camp["feature_disabled"] = True
             self._save(guild.id, camp)
 
     @sender_loop.before_loop

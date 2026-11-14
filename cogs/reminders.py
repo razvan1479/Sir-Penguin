@@ -61,9 +61,17 @@ class Reminders(commands.Cog):
                 await self._send(guild, r)
                 repeat_hours = r.get("repeat_hours")
                 if repeat_hours:
-                    # recurent: NU se sterge — avansam ora de declansare cu exact
-                    # intervalul, ca sa nu se acumuleze intarziere (drift) in timp
-                    r["trigger_ts"] = r.get("trigger_ts", now) + repeat_hours * 3600
+                    # recurent: NU se sterge. Avansam ora de declansare pana AJUNGE
+                    # IN VIITOR, nu doar cu un interval. Altfel, daca botul a fost
+                    # oprit cateva ore, reminderul ar fi "due" la fiecare tur si ar
+                    # trimite o rafala de @everyone (cate unul la 20s). Asa trimitem
+                    # o SINGURA data si sarim peste intervalele pierdute.
+                    step = repeat_hours * 3600
+                    nxt = r.get("trigger_ts", now) + step
+                    if step > 0:
+                        while nxt <= now:
+                            nxt += step
+                    r["trigger_ts"] = nxt
                     remaining.append(r)
             # scoatem/pastram reminderele DUPA ce am incercat sa le trimitem pe
             # toate — daca botul repornise chiar in acest interval, mai bine

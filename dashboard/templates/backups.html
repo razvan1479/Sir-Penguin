@@ -96,7 +96,7 @@
         </div>
         <div class="actions">
           <a class="btn view" href="/backups/{{ guild_id }}?preview={{ b.id }}">👁️ Preview</a>
-          <form method="POST" onsubmit="return confirm('Ștergi acest backup?')" style="margin:0">
+          <form method="POST" data-confirm="Ștergi acest backup?" style="margin:0">
             <input type="hidden" name="action" value="delete"><input type="hidden" name="backup_id" value="{{ b.id }}">
             <button class="del" type="submit">🗑️</button>
           </form>

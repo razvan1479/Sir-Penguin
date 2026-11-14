@@ -159,7 +159,7 @@
         </div>
         <div style="display:flex; gap:8px">
           <a class="del" style="background:var(--input); text-decoration:none; display:inline-flex; align-items:center" href="/helperapp/{{ guild_id }}?editq={{ q.id }}#qform">✏️ Editează</a>
-          <form method="POST" onsubmit="return confirm('Ștergi întrebarea „{{ q.label }}”?')">
+          <form method="POST" data-confirm="Ștergi întrebarea „{{ q.label }}”?">
             <input type="hidden" name="action" value="del_question">
             <input type="hidden" name="q_id" value="{{ q.id }}">
             <button class="del" type="submit">Șterge</button>

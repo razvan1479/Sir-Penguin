@@ -69,7 +69,7 @@
       <div class="sub">
         <span class="badge {{ {'youtube':'yt','tiktok':'tt'}.get(s.platform,'yt') }}">{{ s.platform }}</span>
         <div class="info">{{ s.url }}<br><small>→ canal #{{ s.discord_channel_id }}{% if s.role_id %} · ping &lt;@&amp;{{ s.role_id }}&gt;{% endif %}{% if s.keywords %} · 🔎 {{ s.keywords|join(', ') }}{% endif %} · ID: {{ s.id }}</small></div>
-        <form method="POST" onsubmit="return confirm('Stergi aceasta urmarire?')">
+        <form method="POST" data-confirm="Stergi aceasta urmarire?">
           <input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="{{ s.id }}">
           <button class="del" title="Sterge">✕</button>
         </form>

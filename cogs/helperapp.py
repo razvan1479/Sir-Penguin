@@ -260,7 +260,10 @@ class HelperApp(commands.Cog):
         reqs = storage.get(interaction.guild_id, "helper_requests", {}) or {}
         info = reqs.get(req_id)
         if not info:
-            # cerere necunoscuta (poate un restart intre timp) — stergem oricum mesajul
+            # cerere necunoscuta (poate un restart intre timp) — eliberam lacatul
+            # si stergem oricum mesajul
+            processing.pop(req_id, None)
+            storage.set(interaction.guild_id, "helper_processing", processing)
             try:
                 await interaction.message.delete()
             except discord.HTTPException:
@@ -281,7 +284,9 @@ class HelperApp(commands.Cog):
                 else:
                     text = cfg.get("dm_reject") or DEFAULT_DM_REJECT
                 await member.send(_fill_dm(text, member, interaction.guild))
-            except discord.Forbidden:
+            except discord.HTTPException:
+                # DM inchis SAU alta eroare (rate limit etc.) -> nu lasam cererea
+                # blocata pe veci; marcam doar ca n-a mers DM-ul si mergem mai departe
                 dm_ok = False
 
         # 2) rolul de Helper (doar la acceptare, si doar daca ai setat unul).

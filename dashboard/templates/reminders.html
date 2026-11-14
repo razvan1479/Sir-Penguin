@@ -63,7 +63,7 @@
               {% if r.repeat_hours %} · 🔁 la fiecare {{ r.repeat_hours }}h{% endif %}
             </div>
           </div>
-          <form method="POST" onsubmit="return confirm('Ștergi acest reminder?')">
+          <form method="POST" data-confirm="Ștergi acest reminder?">
             <input type="hidden" name="action" value="delete">
             <input type="hidden" name="id" value="{{ r.id }}">
             <button class="del" type="submit">✕ Șterge</button>

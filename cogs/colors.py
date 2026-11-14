@@ -62,16 +62,27 @@ COLORS = [
 ]
 
 
+async def _reply(interaction, text):
+    """Raspunde ephemeral, fie direct, fie prin followup daca am dat deja defer.
+    Asa nu apare 'interaction failed' cand crearea/mutarea rolului dureaza > 3s."""
+    if interaction.response.is_done():
+        await interaction.followup.send(text, ephemeral=True)
+    else:
+        await interaction.response.send_message(text, ephemeral=True)
+
+
 async def _assign_color(interaction: discord.Interaction, name: str, color_val: int):
     if not _enabled(interaction.guild_id):
-        return await interaction.response.send_message(
-            "Funcția de culori e dezactivată momentan.", ephemeral=True)
+        return await _reply(interaction, "Funcția de culori e dezactivată momentan.")
     if not _can_use_colors(interaction):
-        return await interaction.response.send_message(
-            "Nu ai voie să folosești culorile pe acest server.", ephemeral=True)
+        return await _reply(interaction, "Nu ai voie să folosești culorile pe acest server.")
     guild = interaction.guild
     member = interaction.user
     role_name = f"{ROLE_PREFIX}{name}"
+
+    # crearea + mutarea rolului pot depasi 3s -> dam defer ca sa nu expire interactiunea
+    if not interaction.response.is_done():
+        await interaction.response.defer(ephemeral=True)
 
     # rolul exista deja? (refolosim, nu dublam)
     role = discord.utils.get(guild.roles, name=role_name)
@@ -81,12 +92,11 @@ async def _assign_color(interaction: discord.Interaction, name: str, color_val: 
                 name=role_name, colour=discord.Colour(color_val),
                 reason=f"Rol de culoare (auto) cerut de {member}")
         except discord.Forbidden:
-            return await interaction.response.send_message(
-                "Nu am permisiunea să creez roluri. Dă-mi permisiunea **Gestionează rolurile**.",
-                ephemeral=True)
+            return await _reply(interaction,
+                "Nu am permisiunea să creez roluri. Dă-mi permisiunea **Gestionează rolurile**.")
         except discord.HTTPException:
-            return await interaction.response.send_message(
-                "Nu am putut crea rolul de culoare acum. Încearcă din nou.", ephemeral=True)
+            return await _reply(interaction,
+                "Nu am putut crea rolul de culoare acum. Încearcă din nou.")
 
         # mutam rolul imediat sub rolul cel mai de sus al botului, ca sa se vada culoarea.
         # in Discord, culoarea numelui vine de la cel mai de sus rol COLORAT.
@@ -111,23 +121,20 @@ async def _assign_color(interaction: discord.Interaction, name: str, color_val: 
     if role in member.roles:
         try:
             await member.remove_roles(role, reason="A scos culoarea")
-            return await interaction.response.send_message(
-                f"{name} — ți-am scos culoarea. 🤍", ephemeral=True)
+            return await _reply(interaction, f"{name} — ți-am scos culoarea. 🤍")
         except discord.Forbidden:
-            return await interaction.response.send_message(
-                "Nu pot modifica rolurile tale (rolul meu trebuie să fie mai sus).", ephemeral=True)
+            return await _reply(interaction,
+                "Nu pot modifica rolurile tale (rolul meu trebuie să fie mai sus).")
 
     try:
         if others:
             await member.remove_roles(*others, reason="Schimbare culoare")
         await member.add_roles(role, reason="A ales o culoare")
     except discord.Forbidden:
-        return await interaction.response.send_message(
-            "Nu pot să-ți pun rolul — **mută rolul botului mai sus** decât rolurile de culoare.",
-            ephemeral=True)
+        return await _reply(interaction,
+            "Nu pot să-ți pun rolul — **mută rolul botului mai sus** decât rolurile de culoare.")
 
-    await interaction.response.send_message(
-        f"Gata! Ți-am pus culoarea **{name}**. 🎨", ephemeral=True)
+    await _reply(interaction, f"Gata! Ți-am pus culoarea **{name}**. 🎨")
 
 
 class ColorButton(discord.ui.Button):

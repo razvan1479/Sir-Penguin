@@ -89,6 +89,7 @@
       <p class="sub">Detectarea ține cont de litere mari/mici, spații, puncte și câteva variante scrise (ex. „pr0st" e prins la fel ca „prost").</p>
     </div>
     <div class="panel-body">
+      {% if werr %}<div style="background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:#f87171;border-radius:10px;padding:11px 15px;margin-bottom:14px;font-size:14px">⛔ {{ werr }}</div>{% endif %}
       {% if words %}
       <div class="chips">
         {% for w in words %}

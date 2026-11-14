@@ -131,7 +131,7 @@
           <div class="meta">{{ s.members }} membri · ID {{ s.id }}{% if s.owner %} · owner: {{ s.owner }}{% endif %}</div>
         </div>
         <div class="actions">
-          <form method="POST" onsubmit="return confirm('Sigur scoți botul de pe „{{ s.name }}”? Va trebui reinvitat ca să revină.')">
+          <form method="POST" class="leave-form" data-name="{{ s.name }}">
             <input type="hidden" name="action" value="leave">
             <input type="hidden" name="guild_id" value="{{ s.id }}">
             <button type="submit">🚪 Scoate botul</button>
@@ -141,7 +141,7 @@
             <input type="hidden" name="guild_id" value="{{ s.id }}">
             <input type="hidden" name="confirm_name" value="">
             <button type="button" class="wipebtn"
-                    onclick="wipeServer('{{ s.id }}', {{ s.name|tojson }})">💣 Șterge tot</button>
+                    data-id="{{ s.id }}" data-name="{{ s.name }}">💣 Șterge tot</button>
           </form>
         </div>
       </div>
@@ -155,16 +155,28 @@
         setTimeout(function(){ location.reload(); }, 4000);
       }
     })();
-    function wipeServer(id, name){
-      var t = prompt('⚠️ ȘTERGERE TOTALĂ a serverului „' + name + '”.\n\n'
-        + 'Se vor șterge TOATE canalele ȘI categoriile. Acțiune IREVERSIBILĂ!\n\n'
-        + 'Ca să confirmi, scrie exact numele serverului:');
-      if (t === null) return;
-      if (t.trim() !== name) { alert('Numele nu se potrivește. Am anulat — nu s-a șters nimic.'); return; }
-      var f = document.getElementById('wipe-' + id);
-      f.querySelector('input[name=confirm_name]').value = t.trim();
-      f.submit();
-    }
+    // numele serverului vine din data-name (escapat corect de Jinja), nu din
+    // cod JS injectat in handler -> fara risc de XSS
+    document.querySelectorAll('.leave-form').forEach(function(f){
+      f.addEventListener('submit', function(e){
+        var name = f.dataset.name || '';
+        if (!confirm('Sigur scoți botul de pe „' + name + '”? Va trebui reinvitat ca să revină.'))
+          e.preventDefault();
+      });
+    });
+    document.querySelectorAll('.wipebtn').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var id = btn.dataset.id, name = btn.dataset.name || '';
+        var t = prompt('⚠️ ȘTERGERE TOTALĂ a serverului „' + name + '”.\n\n'
+          + 'Se vor șterge TOATE canalele ȘI categoriile. Acțiune IREVERSIBILĂ!\n\n'
+          + 'Ca să confirmi, scrie exact numele serverului:');
+        if (t === null) return;
+        if (t.trim() !== name) { alert('Numele nu se potrivește. Am anulat — nu s-a șters nimic.'); return; }
+        var f = document.getElementById('wipe-' + id);
+        f.querySelector('input[name=confirm_name]').value = t.trim();
+        f.submit();
+      });
+    });
   </script>
 </body>
 </html>

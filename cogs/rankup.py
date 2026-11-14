@@ -98,7 +98,7 @@ class RankUp(commands.Cog):
                 if member.bot or member.joined_at is None:
                     continue
                 days = (now - member.joined_at).days
-                nick = member.nick or member.name
+                nick = member.nick or member.display_name
                 base = base_nick(nick, emojis)
                 cur = current_tier(nick, tiers)
                 cor = correct_tier(days, tiers)
@@ -178,6 +178,11 @@ class RankUp(commands.Cog):
     @rank_loop.before_loop
     async def _before(self):
         await self.bot.wait_until_ready()
+
+    @rank_loop.error
+    async def _rank_loop_error(self, exc):
+        print(f"[rankup] rank_loop a crapat: {exc!r}; repornesc.")
+        self.rank_loop.restart()
 
     rankup = app_commands.Group(name="rankup", description="Rank-uri automate dupa vechime")
 

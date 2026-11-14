@@ -20,6 +20,7 @@
 
 {% block content %}
   {% if sent %}<div class="saved">✓ Comanda trimisa! Botul o executa in cateva secunde. Reincarca pagina ca sa vezi rezultatul.</div>{% endif %}
+  {% if err %}<div class="saved" style="background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.3);color:#f87171">⛔ {{ err }}</div>{% endif %}
 
   {% if job %}
     <div class="status st-{{ job.status }}">

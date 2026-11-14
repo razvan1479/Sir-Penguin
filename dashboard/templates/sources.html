@@ -55,7 +55,7 @@
         </div>
         <div class="link">
           <code>{{ s.link }}</code>
-          <form method="POST" onsubmit="return confirm('Ștergi sursa „{{ s.label }}” din evidență? (linkul de invite rămâne activ pe Discord)')" style="margin:0">
+          <form method="POST" data-confirm="Ștergi sursa „{{ s.label }}” din evidență? (linkul de invite rămâne activ pe Discord)" style="margin:0">
             <input type="hidden" name="action" value="delete">
             <input type="hidden" name="code" value="{{ s.code }}">
             <button class="del" type="submit">🗑️ Șterge</button>

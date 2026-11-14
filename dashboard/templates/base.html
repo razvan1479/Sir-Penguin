@@ -231,6 +231,13 @@
       setTimeout(function(){ location.reload(); }, 4000);
     }
   })();
+  // Confirmare pentru formulare cu data-confirm. Textul vine din atribut
+  // (escapat corect de Jinja), NU din cod JS injectat -> fara risc de XSS.
+  document.querySelectorAll('form[data-confirm]').forEach(function(f){
+    f.addEventListener('submit', function(e){
+      if (!confirm(f.getAttribute('data-confirm'))) e.preventDefault();
+    });
+  });
 </script>
 </body>
 </html>

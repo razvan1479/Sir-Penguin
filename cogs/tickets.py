@@ -184,6 +184,20 @@ class Tickets(commands.Cog):
     async def _before_perm_sync(self):
         await self.bot.wait_until_ready()
 
+    # -------- canal de ticket sters manual -> il scoatem din evidenta --------
+    @commands.Cog.listener()
+    async def on_guild_channel_delete(self, channel):
+        """Daca cineva sterge manual canalul unui ticket, il scoatem din 'open'.
+        Altfel, cu 'un ticket per persoana', utilizatorul ramane blocat pe veci
+        ('Ai deja un ticket deschis' catre un canal care nu mai exista)."""
+        try:
+            data = _data(channel.guild.id)
+            if str(channel.id) in data.get("open", {}):
+                data["open"].pop(str(channel.id), None)
+                _save(channel.guild.id, data)
+        except Exception:
+            pass
+
     # -------- dispatch butoane (merge si dupa restart) --------
     @commands.Cog.listener()
     async def on_interaction(self, interaction: discord.Interaction):
@@ -254,6 +268,11 @@ class Tickets(commands.Cog):
         except discord.Forbidden:
             return await interaction.followup.send(
                 "Nu am permisiuni sa creez canalul (am nevoie de Manage Channels).", ephemeral=True)
+        except discord.HTTPException as e:
+            # orice alta eroare -> raspundem oricum, ca utilizatorul sa nu ramana
+            # blocat la "thinking..."; nu salvam numarul consumat
+            return await interaction.followup.send(
+                f"Nu am putut crea ticketul acum (`{e}`). Mai încearcă.", ephemeral=True)
 
         data.setdefault("open", {})[str(channel.id)] = {
             "type_id": type_id, "owner_id": interaction.user.id,

@@ -332,7 +332,12 @@ class AutoMod(commands.Cog):
             return
 
         norm = _normalize(message.content or "")
-        hit = next((w for w in words if w and _normalize(w) in norm), None)
+        # IMPORTANT: ignoram cuvintele care, dupa normalizare, raman sub 3 litere.
+        # Altfel un cuvant format doar din diacritice/semne (ex. "???", "ăăă") s-ar
+        # normaliza la "" si ar sterge ORICE mesaj. Un cuvant cu 1-2 litere e prea
+        # scurt oricum (ar prinde subsiruri din cuvinte normale).
+        hit = next((w for w in words
+                    if w and len(_normalize(w)) >= 3 and _normalize(w) in norm), None)
         if not hit:
             return
 

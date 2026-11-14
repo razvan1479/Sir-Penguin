@@ -165,6 +165,13 @@ class Cleanup(commands.Cog):
                         pass
 
                 total = 0
+                # SIGURANTA: daca jobul e pe "canal" dar nu are channel_id valid,
+                # NU curatam tot serverul din greseala — il marcam eroare si iesim.
+                if job.get("scope") == "channel" and not job.get("channel_id"):
+                    job.update(status="error",
+                               result="Job pe canal fără canal ales — am anulat pentru siguranță.")
+                    storage.set(guild.id, "cleanup_job", job)
+                    continue
                 if job.get("channel_id"):  # un singur canal
                     ch = guild.get_channel(int(job["channel_id"]))
                     if ch and ch.permissions_for(guild.me).manage_messages:
@@ -195,6 +202,11 @@ class Cleanup(commands.Cog):
     @job_loop.before_loop
     async def _before_job(self):
         await self.bot.wait_until_ready()
+
+    @job_loop.error
+    async def _job_loop_error(self, exc):
+        print(f"[cleanup] job_loop a crapat: {exc!r}; repornesc.")
+        self.job_loop.restart()
 
     # -------------------------------------------------- AUTO-STERGERE
     # structura in storage, cheia "autodelete":

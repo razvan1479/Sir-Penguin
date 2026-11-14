@@ -39,7 +39,7 @@
     {% for n in embeds %}
     <span class="chip">
       <a href="/embeds/{{ guild_id }}?edit={{ n }}">📄 {{ n }}</a>
-      <form method="POST" style="display:inline" onsubmit="return confirm('Sterg embed-ul {{ n }}?')">
+      <form method="POST" style="display:inline" data-confirm="Sterg embed-ul {{ n }}?">
         <input type="hidden" name="action" value="delete"><input type="hidden" name="name" value="{{ n }}">
         <button class="del" title="Sterge">✕</button>
       </form>

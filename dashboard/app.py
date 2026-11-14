@@ -282,6 +282,48 @@ def _can_manage(user_id, guild_id):
         return False
 
 
+def _can_assign_role(user_id, guild_id, role_id):
+    """Poate userul logat sa dea/scoata ACEST rol? (anti-escaladare privilegii)
+    Owner-ul serverului / super-userii: da. Altfel, rolul-tinta trebuie sa fie
+    STRICT sub rolul cel mai inalt al userului — exact ca la comanda slash, ca
+    nimeni sa nu-si dea (sau sa dea altora) un rol de deasupra lui.
+    Returneaza (ok: bool, motiv: str|None). Pe bot offline, refuzam (fail-safe)."""
+    try:
+        import asyncio
+        from utils import botref
+        bot = botref.bot
+        loop = getattr(bot, "loop", None) if bot else None
+        if bot is None or loop is None:
+            return False, "Botul nu e disponibil acum. Încearcă din nou."
+        uid = int(user_id)
+        if _is_super_user(uid):
+            return True, None
+
+        async def _chk():
+            g = bot.get_guild(int(guild_id))
+            if g is None:
+                return False, "Serverul nu e găsit."
+            role = g.get_role(int(role_id)) if role_id else None
+            if role is None:
+                return False, "Rolul selectat nu mai există."
+            m = g.get_member(uid)
+            if m is None:
+                try:
+                    m = await g.fetch_member(uid)
+                except Exception:
+                    return False, "Nu te găsesc pe server."
+            if g.owner_id == uid:
+                return True, None
+            if role >= m.top_role:
+                return False, (f"Rolul „{role.name}” e la fel de sus sau mai sus "
+                               "decât rolul tău cel mai înalt — nu îl poți atribui.")
+            return True, None
+
+        return asyncio.run_coroutine_threadsafe(_chk(), loop).result(timeout=10)
+    except Exception:
+        return False, "Verificare eșuată. Încearcă din nou."
+
+
 def _remove_timeout(guild_id, user_id):
     """Scoate timeout-ul unui membru (din bot). True daca a reusit."""
     try:
@@ -786,7 +828,7 @@ def _period_counts(invdata, days):
         if e.get("ts", 0) < cutoff or e.get("fake") or e.get("left"):
             continue
         inv = e.get("inviter")
-        if not inv or inv in ("vanity", "unknown"):
+        if not inv or inv in ("vanity", "unknown", "source"):
             continue
         counts[inv] = counts.get(inv, 0) + 1
     return counts
@@ -905,14 +947,14 @@ def giveaway(guild_id):
         cfg = {
             "channel_id": _to_int(request.form.get("channel_id", "")),
             "prize": request.form.get("prize", "").strip(),
-            "duration_minutes": _to_int(request.form.get("duration_minutes", "60")) or 60,
-            "winners": _to_int(request.form.get("winners", "1")) or 1,
+            "duration_minutes": max(1, _to_int(request.form.get("duration_minutes", "60")) or 60),
+            "winners": max(1, _to_int(request.form.get("winners", "1")) or 1),
             "button_label": request.form.get("button_label", "").strip() or "🎉 Particip",
             "title": request.form.get("title", "").strip() or "🎉 GIVEAWAY 🎉",
             "color": request.form.get("color", "#5865f2"),
             "sched_mode": sched_mode,
             # recurent la interval
-            "interval_hours": _to_int(request.form.get("interval_hours", "24")) or 24,
+            "interval_hours": max(1, _to_int(request.form.get("interval_hours", "24")) or 24),
             "anchor_time": request.form.get("anchor_time", "") or "12:00",
             # dată & oră exactă / ora de final (săptămânal)
             "end_date": _end_date,
@@ -1135,12 +1177,22 @@ def rankup(guild_id):
 @guild_required
 def game(guild_id):
     if request.method == "POST":
+        _mn = _to_int(request.form.get("min", "0"))
+        _mx = _to_int(request.form.get("max", "100"))
+        _mn = 0 if _mn is None else _mn
+        _mx = 100 if _mx is None else _mx
+        # min trebuie sa fie strict mai mic decat max (altfel randint crapa).
+        # Daca sunt inversate/egale, le corectam automat.
+        if _mn > _mx:
+            _mn, _mx = _mx, _mn
+        if _mn == _mx:
+            _mx = _mn + 1
         cfg = {
             "enabled": request.form.get("enabled") == "on",
             "channel_id": _to_int(request.form.get("channel_id", "")),
-            "countdown": _to_int(request.form.get("countdown", "60")) or 60,
-            "min": _to_int(request.form.get("min", "0")) or 0,
-            "max": _to_int(request.form.get("max", "100")) or 100,
+            "countdown": max(5, _to_int(request.form.get("countdown", "60")) or 60),
+            "min": _mn,
+            "max": _mx,
         }
         storage.set(int(guild_id), "game", cfg)
         return redirect(url_for("game", guild_id=guild_id, saved=1))
@@ -1224,17 +1276,29 @@ def cleanup(guild_id):
         if action == "start":
             uid = _to_int(request.form.get("user_id", ""))
             scope = request.form.get("scope", "server")  # "server" sau "channel"
-            job = {"status": "pending", "user_id": uid, "deleted": 0}
+            if not uid:
+                return redirect(url_for("cleanup", guild_id=guild_id,
+                                        cerr="Scrie ID-ul membrului."))
+            job = {"status": "pending", "user_id": uid, "deleted": 0, "scope": scope}
             if scope == "channel":
-                job["channel_id"] = _to_int(request.form.get("channel_id", ""))
+                ch = _to_int(request.form.get("channel_id", ""))
+                # SIGURANTA: daca ai ales "doar pe un canal" dar n-ai ales canalul,
+                # NU stergem de pe tot serverul din greseala — anulam cu mesaj.
+                if not ch:
+                    return redirect(url_for("cleanup", guild_id=guild_id,
+                                            cerr="Ai ales „doar pe un canal” dar n-ai ales canalul."))
+                job["channel_id"] = ch
             storage.set(gid, "cleanup_job", job)
         elif action == "auto_add":
             uid = _to_int(request.form.get("user_id", ""))
             if uid:
                 rules = storage.get(gid, "autodelete", {}) or {}
                 if request.form.get("scope", "server") == "channel":
-                    rules[str(uid)] = {"scope": "channel",
-                                       "channel_id": _to_int(request.form.get("channel_id", ""))}
+                    ch = _to_int(request.form.get("channel_id", ""))
+                    if not ch:
+                        return redirect(url_for("cleanup", guild_id=guild_id,
+                                                cerr="Ai ales „doar pe un canal” dar n-ai ales canalul."))
+                    rules[str(uid)] = {"scope": "channel", "channel_id": ch}
                 else:
                     rules[str(uid)] = {"scope": "server"}
                 storage.set(gid, "autodelete", rules)
@@ -1253,7 +1317,7 @@ def cleanup(guild_id):
                            job=storage.get(gid, "cleanup_job", None),
                            autodelete=storage.get(gid, "autodelete", {}) or {},
                            meta=storage.get(gid, "meta", {}),
-                           section="cleanup")
+                           section="cleanup", cerr=request.args.get("cerr"))
 
 
 import time as _time
@@ -1272,10 +1336,15 @@ def massrole(guild_id):
             cond_id = None
             if action in ("give_to", "remove_from"):
                 cond_id = _to_int(request.form.get("condition_role_id", ""))
+            role_id = _to_int(request.form.get("role_id", ""))
+            # ANTI-ESCALADARE: nu lasam userul sa dea/scoata un rol de deasupra lui
+            ok, motiv = _can_assign_role(session["user"]["id"], guild_id, role_id)
+            if not ok:
+                return redirect(url_for("massrole", guild_id=guild_id, err=motiv))
             job = {
                 "id": uuid.uuid4().hex[:8],
                 "action": action,
-                "role_id": _to_int(request.form.get("role_id", "")),
+                "role_id": role_id,
                 "condition_role_id": cond_id,
                 "include_bots": request.form.get("include_bots") == "on",
                 "status": "pending",
@@ -1291,7 +1360,8 @@ def massrole(guild_id):
     return render_template("massrole.html", guild_id=guild_id,
                            roles=roles.get("list", []), job=job,
                            meta=storage.get(int(guild_id), "meta", {}),
-                           section="massrole", sent=request.args.get("sent"))
+                           section="massrole", sent=request.args.get("sent"),
+                           err=request.args.get("err"))
 
 
 @app.route("/contest/<guild_id>", methods=["GET", "POST"])
@@ -1414,7 +1484,7 @@ def contest(guild_id):
             if e.get("ts", 0) < since or e.get("fake") or e.get("left"):
                 continue
             iv = e.get("inviter")
-            if not iv or iv in ("vanity", "unknown"):
+            if not iv or iv in ("vanity", "unknown", "source"):
                 continue
             counts[iv] = counts.get(iv, 0) + 1
         _excl = {str(x) for x in c.get("excluded", [])}
@@ -1698,6 +1768,12 @@ def automod_page(guild_id):
         elif action == "add_word":
             w = request.form.get("word", "").strip().lower()
             words = cfg.get("banned_words") or []
+            # verificam ca dupa normalizare raman macar 3 litere/cifre; altfel
+            # cuvantul (ex. "???", "ăă") ar sterge orice mesaj — il refuzam.
+            from cogs.automod import _normalize as _am_norm
+            if w and len(_am_norm(w)) < 3:
+                return redirect(url_for("automod_page", guild_id=guild_id,
+                                        werr="Cuvântul e prea scurt sau format doar din semne/diacritice."))
             if w and w not in words:
                 words.append(w)
                 cfg["banned_words"] = words
@@ -1776,7 +1852,8 @@ def automod_page(guild_id):
                            words=cfg.get("banned_words") or [],
                            timed_out=timed_out,
                            meta=storage.get(gid, "meta", {}),
-                           section="automod", saved=request.args.get("saved"))
+                           section="automod", saved=request.args.get("saved"),
+                           werr=request.args.get("werr"))
 
 
 @app.route("/helperapp/<guild_id>", methods=["GET", "POST"])
@@ -2199,7 +2276,7 @@ def invitelog(guild_id):
             "member_id": mid,
             "inviter": inviter,
             "inviter_name": h.get("inviter_name"),
-            "inviter_total": _total(inviter) if inviter not in ("vanity", "unknown") else None,
+            "inviter_total": _total(inviter) if inviter not in ("vanity", "unknown", "source") else None,
             "code": h.get("code"),
             "ts": h.get("ts"),
             "fake": h.get("fake", False),
@@ -2335,6 +2412,11 @@ def kingdoms(guild_id):
             if len(cfg["options"]) < 5:
                 rid = _to_int(request.form.get("role_id", ""))
                 if rid:
+                    # ANTI-ESCALADARE: nu lasam sa se ofere (tuturor, prin panou) un
+                    # rol de deasupra celui care configureaza
+                    ok, motiv = _can_assign_role(session["user"]["id"], guild_id, rid)
+                    if not ok:
+                        return redirect(url_for("kingdoms", guild_id=guild_id, err=motiv))
                     cfg["options"].append({
                         "label": request.form.get("label", "").strip() or "Regat",
                         "emoji": request.form.get("emoji", "").strip(),
@@ -2356,7 +2438,8 @@ def kingdoms(guild_id):
                            options=cfg.get("options", []), rname=rname,
                            roles=[r for r in roles.get("list", []) if not r.get("default")],
                            meta=storage.get(gid, "meta", {}),
-                           section="kingdoms", saved=request.args.get("saved"))
+                           section="kingdoms", saved=request.args.get("saved"),
+                           err=request.args.get("err"))
 
 
 # Nume "prietenoase" + iconita pentru cog-urile cunoscute. E DOAR o imbunatatire
@@ -2668,6 +2751,29 @@ def servers():
 LICENSE_SERVER_URL = os.getenv("LICENSE_SERVER_URL", "http://127.0.0.1:8100").rstrip("/")
 LICENSE_ADMIN_TOKEN = os.getenv("LICENSE_ADMIN_TOKEN", "")
 
+# Cheile nou create NU se pun in cookie-ul de sesiune (necriptat + limita ~4KB).
+# Le tinem scurt in memoria serverului, legate de un token mic pus in sesiune;
+# se citesc O SINGURA DATA la urmatoarea incarcare a paginii, apoi se sterg.
+_lic_new_keys_store = {}  # token -> (date, expira_la)
+
+
+def _stash_new_keys(data):
+    import secrets as _secrets
+    import time as _t
+    tok = _secrets.token_urlsafe(16)
+    # curatam intrarile expirate (max 5 min)
+    now = _t.time()
+    for k in list(_lic_new_keys_store):
+        if _lic_new_keys_store[k][1] < now:
+            _lic_new_keys_store.pop(k, None)
+    _lic_new_keys_store[tok] = (data, now + 300)
+    return tok
+
+
+def _pop_new_keys(tok):
+    row = _lic_new_keys_store.pop(tok, None) if tok else None
+    return row[0] if row else None
+
 
 def _lic_call(method, path, payload=None, params=None):
     """Apel către serverul de licențe. Întoarce (date, eroare)."""
@@ -2706,7 +2812,7 @@ def licenses_page():
                 "amount": _to_int(f.get("amount")) or 1, "unit": f.get("unit", "zile"),
                 "count": _to_int(f.get("count")) or 1, "note": f.get("note", ""), "actor": actor})
             if data:
-                session["lic_new_keys"] = data
+                session["lic_new_keys_tok"] = _stash_new_keys(data)
         elif action == "delete":
             data, err = _lic_call("POST", "/internal/keys/delete", {"key": f.get("key", ""), "actor": actor})
             if data:
@@ -2757,7 +2863,7 @@ def licenses_page():
     return render_template("licente.html", denied=False, data=data,
                            error=session.pop("lic_error", None) or err,
                            flash=session.pop("lic_flash", None),
-                           new_keys=session.pop("lic_new_keys", None),
+                           new_keys=_pop_new_keys(session.pop("lic_new_keys_tok", None)),
                            filtru=filtru)
 
 

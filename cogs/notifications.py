@@ -322,25 +322,54 @@ class Notifications(commands.Cog):
                 "live_url": f"https://www.tiktok.com/@{user}/live"}
 
     # =============================================================== POLLER
+    # campurile de STARE pe care le scrie poller-ul (restul — ce ai configurat
+    # din dashboard — nu le atingem, ca sa nu suprascriem modificarile tale)
+    _STATE_KEYS = ("identifier", "initialized", "last_video_id", "was_live")
+
     @tasks.loop(minutes=5)
     async def poller(self):
         for guild in self.bot.guilds:
-            data = storage.get(guild.id, "notifications", {})
-            subs = data.get("subscriptions", [])
-            if not subs:
-                continue
-            for sub in subs:
-                try:
-                    await self._process(guild, sub)
-                except Exception as e:
-                    log.warning("Notificari: eroare la %s (%s): %s",
-                                sub.get("platform"), sub.get("url"), e)
-            data["subscriptions"] = subs
-            storage.set(guild.id, "notifications", data)
+            try:
+                data = storage.get(guild.id, "notifications", {})
+                subs = data.get("subscriptions", [])
+                if not subs:
+                    continue
+                for sub in subs:
+                    try:
+                        await self._process(guild, sub)
+                    except Exception as e:
+                        log.warning("Notificari: eroare la %s (%s): %s",
+                                    sub.get("platform"), sub.get("url"), e)
+                # IMPORTANT: recitim lista ACUM (dupa request-urile de retea, care
+                # dureaza) si actualizam DOAR campurile de stare, dupa id-ul
+                # abonamentului. Asa, daca ai adaugat/sters ceva din dashboard cat
+                # timp rulam, modificarea ta nu se pierde.
+                fresh = storage.get(guild.id, "notifications", {})
+                fresh_subs = fresh.get("subscriptions", [])
+                by_id = {s.get("id"): s for s in subs}
+                changed = False
+                for fs in fresh_subs:
+                    src = by_id.get(fs.get("id"))
+                    if not src:
+                        continue  # abonament nou/sters din dashboard -> nu-l atingem
+                    for k in self._STATE_KEYS:
+                        if k in src and fs.get(k) != src.get(k):
+                            fs[k] = src[k]
+                            changed = True
+                if changed:
+                    fresh["subscriptions"] = fresh_subs
+                    storage.set(guild.id, "notifications", fresh)
+            except Exception as e:
+                log.warning("Notificari: eroare pe serverul %s: %s", guild.id, e)
 
     @poller.before_loop
     async def _before(self):
         await self.bot.wait_until_ready()
+
+    @poller.error
+    async def _poller_error(self, exc):
+        log.warning("Notificari: poller a crapat (%r); repornesc.", exc)
+        self.poller.restart()
 
     async def _process(self, guild, sub):
         provider = self._providers.get(sub["platform"])

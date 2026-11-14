@@ -19,6 +19,7 @@
 {% endblock %}
 
 {% block content %}
+  {% if cerr %}<div style="background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:#f87171;border-radius:10px;padding:11px 15px;margin-bottom:16px;font-size:14px">⛔ {{ cerr }}</div>{% endif %}
   <div class="panel">
     <h3>🧹 Curățare mesaje</h3>
     <p class="sub">Șterge toate mesajele unui membru sau bot — de pe un canal anume sau de pe tot serverul. Șterge orice mesaj, oricât de vechi.</p>
@@ -33,7 +34,7 @@
       <div class="warn">⚠️ {{ job.result }}</div>
     {% endif %}
 
-    <form method="POST" onsubmit="return confirm('Sigur ștergi TOATE mesajele acestui membru? Nu se poate anula.')">
+    <form method="POST" data-confirm="Sigur ștergi TOATE mesajele acestui membru? Nu se poate anula.">
       <input type="hidden" name="action" value="start">
 
       <label>ID-ul membrului / botului</label>

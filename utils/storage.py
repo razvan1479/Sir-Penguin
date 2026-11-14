@@ -19,24 +19,59 @@ _lock = threading.Lock()
 _cache = None  # copia in memorie a intregului depozit
 
 
+# Daca fisierul principal nu se poate citi, am pierde TOTUL la prima scriere
+# urmatoare (cache-ul ar deveni {} si l-ar suprascrie). Ca sa nu se intample:
+#   - pastram un backup rotativ (.bak) la fiecare salvare reusita
+#   - daca principalul e corupt, incercam backup-ul; daca nici el nu merge,
+#     RIDICAM eroare (nu pornim cu {} gol) ca sa nu stergem datele bune de pe disc
+_BAK_FILE = _DATA_FILE + ".bak"
+_load_failed = False  # True daca n-am putut citi nici fisierul, nici backup-ul
+
+
+def _try_read(path):
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
 def _ensure_loaded():
     """Incarca fisierul in cache o singura data (la prima folosire)."""
-    global _cache
+    global _cache, _load_failed
     if _cache is None:
         if os.path.exists(_DATA_FILE):
             try:
-                with open(_DATA_FILE, "r", encoding="utf-8") as f:
-                    _cache = json.load(f)
+                _cache = _try_read(_DATA_FILE)
             except (json.JSONDecodeError, OSError):
-                _cache = {}
+                # principalul e corupt -> incercam backup-ul
+                try:
+                    _cache = _try_read(_BAK_FILE)
+                    print("[storage] store.json corupt — am incarcat din store.json.bak")
+                except (json.JSONDecodeError, OSError, FileNotFoundError):
+                    # nici backup -> NU pornim gol (altfel prima scriere sterge tot).
+                    # Marcam esecul: scrierile vor fi blocate pana se rezolva manual.
+                    _load_failed = True
+                    _cache = {}
+                    print("[storage] ATENTIE: nu am putut citi store.json si nici "
+                          "store.json.bak. Scrierile sunt BLOCATE ca sa nu pierzi "
+                          "datele. Repara/sterge fisierul corupt si reporneste.")
         else:
             _cache = {}
     return _cache
 
 
 def _save_locked():
-    """Scrie cache-ul pe disc atomic (tmp + replace) ca sa nu se corupa."""
+    """Scrie cache-ul pe disc atomic (tmp + replace) ca sa nu se corupa.
+    Pastreaza si un backup (.bak) cu versiunea dinainte de scriere."""
+    if _load_failed:
+        # nu scriem peste date pe care nu le-am putut citi la pornire
+        return
     os.makedirs(os.path.dirname(_DATA_FILE), exist_ok=True)
+    # backup: copiem fisierul curent (bun) inainte sa-l inlocuim
+    if os.path.exists(_DATA_FILE):
+        try:
+            import shutil
+            shutil.copy2(_DATA_FILE, _BAK_FILE)
+        except OSError:
+            pass
     tmp = _DATA_FILE + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(_cache, f, indent=2, ensure_ascii=False)

@@ -186,8 +186,10 @@ class Metin2Bridge(commands.Cog):
             self._last_poll[guild.id] = now
             try:
                 await self._sync_guild(guild, cfg)
-            except Exception:
-                # orice eroare -> sarim peste ciclul asta, botul merge mai departe
+            except Exception as e:
+                # orice eroare -> sarim peste ciclul asta, botul merge mai departe,
+                # dar logam ca sa se poata diagnostica (inainte era tacut complet)
+                print(f"[metin2] sync eroare pe {guild.id}: {e!r}")
                 continue
 
     async def _sync_guild(self, guild, cfg):
@@ -206,16 +208,26 @@ class Metin2Bridge(commands.Cog):
             tid_to_cid = {v: k for k, v in open_map.items()}
             for m in msgs["messages"]:
                 cid = tid_to_cid.get(m.get("ticket_id"))
-                if not cid:
-                    continue
-                channel = guild.get_channel(int(cid))
+                channel = guild.get_channel(int(cid)) if cid else None
                 if channel is None:
+                    # ticketul nu mai e deschis / canalul a disparut -> mesajul nu
+                    # are unde ajunge. Il CONFIRMAM oricum, altfel se aduna la
+                    # nesfarsit si blocheaza coada (API-ul da doar primele 50).
+                    acked.append(m.get("id"))
                     continue
                 content, embed = _player_message(m, cfg.get("msg_style", "simplu"))
                 try:
-                    await channel.send(content=content, embed=embed)
+                    # allowed_mentions.none() -> textul unui jucator din joc NU poate
+                    # pinge @everyone sau roluri pe Discord
+                    await channel.send(content=content, embed=embed,
+                                       allowed_mentions=discord.AllowedMentions.none())
+                    acked.append(m.get("id"))
+                except discord.Forbidden:
+                    # fara drept de scriere pe canal -> confirmam ca sa nu blocheze
+                    # coada; mesajul oricum nu poate fi livrat aici
                     acked.append(m.get("id"))
                 except discord.HTTPException:
+                    # eroare temporara (rate limit etc.) -> NU confirmam, reincercam
                     pass
             if acked:
                 await self._post(cfg, "/messages/ack", {"message_ids": acked})

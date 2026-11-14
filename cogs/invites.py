@@ -275,6 +275,12 @@ class Invites(commands.Cog):
             if str(info["inviter_id"]) == str(member.id):
                 info = {"type": "unknown", "inviter_id": None,
                         "inviter_name": None, "code": info.get("code")}
+            # BOTUL nu poate fi invitator (ex. linkurile de la /sursa creaza sunt
+            # facute de bot). Le tratam ca "sursa", nu ca invitatie personala, ca
+            # sa nu apara botul in clasament / concurs.
+            elif self.bot.user and str(info["inviter_id"]) == str(self.bot.user.id):
+                info = {"type": "source", "inviter_id": None,
+                        "inviter_name": None, "code": info.get("code")}
         if info["type"] == "personal" and info["inviter_id"]:
             inviter_key = str(info["inviter_id"])
             if str(member.id) in credited:
@@ -301,6 +307,10 @@ class Invites(commands.Cog):
         elif info["type"] == "vanity":
             inviter_key = "vanity"
             data["vanity_count"] = data.get("vanity_count", 0) + 1
+        elif info["type"] == "source":
+            # link de sursa (facut de bot) -> nu se crediteaza niciun invitator,
+            # dar pastram codul in istoric ca /sursa cine sa stie cine a intrat
+            inviter_key = "source"
         else:
             inviter_key = "unknown"
 
@@ -323,7 +333,7 @@ class Invites(commands.Cog):
         joined_by = data.get("joined_by", {})
         rec = joined_by.pop(str(member.id), None)
 
-        if rec and rec["inviter"] not in ("vanity", "unknown"):
+        if rec and rec["inviter"] not in ("vanity", "unknown", "source"):
             members = data.get("members", {})
             stats = members.setdefault(rec["inviter"], _empty_stats())
             if rec.get("fake"):
@@ -456,7 +466,7 @@ class Invites(commands.Cog):
             if e.get("fake") or e.get("left"):
                 continue
             inv = e.get("inviter")
-            if not inv or inv in ("vanity", "unknown"):
+            if not inv or inv in ("vanity", "unknown", "source"):
                 continue
             mid = e.get("member")
             if mid in counted:
@@ -748,7 +758,7 @@ class Invites(commands.Cog):
             if e.get("ts", 0) < since_ts:
                 continue
             inv = e.get("inviter")
-            if not inv or inv in ("vanity", "unknown"):
+            if not inv or inv in ("vanity", "unknown", "source"):
                 continue
             mid = e.get("member")
             key = (inv, mid)
@@ -844,7 +854,7 @@ class Invites(commands.Cog):
         for h in history:
             inv = h.get("inviter")
             m = str(h.get("member") or "")
-            if not inv or inv in ("vanity", "unknown") or not m:
+            if not inv or inv in ("vanity", "unknown", "source") or not m:
                 continue
             if m in fake_members:
                 continue

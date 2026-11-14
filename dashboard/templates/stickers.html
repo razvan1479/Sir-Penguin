@@ -70,7 +70,7 @@
     <div class="panel-body">
       <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-bottom:18px">
         <a class="allbtn" href="/stickers/{{ guild_id }}/zip">⬇️ Descarcă toate (.zip)</a>
-        <form method="POST" style="margin:0" onsubmit="return confirm('Sigur ștergi stickerele de pe server? (fișierele deja descărcate pe PC rămân la tine)')">
+        <form method="POST" style="margin:0" data-confirm="Sigur ștergi stickerele de pe server? (fișierele deja descărcate pe PC rămân la tine)">
           <input type="hidden" name="action" value="clear">
           <button type="submit" style="background:rgba(244,63,94,.15); color:#fb7185; border:1px solid rgba(244,63,94,.35); border-radius:11px; padding:12px 22px; font-weight:700; font-size:14px; cursor:pointer;">🗑️ Golește de pe server</button>
         </form>

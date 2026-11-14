@@ -77,7 +77,7 @@
     {% if not cfg.get('role_id') %}
       <div class="warn">Alege întâi un rol în setările de sus și salvează, apoi poți scana.</div>
     {% else %}
-      <form method="POST" onsubmit="return confirm('Sigur pui rolul la toate conturile noi de pe server?')">
+      <form method="POST" data-confirm="Sigur pui rolul la toate conturile noi de pe server?">
         <input type="hidden" name="action" value="scan">
         <button class="save" type="submit">🔎 Scanează și pune rolul acum</button>
       </form>

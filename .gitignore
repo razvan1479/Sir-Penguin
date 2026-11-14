@@ -2,3 +2,4 @@
 data/store.json
 __pycache__/
 *.pyc
+data/store.json.bak
