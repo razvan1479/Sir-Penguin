@@ -31,6 +31,7 @@ from flask import (Flask, render_template, request, redirect, url_for,
                    jsonify, session, abort, send_file)
 
 from utils import storage
+from utils import contest_i18n
 
 load_dotenv(os.path.join(ROOT, ".env"))
 
@@ -1300,7 +1301,15 @@ def contest(guild_id):
     if request.method == "POST":
         action = request.form.get("action")
         c = storage.get(gid, "contest", {}) or {}
-        if action == "start" and c.get("status") not in ("scheduled", "running"):
+        if action == "lang":
+            # limba concursului (dashboard + mesajele botului pe Discord), per server
+            contest_i18n.set_lang(gid, request.form.get("lang", ""))
+            # fortam re-postarea clasamentului live, ca sa apara imediat in limba noua
+            if c.get("status") == "running":
+                c["live_message_id"] = None
+                c["live_last_post"] = 0
+                storage.set(gid, "contest", c)
+        elif action == "start" and c.get("status") not in ("scheduled", "running"):
             now = _time.time()
             start_delay_h = float(request.form.get("start_delay", "0") or 0)
             dur_days = float(request.form.get("duration_days", "0") or 0)
@@ -1310,7 +1319,7 @@ def contest(guild_id):
             end_ts = (start_ts + dur) if dur > 0 else None
             storage.set(gid, "contest", {
                 "status": "scheduled" if start_ts > now + 5 else "running",
-                "name": request.form.get("name", "").strip() or "Concurs invitatii",
+                "name": request.form.get("name", "").strip() or contest_i18n.t(gid, "default_name"),
                 "start_ts": start_ts,
                 "end_ts": end_ts,
                 "announce_channel_id": _to_int(request.form.get("announce_channel_id", "")),
@@ -1378,7 +1387,9 @@ def contest(guild_id):
         remaining = max(0, c.get("start_ts", 0) - _time.time())
 
     excluded_named = [{"id": x, "name": resolve_name(gid, x)} for x in c.get("excluded", [])]
+    lang = contest_i18n.get_lang(gid)
     return render_template("contest.html", guild_id=guild_id, contest=c,
+                           T=contest_i18n.strings(lang), lang=lang, langs=contest_i18n.LANGS,
                            standings=standings, remaining=remaining,
                            excluded=excluded_named,
                            channels=(storage.get(gid, "channels", {}) or {}).get("texts", []),

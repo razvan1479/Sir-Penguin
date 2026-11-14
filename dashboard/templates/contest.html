@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Concurs invite · {{ meta.get('name','Server') }}{% endblock %}
+{% block title %}{{ T.page_title }} · {{ meta.get('name','Server') }}{% endblock %}
 
 {% block extra_style %}
     .panel { background:var(--card); border-radius:14px; padding:22px; max-width:620px; }
@@ -30,43 +30,56 @@
     .excl-add { display:flex; flex-wrap:wrap; gap:8px; margin-top:6px; }
     .excl-add input[type=text] { padding:11px; border-radius:8px; color:var(--text); font-size:14px; font-family:inherit; }
     .excl-add input::placeholder { color:var(--muted); }
+    .langbar { margin-bottom:18px; padding-bottom:18px; border-bottom:1px solid var(--glass-border); }
+    .langbar label { margin-top:0; }
+    select { width:100%; padding:11px; border-radius:8px; border:none; background:var(--input); color:var(--text); font-size:14px; font-family:inherit; }
 {% endblock %}
 
 {% block content %}
   <div class="panel">
+    <form method="POST" class="langbar">
+      <input type="hidden" name="action" value="lang">
+      <label for="lang">🌐 {{ T.lang_label }}</label>
+      <div style="display:flex;gap:8px">
+        <select id="lang" name="lang" style="flex:1">
+          {% for code, nm in langs.items() %}<option value="{{ code }}" {% if code == lang %}selected{% endif %}>{{ nm }}</option>{% endfor %}
+        </select>
+        <button type="submit" style="margin-top:0;width:auto;padding:11px 18px;font-size:14px;background:var(--input)">{{ T.lang_save }}</button>
+      </div>
+    </form>
     {% set st = contest.get('status') %}
     {% if st == 'running' or st == 'scheduled' %}
       {% if st == 'scheduled' %}
-        <span class="badge sched">🕒 Programat: {{ contest.get('name') }}</span>
-        {% if remaining is not none %}<div class="timer">Începe în {{ (remaining/3600)|round(1) }} ore</div>{% endif %}
+        <span class="badge sched">{{ T.scheduled_badge.format(name=contest.get('name')) }}</span>
+        {% if remaining is not none %}<div class="timer">{{ T.starts_in.format(h=(remaining/3600)|round(1)) }}</div>{% endif %}
       {% else %}
-        <span class="badge on">🏁 Activ: {{ contest.get('name') }}</span>
-        {% if remaining is not none %}<div class="timer">Mai sunt {{ (remaining/3600)|round(1) }} ore</div>
-        {% else %}<div class="hint">Fără durată fixă — se oprește manual.</div>{% endif %}
+        <span class="badge on">{{ T.active_badge.format(name=contest.get('name')) }}</span>
+        {% if remaining is not none %}<div class="timer">{{ T.remaining.format(h=(remaining/3600)|round(1)) }}</div>
+        {% else %}<div class="hint">{{ T.no_fixed_duration }}</div>{% endif %}
       {% endif %}
       <form method="POST"><input type="hidden" name="action" value="stop">
-        <button class="stop" type="submit">⏹️ Oprește acum</button>
+        <button class="stop" type="submit">{{ T.stop_btn }}</button>
       </form>
-      <p class="hint">La final, botul anunță automat câștigătorii și clasamentul în canalul setat. Clasamentul se actualizează automat.</p>
+      <p class="hint">{{ T.stop_hint }}</p>
 
       <div class="livebox" style="margin-top:16px">
         <form method="POST">
           <input type="hidden" name="action" value="live">
-          <label class="ck"><input type="checkbox" name="live_enabled" {% if contest.get('live_enabled') %}checked{% endif %}> 📊 Postează clasamentul live pe un canal</label>
+          <label class="ck"><input type="checkbox" name="live_enabled" {% if contest.get('live_enabled') %}checked{% endif %}> {{ T.live_enable }}</label>
           <div class="row2">
-            <div><label>ID canal clasament live</label><input type="text" name="live_channel_id" value="{{ contest.get('live_channel_id','') or '' }}" placeholder="unde apare clasamentul"></div>
-            <div><label>La câte minute se actualizează</label><input type="number" name="live_interval_minutes" value="{{ contest.get('live_interval_minutes',30) }}" min="1"></div>
+            <div><label>{{ T.live_channel }}</label><input type="text" name="live_channel_id" value="{{ contest.get('live_channel_id','') or '' }}" placeholder="{{ T.live_channel_ph }}"></div>
+            <div><label>{{ T.live_interval }}</label><input type="number" name="live_interval_minutes" value="{{ contest.get('live_interval_minutes',30) }}" min="1"></div>
           </div>
-          <label>Câți apar în clasament (max 25)</label>
+          <label>{{ T.board_count }}</label>
           <input type="number" name="board_count" value="{{ contest.get('board_count',10) }}" min="1" max="25">
-          <p class="hint">Se actualizează singur (editează același mesaj). Poți schimba asta chiar și în timpul concursului.</p>
-          <button class="start" type="submit" style="background:var(--input)">💾 Salvează clasamentul live</button>
+          <p class="hint">{{ T.live_hint_running }}</p>
+          <button class="start" type="submit" style="background:var(--input)">{{ T.live_save }}</button>
         </form>
       </div>
 
       <div class="livebox" style="margin-top:16px">
-        <div style="font-weight:700;margin-bottom:8px">🚫 Exclude persoane din clasament</div>
-        <p class="hint" style="margin-top:0">Cine e exclus nu apare în clasament (ex. tu / owner-ul). Invitațiile lor reale rămân neatinse în restul botului.</p>
+        <div style="font-weight:700;margin-bottom:8px">{{ T.excl_title }}</div>
+        <p class="hint" style="margin-top:0">{{ T.excl_hint }}</p>
         {% if excluded %}
         <div class="excl-list">
           {% for e in excluded %}
@@ -75,60 +88,60 @@
             <form method="POST" style="margin:0">
               <input type="hidden" name="action" value="include">
               <input type="hidden" name="include_id" value="{{ e.id }}">
-              <button type="submit" class="x">✕ scoate din listă</button>
+              <button type="submit" class="x">{{ T.excl_remove }}</button>
             </form>
           </div>
           {% endfor %}
         </div>
         {% else %}
-        <p class="hint">Nimeni exclus deocamdată.</p>
+        <p class="hint">{{ T.excl_none }}</p>
         {% endif %}
         <form method="POST" class="excl-add">
           <input type="hidden" name="action" value="exclude">
-          <label style="width:100%;display:block;margin-bottom:6px;font-size:13px;color:var(--muted);font-weight:600">ID-ul persoanei de exclus</label>
+          <label style="width:100%;display:block;margin-bottom:6px;font-size:13px;color:var(--muted);font-weight:600">{{ T.excl_id_label }}</label>
           <div style="display:flex;gap:8px;width:100%">
             <input type="text" name="exclude_id" placeholder="ex: 1216202118135021581" style="flex:1;border:1px solid var(--glass-border);background:var(--bg)">
-            <button type="submit">➕ Exclude</button>
+            <button type="submit">{{ T.excl_btn }}</button>
           </div>
         </form>
-        <p class="hint">Click dreapta pe persoană în Discord → Copiază ID utilizator. (Ai nevoie de „Mod dezvoltator" pornit în Discord.)</p>
+        <p class="hint">{{ T.excl_howto }}</p>
       </div>
     {% else %}
-      <span class="badge off">Niciun concurs activ</span>
+      <span class="badge off">{{ T.no_contest }}</span>
       <form method="POST" style="margin-top:8px">
         <input type="hidden" name="action" value="start">
-        <label>Numele concursului</label>
-        <input type="text" name="name" placeholder="ex: Concurs August" value="Concurs invitatii">
+        <label>{{ T.name_label }}</label>
+        <input type="text" name="name" placeholder="{{ T.name_ph }}" value="{{ T.default_name }}">
 
-        <label>Începe peste (ore) — 0 = acum</label>
+        <label>{{ T.start_delay }}</label>
         <input type="number" name="start_delay" value="0" min="0" step="1">
 
         <div class="row2">
-          <div><label>Durată — zile</label><input type="number" name="duration_days" value="7" min="0"></div>
-          <div><label>+ ore</label><input type="number" name="duration_hours" value="0" min="0"></div>
+          <div><label>{{ T.dur_days }}</label><input type="number" name="duration_days" value="7" min="0"></div>
+          <div><label>{{ T.dur_hours }}</label><input type="number" name="duration_hours" value="0" min="0"></div>
         </div>
-        <p class="hint">Durată 0 = fără limită (se oprește manual). Ex: 7 zile = concurs de o săptămână.</p>
+        <p class="hint">{{ T.dur_hint }}</p>
 
-        <label>ID canal pentru anunț final</label>
-        <input type="text" name="announce_channel_id" placeholder="unde se anunță câștigătorii">
+        <label>{{ T.announce_channel }}</label>
+        <input type="text" name="announce_channel_id" placeholder="{{ T.announce_channel_ph }}">
 
-        <label>Câți câștigători se anunță</label>
+        <label>{{ T.winners_count }}</label>
         <input type="number" name="winners_count" value="1" min="1">
 
         <div class="livebox">
-          <label class="ck"><input type="checkbox" name="live_enabled"> 📊 Postează clasamentul live pe un canal</label>
+          <label class="ck"><input type="checkbox" name="live_enabled"> {{ T.live_enable }}</label>
           <div class="row2">
-            <div><label>ID canal clasament live</label><input type="text" name="live_channel_id" placeholder="unde apare clasamentul"></div>
-            <div><label>La câte minute se actualizează</label><input type="number" name="live_interval_minutes" value="30" min="1"></div>
+            <div><label>{{ T.live_channel }}</label><input type="text" name="live_channel_id" placeholder="{{ T.live_channel_ph }}"></div>
+            <div><label>{{ T.live_interval }}</label><input type="number" name="live_interval_minutes" value="30" min="1"></div>
           </div>
-          <label>Câți apar în clasament (max 25)</label>
+          <label>{{ T.board_count }}</label>
           <input type="number" name="board_count" value="10" min="1" max="25">
-          <p class="hint">Botul postează un clasament care se actualizează singur (editează același mesaj, nu spamează). Ex: 30 = din jumătate în jumătate de oră.</p>
+          <p class="hint">{{ T.live_hint_new }}</p>
         </div>
 
-        <button class="start" type="submit">🏁 Pornește concursul</button>
+        <button class="start" type="submit">{{ T.start_btn }}</button>
       </form>
-      <p class="hint">Concursul numără doar invitațiile reale (fără conturi plecate/false) de la pornire încoace, fără să afecteze clasamentul „tot timpul".</p>
+      <p class="hint">{{ T.counts_hint }}</p>
     {% endif %}
 
     {% if standings %}
@@ -140,9 +153,9 @@
           </div>
         {% endfor %}
       </div>
-      {% if st == 'ended' %}<p class="hint">🏆 Încheiat. Câștigător: <b>{{ standings[0][0] }}</b> cu {{ standings[0][1] }} invitații.</p>{% endif %}
+      {% if st == 'ended' %}<p class="hint">{{ T.ended_winner.format(name=standings[0][0]|e, n=standings[0][1])|safe }}</p>{% endif %}
     {% elif st == 'running' %}
-      <div class="live"><div class="lrow"><span class="nm" style="color:var(--muted)">Încă nu a invitat nimeni.</span></div></div>
+      <div class="live"><div class="lrow"><span class="nm" style="color:var(--muted)">{{ T.nobody_yet }}</span></div></div>
     {% endif %}
     {% if st == 'running' or st == 'scheduled' %}
       <script>setTimeout(function(){ location.reload(); }, 30000);</script>
