@@ -1304,9 +1304,8 @@ def contest(guild_id):
         if action == "lang":
             # limba concursului (dashboard + mesajele botului pe Discord), per server
             contest_i18n.set_lang(gid, request.form.get("lang", ""))
-            # fortam re-postarea clasamentului live, ca sa apara imediat in limba noua
+            # fortam actualizarea clasamentului live (editeaza ACELASI mesaj, in limba noua)
             if c.get("status") == "running":
-                c["live_message_id"] = None
                 c["live_last_post"] = 0
                 storage.set(gid, "contest", c)
         elif action == "start" and c.get("status") not in ("scheduled", "running"):
@@ -1330,6 +1329,49 @@ def contest(guild_id):
                 "board_count": _to_int(request.form.get("board_count", "10")) or 10,
                 "live_message_id": None, "live_last_post": 0,
             })
+        elif action == "edit" and c.get("status") in ("scheduled", "running"):
+            # editare concurs IN DESFASURARE: nume, canal anunt, nr. castigatori, start/sfarsit.
+            # Numaratoarea invitatiilor nu se atinge (depinde doar de start_ts).
+            def _fl(v):
+                try:
+                    return float(str(v).replace(",", ".").strip() or 0)
+                except ValueError:
+                    return 0.0
+            now = _time.time()
+            flash = "flash_saved"
+            new_name = request.form.get("name", "").strip()
+            if new_name:
+                c["name"] = new_name
+            c["announce_channel_id"] = _to_int(request.form.get("announce_channel_id", ""))
+            c["winners_count"] = max(1, _to_int(request.form.get("winners_count", "1")) or 1)
+
+            if c.get("status") == "scheduled":
+                # mutam startul; daca exista final, il mutam la fel (durata ramane aceeasi)
+                shift = _fl(request.form.get("start_adjust", "0")) * 3600
+                if shift:
+                    new_start = c.get("start_ts", now) + shift
+                    if new_start < now:
+                        new_start = now
+                        shift = now - c.get("start_ts", now)
+                    c["start_ts"] = new_start
+                    if c.get("end_ts"):
+                        c["end_ts"] = c["end_ts"] + shift
+
+            if request.form.get("no_limit") == "on":
+                c["end_ts"] = None
+            else:
+                adj = _fl(request.form.get("end_adjust", "0")) * 3600
+                if adj:
+                    base = c.get("end_ts") or max(now, c.get("start_ts", now))
+                    new_end = base + adj
+                    if new_end <= max(now, c.get("start_ts", now)) + 30:
+                        flash = "flash_end_past"
+                    else:
+                        c["end_ts"] = new_end
+            # numele apare in titlul clasamentului live -> il actualizam pe acelasi mesaj
+            c["live_last_post"] = 0
+            storage.set(gid, "contest", c)
+            session["contest_flash"] = flash
         elif action == "live":
             # actualizeaza doar setarile de clasament live (merge si in timpul concursului)
             c["live_enabled"] = request.form.get("live_enabled") == "on"
@@ -1375,8 +1417,10 @@ def contest(guild_id):
             if not iv or iv in ("vanity", "unknown"):
                 continue
             counts[iv] = counts.get(iv, 0) + 1
-        ranked = sorted(((u, n) for u, n in counts.items() if n > 0),
-                        key=lambda x: x[1], reverse=True)[:10]
+        _excl = {str(x) for x in c.get("excluded", [])}
+        _lim = max(1, min(25, int(c.get("board_count", 10) or 10)))
+        ranked = sorted(((u, n) for u, n in counts.items() if n > 0 and str(u) not in _excl),
+                        key=lambda x: x[1], reverse=True)[:_lim]
         standings = [(resolve_name(gid, u) or f"User {u}", n) for u, n in ranked]
 
     # timp ramas / pana la start, pentru afisare
@@ -1388,7 +1432,21 @@ def contest(guild_id):
 
     excluded_named = [{"id": x, "name": resolve_name(gid, x)} for x in c.get("excluded", [])]
     lang = contest_i18n.get_lang(gid)
+    T = contest_i18n.strings(lang)
+
+    def _fmt_ts(ts):
+        if not ts:
+            return None
+        from datetime import datetime as _dt, timezone as _tz
+        try:
+            from zoneinfo import ZoneInfo
+            return _dt.fromtimestamp(ts, ZoneInfo("Europe/Bucharest")).strftime("%d.%m.%Y %H:%M")
+        except Exception:
+            return _dt.fromtimestamp(ts, _tz.utc).strftime("%d.%m.%Y %H:%M UTC")
+    flash_key = session.pop("contest_flash", None)
     return render_template("contest.html", guild_id=guild_id, contest=c,
+                           start_str=_fmt_ts(c.get("start_ts")), end_str=_fmt_ts(c.get("end_ts")),
+                           flash=T.get(flash_key) if flash_key else None,
                            T=contest_i18n.strings(lang), lang=lang, langs=contest_i18n.LANGS,
                            standings=standings, remaining=remaining,
                            excluded=excluded_named,

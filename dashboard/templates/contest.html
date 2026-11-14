@@ -30,6 +30,11 @@
     .excl-add { display:flex; flex-wrap:wrap; gap:8px; margin-top:6px; }
     .excl-add input[type=text] { padding:11px; border-radius:8px; color:var(--text); font-size:14px; font-family:inherit; }
     .excl-add input::placeholder { color:var(--muted); }
+    .flash { background:var(--input); border:1px solid var(--glass-border); border-radius:10px; padding:11px 14px; margin-bottom:16px; font-size:14px; }
+    .sum { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:6px; }
+    .sum div { background:var(--card); border:1px solid var(--glass-border); border-radius:10px; padding:9px 12px; display:flex; flex-direction:column; gap:3px; min-width:0; }
+    .sum span { font-size:11px; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); }
+    .sum b { font-size:14px; word-break:break-all; }
     .langbar { margin-bottom:18px; padding-bottom:18px; border-bottom:1px solid var(--glass-border); }
     .langbar label { margin-top:0; }
     select { width:100%; padding:11px; border-radius:8px; border:none; background:var(--input); color:var(--text); font-size:14px; font-family:inherit; }
@@ -37,6 +42,7 @@
 
 {% block content %}
   <div class="panel">
+    {% if flash %}<div class="flash">{{ flash }}</div>{% endif %}
     <form method="POST" class="langbar">
       <input type="hidden" name="action" value="lang">
       <label for="lang">🌐 {{ T.lang_label }}</label>
@@ -61,6 +67,34 @@
         <button class="stop" type="submit">{{ T.stop_btn }}</button>
       </form>
       <p class="hint">{{ T.stop_hint }}</p>
+
+      <div class="livebox" style="margin-top:16px">
+        <div style="font-weight:700;margin-bottom:10px">{{ T.edit_title }}</div>
+        <div class="sum">
+          <div><span>{{ T.lbl_start_sched if st == 'scheduled' else T.lbl_start }}</span><b>{{ start_str or '—' }}</b></div>
+          <div><span>{{ T.lbl_end }}</span><b>{{ end_str or T.end_none }}</b></div>
+          <div><span>{{ T.lbl_announce }}</span><b>{{ contest.get('announce_channel_id') or T.not_set }}</b></div>
+          <div><span>{{ T.lbl_winners }}</span><b>{{ contest.get('winners_count', 1) }}</b></div>
+        </div>
+        <form method="POST">
+          <input type="hidden" name="action" value="edit">
+          <label>{{ T.name_label }}</label>
+          <input type="text" name="name" value="{{ contest.get('name','') }}">
+          <label>{{ T.announce_channel }}</label>
+          <input type="text" name="announce_channel_id" value="{{ contest.get('announce_channel_id','') or '' }}" placeholder="{{ T.announce_channel_ph }}">
+          <label>{{ T.winners_count }}</label>
+          <input type="number" name="winners_count" value="{{ contest.get('winners_count',1) }}" min="1">
+          {% if st == 'scheduled' %}
+          <label>{{ T.adjust_start }}</label>
+          <input type="number" name="start_adjust" value="0" step="0.5">
+          {% endif %}
+          <label>{{ T.adjust_end }}</label>
+          <input type="number" name="end_adjust" value="0" step="0.5">
+          <label class="ck" style="margin-top:12px"><input type="checkbox" name="no_limit"> {{ T.no_limit }}</label>
+          <p class="hint">{{ T.edit_hint }}</p>
+          <button class="start" type="submit">{{ T.edit_save }}</button>
+        </form>
+      </div>
 
       <div class="livebox" style="margin-top:16px">
         <form method="POST">
