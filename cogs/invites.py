@@ -84,6 +84,15 @@ class Invites(commands.Cog):
             for inv in invite_list
         }
 
+    @staticmethod
+    def _find_used(before, after_list):
+        """Gaseste invitatia folosita comparand folosirile fata de 'before'.
+        Returneaza invitatia DOAR daca EXACT un cod a crescut. Daca niciunul sau
+        mai multe au crescut (intrari simultane, ori cache gol dupa restart), lasam
+        'necunoscut' — mai bine necreditat decat creditat gresit la concurs."""
+        increased = [inv for inv in after_list if (inv.uses or 0) > before.get(inv.code, 0)]
+        return increased[0] if len(increased) == 1 else None
+
     def _lock_for(self, gid: int) -> "asyncio.Lock":
         lock = self._join_locks.get(gid)
         if lock is None:
@@ -191,15 +200,23 @@ class Invites(commands.Cog):
         # numarului de folosiri cand intra multi oameni deodata (ex. la concurs)
         async with self._lock_for(guild.id):
             try:
-                before = self.invite_cache.get(guild.id, {})
-                owners_before = self.invite_owners.get(guild.id, {})  # snapshot dinainte
+                # copie a snapshot-ului dinainte (il vom suprascrie mai jos)
+                before = dict(self.invite_cache.get(guild.id, {}))
+                owners_before = dict(self.invite_owners.get(guild.id, {}))  # snapshot dinainte
                 after_list = await guild.invites()
+                used = self._find_used(before, after_list)
+
+                # Discord uneori NU a actualizat inca numarul de folosiri cand
+                # primim evenimentul de intrare -> daca prima incercare n-a gasit
+                # nimic, mai incercam o data dupa o scurta pauza. Intrarile deja
+                # rezolvate NU sunt intarziate (pauza e doar pentru cele care altfel
+                # ar iesi "necunoscut"), asa ca nu incetinim cazul normal.
+                if used is None:
+                    await asyncio.sleep(1.5)
+                    after_list = await guild.invites()
+                    used = self._find_used(before, after_list)
+
                 after = {inv.code: inv for inv in after_list}
-                used = None
-                for code, inv in after.items():
-                    if (inv.uses or 0) > before.get(code, 0):
-                        used = inv
-                        break
                 self.invite_cache[guild.id] = {inv.code: inv.uses or 0 for inv in after_list}
                 self._snapshot_owners(guild.id, after_list)  # snapshot proaspat
 
