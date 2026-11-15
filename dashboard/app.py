@@ -324,6 +324,63 @@ def _can_assign_role(user_id, guild_id, role_id):
         return False, "Verificare eșuată. Încearcă din nou."
 
 
+def _send_announcement(guild_id, channel_id, kind, text, embed_data, mention):
+    """Trimite un anunt ACUM pe un canal, prin bot. kind = 'text' sau 'embed'.
+    mention = 'none' | 'everyone' | 'here'. Returneaza (ok, mesaj)."""
+    try:
+        import asyncio
+        from utils import botref
+        from cogs.embeds import build_embed
+        bot = botref.bot
+        loop = getattr(bot, "loop", None) if bot else None
+        if bot is None or loop is None:
+            return False, "Botul nu e disponibil acum. Încearcă din nou."
+
+        async def _do():
+            g = bot.get_guild(int(guild_id))
+            if g is None:
+                return False, "Serverul nu e găsit."
+            ch = g.get_channel(int(channel_id)) if channel_id else None
+            if ch is None:
+                return False, "Canalul selectat nu există."
+            import discord
+            me = g.me
+            perms = ch.permissions_for(me)
+            if not perms.send_messages:
+                return False, f"Nu am voie să scriu în #{ch.name}."
+            if kind == "embed" and not perms.embed_links:
+                return False, f"Nu am voie să trimit embed-uri în #{ch.name} (lipsește „Embed Links”)."
+
+            # continutul textului care insoteste mesajul (si mentiunea)
+            prefix = ""
+            allowed = discord.AllowedMentions.none()
+            if mention == "everyone":
+                prefix = "@everyone"
+                allowed = discord.AllowedMentions(everyone=True)
+            elif mention == "here":
+                prefix = "@here"
+                allowed = discord.AllowedMentions(everyone=True)
+
+            if kind == "embed":
+                emb = build_embed(embed_data, g)
+                content = prefix or None
+                await ch.send(content=content, embed=emb, allowed_mentions=allowed)
+            else:
+                body = (text or "").strip()
+                if prefix:
+                    body = f"{prefix}\n{body}" if body else prefix
+                if not body:
+                    return False, "Mesajul e gol."
+                if len(body) > 2000:
+                    return False, f"Mesajul are {len(body)} caractere (maxim 2000)."
+                await ch.send(content=body, allowed_mentions=allowed)
+            return True, f"Anunț trimis în #{ch.name}."
+
+        return asyncio.run_coroutine_threadsafe(_do(), loop).result(timeout=15)
+    except Exception as e:
+        return False, f"Nu am putut trimite anunțul: {e}"
+
+
 def _remove_timeout(guild_id, user_id):
     """Scoate timeout-ul unui membru (din bot). True daca a reusit."""
     try:
@@ -889,6 +946,44 @@ def embeds(guild_id):
                            current=current, edit_name=edit,
                            meta=storage.get(int(guild_id), "meta", {}),
                            section="embeds", saved=request.args.get("saved"))
+
+
+@app.route("/announce/<guild_id>", methods=["GET", "POST"])
+@guild_required
+def announce(guild_id):
+    gid = int(guild_id)
+    sent = err = None
+    if request.method == "POST":
+        kind = request.form.get("kind", "text")  # 'text' sau 'embed'
+        channel_id = _to_int(request.form.get("channel_id", ""))
+        mention = request.form.get("mention", "none")
+        text = request.form.get("message", "")
+        embed_data = {
+            "title": request.form.get("title", "").strip(),
+            "description": request.form.get("description", "").strip(),
+            "color": request.form.get("color", "#5865f2"),
+            "image": request.form.get("image", "").strip(),
+            "thumbnail": request.form.get("thumbnail", "").strip(),
+            "footer": request.form.get("footer", "").strip(),
+            "author": request.form.get("author", "").strip(),
+        }
+        if not channel_id:
+            err = "Alege un canal."
+        elif kind == "embed" and not (embed_data["title"] or embed_data["description"]
+                                      or embed_data["image"]):
+            err = "Embed-ul e gol — pune măcar un titlu sau o descriere."
+        else:
+            ok, msg = _send_announcement(gid, channel_id, kind, text, embed_data, mention)
+            if ok:
+                sent = msg
+            else:
+                err = msg
+
+    channels = storage.get(gid, "channels", {}) or {}
+    return render_template("announce.html", guild_id=guild_id,
+                           channels=channels.get("texts", []),
+                           meta=storage.get(gid, "meta", {}),
+                           section="announce", sent=sent, err=err)
 
 
 def _to_int(v):
