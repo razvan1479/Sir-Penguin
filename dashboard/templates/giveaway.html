@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_fields.html" import channel_select %}
 {% block title %}Giveaway · {{ meta.get('name','Server') }}{% endblock %}
 
 {% block extra_style %}
@@ -145,9 +146,9 @@
   <div class="grid">
     <!-- FORMULAR -->
     <form class="panel" method="POST">
-      <label>ID canal (unde se posteaza)</label>
-      <input type="text" name="channel_id" id="channel_id" placeholder="ex: 123456789012345678" value="{{ cfg.get('channel_id','') }}">
-      <p class="hint">Click dreapta pe canal → Copiaza ID canal.</p>
+      <label>Canal (unde se posteaza)</label>
+      {{ channel_select("channel_id", channels, cfg.get('channel_id'), empty_label="— alege canalul —", id="channel_id") }}
+      <p class="hint">Canalul unde se postează giveaway-ul. Alege-l din lista.</p>
 
       <label>Premiu</label>
       <input type="text" name="prize" id="prize" placeholder="ex: Discord Nitro" value="{{ cfg.get('prize','') }}">

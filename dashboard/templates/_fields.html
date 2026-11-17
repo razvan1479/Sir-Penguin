@@ -1,0 +1,23 @@
+{# Selector de canal reutilizabil: dropdown cu scroll in loc de ID scris de mana.
+   - channels: lista [{id, name}] (canalele de text sincronizate)
+   - selected: ID-ul salvat (poate fi gol / None)
+   - empty_label: daca e dat, adauga o optiune goala (ex. "— alege —" sau "orice canal")
+   - daca lista nu e sincronizata inca, cade pe un input normal ca pagina sa ramana utila
+   - daca ID-ul salvat nu mai e in lista (canal sters), tot il pastreaza selectat #}
+{% macro channel_select(name, channels, selected='', empty_label=None, required=False, id=None) %}
+  {% set sel = (selected|string) if selected is not none else '' %}
+  {% if channels %}
+  <select class="chan-sel" name="{{ name }}"{% if id %} id="{{ id }}"{% endif %}{% if required %} required{% endif %}>
+    {% if empty_label is not none %}<option value="">{{ empty_label }}</option>{% endif %}
+    {% set ns = namespace(found=false) %}
+    {% for c in channels %}
+      <option value="{{ c.id }}"{% if sel and (c.id|string) == sel %} selected{% endif %}>#{{ c.name }}</option>
+      {% if sel and (c.id|string) == sel %}{% set ns.found = true %}{% endif %}
+    {% endfor %}
+    {% if sel and not ns.found %}<option value="{{ sel }}" selected>ID {{ sel }} (canal inexistent)</option>{% endif %}
+  </select>
+  {% else %}
+  <input type="text" name="{{ name }}"{% if id %} id="{{ id }}"{% endif %}{% if required %} required{% endif %}
+         value="{{ sel }}" placeholder="ID canal (lista nu e sincronizată încă)">
+  {% endif %}
+{% endmacro %}

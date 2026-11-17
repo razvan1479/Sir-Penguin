@@ -846,6 +846,7 @@ def guild_settings(guild_id):
     cfg = storage.get(int(guild_id), "welcome", {})
     meta = storage.get(int(guild_id), "meta", {})
     return render_template("guild.html", guild_id=guild_id, cfg=cfg, meta=meta,
+                           channels=(storage.get(int(guild_id), "channels", {}) or {}).get("texts", []),
                            section="welcome", saved=request.args.get("saved"))
 
 
@@ -1183,6 +1184,7 @@ def giveaway(guild_id):
                            next_post_str=next_post_str,
                            mode=mode,
                            meta=meta,
+                           channels=(storage.get(int(guild_id), "channels", {}) or {}).get("texts", []),
                            section="giveaway", saved=request.args.get("saved"),
                            cancelled=request.args.get("cancelled"),
                            unscheduled=request.args.get("unscheduled"))
@@ -1229,6 +1231,7 @@ def notifications(guild_id):
         return redirect(url_for("notifications", guild_id=guild_id, saved=1))
 
     return render_template("notifications.html", guild_id=guild_id, subs=subs,
+                           channels=(storage.get(int(guild_id), "channels", {}) or {}).get("texts", []),
                            meta=storage.get(int(guild_id), "meta", {}),
                            section="notifications", saved=request.args.get("saved"))
 
@@ -1264,6 +1267,7 @@ def rankup(guild_id):
     roles = storage.get(gid, "roles", {}) or {}
     return render_template("rankup.html", guild_id=guild_id, cfg=cfg,
                            roles=roles.get("list", []),
+                           channels=(storage.get(gid, "channels", {}) or {}).get("texts", []),
                            meta=storage.get(gid, "meta", {}),
                            section="rankup", saved=request.args.get("saved"))
 
@@ -1294,6 +1298,7 @@ def game(guild_id):
 
     cfg = storage.get(int(guild_id), "game", {})
     return render_template("game.html", guild_id=guild_id, cfg=cfg,
+                           channels=(storage.get(int(guild_id), "channels", {}) or {}).get("texts", []),
                            meta=storage.get(int(guild_id), "meta", {}),
                            section="game", saved=request.args.get("saved"))
 
@@ -1311,6 +1316,7 @@ def rps(guild_id):
 
     cfg = storage.get(int(guild_id), "rps", {})
     return render_template("rps.html", guild_id=guild_id, cfg=cfg,
+                           channels=(storage.get(int(guild_id), "channels", {}) or {}).get("texts", []),
                            meta=storage.get(int(guild_id), "meta", {}),
                            section="rps", saved=request.args.get("saved"))
 

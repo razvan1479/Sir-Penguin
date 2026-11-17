@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_fields.html" import channel_select %}
 {% block title %}Rank-uri auto · {{ meta.get('name','Server') }}{% endblock %}
 
 {% block extra_style %}
@@ -28,8 +29,8 @@
       <span>Activează rank-urile automate</span>
     </label>
 
-    <label>ID canal pentru loguri (opțional)</label>
-    <input type="text" name="log_channel_id" style="width:100%" value="{{ cfg.get('log_channel_id','') if cfg.get('log_channel_id') is not none else '' }}" placeholder="unde se anunță avansările">
+    <label>Canal pentru loguri (opțional)</label>
+    {{ channel_select("log_channel_id", channels, cfg.get('log_channel_id'), empty_label="— fără loguri —") }}
 
     <label>Treptele de rank</label>
     <p class="hint">Adaugă câte trepte vrei. Fiecare: de la câte <b>zile</b> se obține, un <b>emoji</b> (opțional, apare la finalul nickname-ului) și un <b>rol</b> (opțional). Membrul primește rolul celei mai înalte trepte atinse și pierde rolul treptei anterioare.</p>

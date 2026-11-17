@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_fields.html" import channel_select %}
 {% block title %}Piatra-foarfeca · {{ meta.get('name','Server') }}{% endblock %}
 
 {% block extra_style %}
@@ -24,9 +25,9 @@
       <span>Activeaza jocul Piatra-Foarfeca-Hartie</span>
     </label>
 
-    <label>ID canal permis (optional)</label>
-    <input type="text" name="channel_id" value="{{ cfg.get('channel_id', '') if cfg.get('channel_id') is not none else '' }}" placeholder="gol = orice canal">
-    <p class="hint">Daca pui un ID, jocul merge doar pe acel canal. Lasa gol ca sa se poata juca oriunde.</p>
+    <label>Canal permis (optional)</label>
+    {{ channel_select("channel_id", channels, cfg.get('channel_id'), empty_label="Orice canal") }}
+    <p class="hint">Daca alegi un canal, jocul merge doar acolo. „Orice canal" = se poate juca oriunde.</p>
 
     <div class="how">
       <b>Cum se joaca:</b><br>

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_fields.html" import channel_select %}
 {% block title %}Notificari · {{ meta.get('name','Server') }}{% endblock %}
 
 {% block extra_style %}
@@ -44,8 +45,8 @@
       <label>URL canal creator</label>
       <input type="text" name="url" placeholder="https://youtube.com/@Creator  ·  https://tiktok.com/@nume" required>
 
-      <label>ID canal Discord (unde se posteaza)</label>
-      <input type="text" name="discord_channel_id" placeholder="ex: 123456789012345678" required>
+      <label>Canal Discord (unde se posteaza)</label>
+      {{ channel_select("discord_channel_id", channels, "", empty_label="— alege canalul —", required=True) }}
 
       <label>Cuvinte cheie (optional) — anunta doar cand apar in descriere</label>
       <input type="text" name="keywords" placeholder="ex: apollo2, apollo  ·  gol = anunta tot">

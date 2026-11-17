@@ -60,6 +60,10 @@
     }
     /* checkbox-uri mai mici, uniform pe tot dashboardul */
     input[type=checkbox] { width:15px !important; height:15px !important; accent-color:var(--accent); cursor:pointer; }
+    /* selector de canal reutilizabil (dropdown cu scroll) — stil uniform peste tot */
+    select.chan-sel { width:100%; padding:11px; border-radius:8px; border:1px solid var(--glass-border, transparent);
+      background:var(--input, var(--bg)); color:var(--text); font-size:14px; font-family:inherit; box-sizing:border-box; cursor:pointer; }
+    select.chan-sel:focus { outline:none; border-color:var(--accent); }
     {% block extra_style %}{% endblock %}
   </style>
 </head>

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_fields.html" import channel_select %}
 {% block title %}Joc numere · {{ meta.get('name','Server') }}{% endblock %}
 
 {% block extra_style %}
@@ -27,9 +28,9 @@
       <span>Activeaza jocul</span>
     </label>
 
-    <label>ID canal joc</label>
-    <input type="text" name="channel_id" value="{{ cfg.get('channel_id', '') if cfg.get('channel_id') is not none else '' }}" placeholder="ex: 123456789012345678">
-    <p class="hint">Jocul merge doar pe acest canal. Click dreapta pe canal → Copiaza ID canal.</p>
+    <label>Canal joc</label>
+    {{ channel_select("channel_id", channels, cfg.get('channel_id'), empty_label="— alege canalul —") }}
+    <p class="hint">Jocul merge doar pe acest canal. Alege-l din lista.</p>
 
     <hr class="sep">
     <div class="row">

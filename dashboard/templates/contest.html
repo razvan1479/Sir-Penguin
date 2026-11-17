@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_fields.html" import channel_select %}
 {% block title %}{{ T.page_title }} · {{ meta.get('name','Server') }}{% endblock %}
 
 {% block extra_style %}
@@ -81,7 +82,7 @@
           <label>{{ T.name_label }}</label>
           <input type="text" name="name" value="{{ contest.get('name','') }}">
           <label>{{ T.announce_channel }}</label>
-          <input type="text" name="announce_channel_id" value="{{ contest.get('announce_channel_id','') or '' }}" placeholder="{{ T.announce_channel_ph }}">
+          {{ channel_select("announce_channel_id", channels, contest.get('announce_channel_id'), empty_label=T.announce_channel_ph) }}
           <label>{{ T.winners_count }}</label>
           <input type="number" name="winners_count" value="{{ contest.get('winners_count',1) }}" min="1">
           {% if st == 'scheduled' %}
@@ -101,7 +102,7 @@
           <input type="hidden" name="action" value="live">
           <label class="ck"><input type="checkbox" name="live_enabled" {% if contest.get('live_enabled') %}checked{% endif %}> {{ T.live_enable }}</label>
           <div class="row2">
-            <div><label>{{ T.live_channel }}</label><input type="text" name="live_channel_id" value="{{ contest.get('live_channel_id','') or '' }}" placeholder="{{ T.live_channel_ph }}"></div>
+            <div><label>{{ T.live_channel }}</label>{{ channel_select("live_channel_id", channels, contest.get('live_channel_id'), empty_label=T.live_channel_ph) }}</div>
             <div><label>{{ T.live_interval }}</label><input type="number" name="live_interval_minutes" value="{{ contest.get('live_interval_minutes',30) }}" min="1"></div>
           </div>
           <label>{{ T.board_count }}</label>
@@ -157,7 +158,7 @@
         <p class="hint">{{ T.dur_hint }}</p>
 
         <label>{{ T.announce_channel }}</label>
-        <input type="text" name="announce_channel_id" placeholder="{{ T.announce_channel_ph }}">
+        {{ channel_select("announce_channel_id", channels, "", empty_label=T.announce_channel_ph) }}
 
         <label>{{ T.winners_count }}</label>
         <input type="number" name="winners_count" value="1" min="1">
@@ -165,7 +166,7 @@
         <div class="livebox">
           <label class="ck"><input type="checkbox" name="live_enabled"> {{ T.live_enable }}</label>
           <div class="row2">
-            <div><label>{{ T.live_channel }}</label><input type="text" name="live_channel_id" placeholder="{{ T.live_channel_ph }}"></div>
+            <div><label>{{ T.live_channel }}</label>{{ channel_select("live_channel_id", channels, "", empty_label=T.live_channel_ph) }}</div>
             <div><label>{{ T.live_interval }}</label><input type="number" name="live_interval_minutes" value="30" min="1"></div>
           </div>
           <label>{{ T.board_count }}</label>
